@@ -1,4 +1,12 @@
 import { useEffect, useState } from "react";
+import type { WeaponId } from "@/game/build";
+
+const WEAPON_ORDER: WeaponId[] = ["buttress", "chisel", "slipstream"];
+
+/** The next weapon round the ring, for a tap-to-cycle control. */
+export function nextWeapon(id: WeaponId): WeaponId {
+  return WEAPON_ORDER[(WEAPON_ORDER.indexOf(id) + 1) % WEAPON_ORDER.length]!;
+}
 
 /** Eases a number up from zero, for results that should land rather than appear. */
 export function useCountUp(value: number, delayMs: number, durationMs = 700): number {

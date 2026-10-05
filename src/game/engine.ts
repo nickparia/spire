@@ -24,9 +24,12 @@ import {
   buyLevel,
   buyRank,
   dropCoins,
+  forgeOffers,
+  houseOf,
   kitFor,
   summitCoins,
   type Kit,
+  type Offer,
   type Payout,
 } from "./gear";
 import { haptics } from "./haptics";
@@ -103,7 +106,7 @@ const LEAD = 0.22;
 /** In the menus the ground rides a little higher, clear of the buttons. */
 const MENU_LIFT = 56;
 /** Room the results card needs at the foot of the view, px. */
-const CARD_H = 476;
+const CARD_H = 560;
 const GOLD = "#ffd24a";
 const GOLD_RGB: RGB = [255, 210, 74];
 /** A run can carry this many shields at once. */
@@ -139,6 +142,8 @@ export type LevelResult = {
   coins: Payout;
   /** The run used a paid rebuild, which forfeits the pace star. */
   rebuilt: boolean;
+  /** What the forge has on the table, priced for your house. */
+  offers: Offer[];
 };
 
 export type Hud = {
@@ -182,6 +187,10 @@ export type Hud = {
   offers: UpgradeId[];
   /** How the run was climbed, once it has ended. */
   style: Family | null;
+  /** The class you have built most: your house. */
+  house: Family;
+  /** Coins in the wallet. */
+  coins: number;
   /** The current sky's accent, as a CSS colour. */
   accent: string;
   result: LevelResult | null;
@@ -666,35 +675,47 @@ export class SpireEngine {
   }
 
   /** Buys the next rank on a class track. Returns false if it can't be afforded. */
-  buyRank(family: Family): boolean {
+  /** Takes one of the forge's offers on the summit card. Returns false if it can't be bought. */
+  forge(index: number): boolean {
+    const result = this.result;
+    const offer = result?.offers[index];
+    if (!result || !offer || offer.needs > 0) return false;
     this.wake();
-    const deal = buyRank(this.save.coins, this.save.tracks, family, skiesLit(this.save));
-    if (!deal) {
-      this.sfx.sputter();
-      return false;
+    const house = houseOf(this.save.tracks, this.save.weapon);
+    const lit = skiesLit(this.save);
+    if (offer.kind === "rank") {
+      const deal = buyRank(this.save.coins, this.save.tracks, offer.family, lit, house);
+      if (!deal) {
+        this.sfx.sputter();
+        return false;
+      }
+      this.save.coins = deal.coins;
+      this.save.tracks = deal.tracks;
+    } else {
+      const deal = buyLevel(this.save.coins, this.save.levels2, this.save.weapon, lit, house);
+      if (!deal) {
+        this.sfx.sputter();
+        return false;
+      }
+      this.save.coins = deal.coins;
+      this.save.levels2 = deal.levels;
     }
-    this.save.coins = deal.coins;
-    this.save.tracks = deal.tracks;
     this.sfx.buy();
     haptics.medium();
+    this.result = { ...result, offers: this.offersNow() };
     this.commit();
+    this.emit();
     return true;
   }
 
-  /** Buys the next level of a weapon. Returns false if it can't be afforded. */
-  buyLevel(weapon: WeaponId): boolean {
-    this.wake();
-    const deal = buyLevel(this.save.coins, this.save.levels2, weapon, skiesLit(this.save));
-    if (!deal) {
-      this.sfx.sputter();
-      return false;
-    }
-    this.save.coins = deal.coins;
-    this.save.levels2 = deal.levels;
-    this.sfx.buy();
-    haptics.medium();
-    this.commit();
-    return true;
+  private offersNow(): Offer[] {
+    return forgeOffers(
+      this.save.coins,
+      this.save.tracks,
+      this.save.levels2,
+      this.save.weapon,
+      skiesLit(this.save),
+    );
   }
 
   click(): void {
@@ -1875,7 +1896,9 @@ export class SpireEngine {
       outcome,
       coins: this.paySummit(accuracy, goals, outcome),
       rebuilt: this.rebuilt,
+      offers: [],
     };
+    this.result.offers = this.offersNow();
     this.phase = "won";
     this.wonAge = 0;
     this.camAtWin = this.camY;
@@ -2014,6 +2037,8 @@ export class SpireEngine {
         this.phase === "fall" || this.phase === "won"
           ? styleOf(this.floors, this.perfects, this.fastDrops)
           : null,
+      house: houseOf(this.save.tracks, this.save.weapon),
+      coins: this.save.coins,
       accent: rgbCss(this.theme.accent),
       result: this.result,
       rescue: this.rescueOpen()

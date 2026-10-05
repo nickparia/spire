@@ -16,9 +16,11 @@ import {
   FAMILIES,
   STYLE_LINES,
   upgrade,
+  WEAPONS,
   type Family,
   type WeaponId,
 } from "@/game/build";
+import { nextWeapon } from "./use-count-up";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { formatPercent, formatTime, starCount } from "@/game/logic";
@@ -248,14 +250,17 @@ export function OverPanel({
   onRetry,
   onQuit,
   onRebuild,
+  onWeapon,
 }: {
   hud: Hud;
   onRetry: () => void;
   onQuit: () => void;
   onRebuild: () => void;
+  onWeapon: (id: WeaponId) => void;
 }) {
   const level = hud.mode === "level";
   const rescue = hud.rescue;
+  const weapon = WEAPONS[hud.weapon];
   return (
     <section className="panel panel-in" aria-live="polite">
       {rescue ? (
@@ -310,6 +315,17 @@ export function OverPanel({
           {level ? "Levels" : "Menu"}
         </button>
       </div>
+      <button
+        type="button"
+        className={"carrying carrying-small weapon-" + weapon.family + " weapon-on"}
+        onClick={() => onWeapon(nextWeapon(hud.weapon))}
+        aria-label={`Carrying the ${weapon.name}. Tap to try another weapon.`}
+      >
+        <span className="carrying-name">
+          {weapon.name}
+          <small>tap to try another</small>
+        </span>
+      </button>
       {rescue ? null : <p className="tap-hint mt-3">Tap anywhere to retry</p>}
     </section>
   );
@@ -364,15 +380,73 @@ function Purse({ result }: { result: LevelResult }) {
 }
 
 /** Summit reached: stars, the two numbers that matter, and what to chase next. */
+/** The forge: what your coins can buy, right where you earned them. */
+function Forge({
+  result,
+  house,
+  onForge,
+}: {
+  result: LevelResult;
+  house: Family;
+  onForge: (index: number) => void;
+}) {
+  const offers = result.offers.slice(0, 3);
+  if (offers.length === 0) return null;
+  return (
+    <div className="forge" data-ui>
+      <p className="kicker">
+        The forge · <span className={"build-" + house}>House {FAMILIES[house].name}</span> pays less
+      </p>
+      {offers.map((offer, i) => {
+        const open = offer.needs === 0;
+        return (
+          <button
+            key={offer.kind + offer.name}
+            type="button"
+            className={"offer build-" + offer.family + (offer.house ? " offer-house" : "")}
+            disabled={!open || !offer.affordable}
+            onClick={() => onForge(i)}
+          >
+            <span className="offer-text">
+              <span className="pick-family">
+                {FAMILIES[offer.family].name}
+                {offer.house ? <em>Your house</em> : null}
+              </span>
+              <span className="offer-name">{offer.name}</span>
+              <span className="offer-effect">{offer.effect}</span>
+            </span>
+            <span className="offer-price">
+              {open ? (
+                <>
+                  <Coin size={13} /> {offer.price}
+                  {!offer.affordable ? <small>short</small> : null}
+                </>
+              ) : (
+                <small>
+                  Light {offer.needs} more {offer.needs === 1 ? "sky" : "skies"}
+                </small>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ResultsPanel({
   result,
   style,
+  house,
+  onForge,
   onNext,
   onRetry,
   onQuit,
 }: {
   result: LevelResult;
   style: Family | null;
+  house: Family;
+  onForge: (index: number) => void;
   onNext: (() => void) | null;
   onRetry: () => void;
   onQuit: () => void;
@@ -430,6 +504,8 @@ export function ResultsPanel({
           </span>
         ) : null}
       </p>
+
+      <Forge result={result} house={house} onForge={onForge} />
 
       <div className="mt-3 flex flex-col gap-2">
         {onNext ? (

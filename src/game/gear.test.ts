@@ -4,11 +4,14 @@ import {
   buyLevel,
   buyRank,
   dropCoins,
+  forgeOffers,
+  houseOf,
   kitFor,
   levelNeeds,
   levelOf,
   nextLevelCost,
   nextRank,
+  priceFor,
   RANK_UNLOCKS,
   rankNeeds,
   rankOf,
@@ -67,17 +70,18 @@ describe("tracks", () => {
 
   it("sell ranks in order, only when open and the wallet covers them", () => {
     expect(nextRank({}, "mason")?.name).toBe("Brace");
-    const first = buyRank(150, {}, "mason", 0);
+    // Bought outside your house: full price.
+    const first = buyRank(150, {}, "mason", 0, "runner");
     expect(first).toEqual({ coins: 30, tracks: { mason: 1 } });
     expect(nextRank(first!.tracks, "mason")?.name).toBe("Second Wind");
     // The second rank needs a sky lit first.
     expect(rankNeeds(first!.tracks, "mason", 0)).toBe(1);
-    expect(buyRank(999, first!.tracks, "mason", 0)).toBeNull();
-    expect(buyRank(999, first!.tracks, "mason", 1)).toEqual({
+    expect(buyRank(999, first!.tracks, "mason", 0, "runner")).toBeNull();
+    expect(buyRank(999, first!.tracks, "mason", 1, "runner")).toEqual({
       coins: 999 - 260,
       tracks: { mason: 2 },
     });
-    expect(buyRank(259, first!.tracks, "mason", 1)).toBeNull();
+    expect(buyRank(259, first!.tracks, "mason", 1, "runner")).toBeNull();
   });
 
   it("open up across the game", () => {
@@ -105,12 +109,54 @@ describe("weapon levels", () => {
 
   it("sell the next level when open, and stop at mastery", () => {
     expect(nextLevelCost({}, "buttress")).toBe(200);
-    expect(buyLevel(200, {}, "buttress", 0)).toEqual({ coins: 0, levels: { buttress: 2 } });
-    expect(buyLevel(199, {}, "buttress", 0)).toBeNull();
+    expect(buyLevel(200, {}, "buttress", 0, "runner")).toEqual({
+      coins: 0,
+      levels: { buttress: 2 },
+    });
+    expect(buyLevel(199, {}, "buttress", 0, "runner")).toBeNull();
     expect(levelNeeds({ buttress: 2 }, "buttress", 1)).toBe(1);
-    expect(buyLevel(999, { buttress: 2 }, "buttress", 1)).toBeNull();
-    expect(buyLevel(999, { buttress: 2 }, "buttress", 2)).not.toBeNull();
+    expect(buyLevel(999, { buttress: 2 }, "buttress", 1, "runner")).toBeNull();
+    expect(buyLevel(999, { buttress: 2 }, "buttress", 2, "runner")).not.toBeNull();
     expect(nextLevelCost({ buttress: 5 }, "buttress")).toBeNull();
+  });
+});
+
+describe("houses", () => {
+  it("name the class you have built most, with the carried weapon breaking ties", () => {
+    expect(houseOf({}, "chisel")).toBe("striker");
+    expect(houseOf({ mason: 2, runner: 1 }, "chisel")).toBe("mason");
+    expect(houseOf({ mason: 2, runner: 2 }, "slipstream")).toBe("runner");
+  });
+
+  it("charge a quarter less within your house", () => {
+    expect(priceFor(200, "mason", "mason")).toBe(150);
+    expect(priceFor(200, "mason", "striker")).toBe(200);
+    expect(buyRank(90, {}, "mason", 0, "mason")).toEqual({ coins: 0, tracks: { mason: 1 } });
+    expect(buyRank(89, {}, "mason", 0, "mason")).toBeNull();
+  });
+
+  it("put the next rank of every track and the carried weapon's next level on the table", () => {
+    const offers = forgeOffers(500, { striker: 1 }, {}, "chisel", 1);
+    expect(offers.map((o) => o.kind + ":" + o.family).sort()).toEqual([
+      "level:striker",
+      "rank:mason",
+      "rank:runner",
+      "rank:striker",
+    ]);
+    const magnet = offers.find((o) => o.name === "Magnet")!;
+    expect(magnet.house).toBe(true);
+    expect(magnet.price).toBe(195);
+    expect(offers.find((o) => o.name === "Brace")!.price).toBe(120);
+  });
+
+  it("lead with what is open and affordable, and still show what is locked", () => {
+    const offers = forgeOffers(100, {}, {}, "buttress", 0);
+    expect(offers[0]!.needs).toBe(0);
+    expect(offers[0]!.affordable).toBe(true);
+    const locked = forgeOffers(9999, { mason: 1 }, {}, "buttress", 0).find(
+      (o) => o.family === "mason" && o.kind === "rank",
+    )!;
+    expect(locked.needs).toBe(1);
   });
 });
 

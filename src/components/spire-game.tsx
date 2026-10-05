@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { SpireEngine, type Hud } from "@/game/engine";
-import type { Family, WeaponId } from "@/game/build";
 import { LEVELS } from "@/game/levels";
 import { emptySave, isUnlocked, nextLevelIndex, type Save } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { LevelSelect, TitleScreen } from "./screens";
-import { Workshop } from "./workshop";
 
 const INITIAL: Hud = {
   phase: "menu",
@@ -36,12 +34,14 @@ const INITIAL: Hud = {
   families: { mason: 0, striker: 0, runner: 0 },
   offers: [],
   style: null,
+  house: "mason",
+  coins: 0,
   rescue: null,
   accent: "rgb(255,77,26)",
   result: null,
 };
 
-type Menu = "title" | "levels" | "workshop";
+type Menu = "title" | "levels";
 
 /** Text colour that reads on the sky's accent: dark on a pale accent, white on a deep one. */
 function onAccent(css: string): string {
@@ -95,19 +95,6 @@ export function SpireGame() {
     engine.click();
     setMenu("title");
     engine.showMenu(nextLevelIndex(state.current.save));
-  }, []);
-
-  const openWorkshop = useCallback(() => {
-    engineRef.current?.click();
-    setMenu("workshop");
-  }, []);
-
-  const buyRank = useCallback((family: Family) => {
-    engineRef.current?.buyRank(family);
-  }, []);
-
-  const buyLevel = useCallback((weapon: WeaponId) => {
-    engineRef.current?.buyLevel(weapon);
   }, []);
 
   const select = useCallback((index: number) => {
@@ -231,8 +218,8 @@ export function SpireGame() {
             onPlay={play}
             onLevels={() => openLevels()}
             onEndless={endless}
-            onWorkshop={openWorkshop}
             onReset={() => engineRef.current?.resetProgress()}
+            onWeapon={(id) => engineRef.current?.setWeapon(id)}
             onMusic={setMusic}
             onSfx={setSfx}
           />
@@ -244,16 +231,6 @@ export function SpireGame() {
             selected={selected}
             onSelect={select}
             onPlay={play}
-            onBack={openTitle}
-          />
-        ) : null}
-
-        {hud.phase === "menu" && menu === "workshop" ? (
-          <Workshop
-            save={save}
-            onRank={buyRank}
-            onLevel={buyLevel}
-            onCarry={(id) => engineRef.current?.setWeapon(id)}
             onBack={openTitle}
           />
         ) : null}
@@ -282,6 +259,7 @@ export function SpireGame() {
             onRetry={retry}
             onQuit={quit}
             onRebuild={() => engineRef.current?.rebuild()}
+            onWeapon={(id) => engineRef.current?.setWeapon(id)}
           />
         ) : null}
 
@@ -289,6 +267,8 @@ export function SpireGame() {
           <ResultsPanel
             result={hud.result}
             style={hud.style}
+            house={hud.house}
+            onForge={(i) => engineRef.current?.forge(i)}
             onNext={hud.result.levelIndex + 1 < LEVELS.length ? next : null}
             onRetry={retry}
             onQuit={quit}

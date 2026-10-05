@@ -7,7 +7,6 @@ import {
   Volume2,
   VolumeX,
   LayoutGrid,
-  Wrench,
 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { LEVELS, type LevelDef } from "@/game/levels";
@@ -15,7 +14,34 @@ import { formatPercent, formatTime } from "@/game/logic";
 import { isUnlocked, levelStars, nextLevelIndex, totalStars, type Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
 import { Coin, Goal, IconButton, StarIcon, Stars } from "./bits";
-import { WEAPONS } from "@/game/build";
+import { FAMILIES, WEAPONS, type WeaponId } from "@/game/build";
+import { houseOf, rankOf, TRACKS } from "@/game/gear";
+import { nextWeapon } from "./use-count-up";
+
+/** What you've built, as three quiet rows of pips: one per house. */
+export function Houses({ save }: { save: Save }) {
+  const house = houseOf(save.tracks, save.weapon);
+  return (
+    <div className="houses" aria-label="Houses built">
+      {TRACKS.map((t) => {
+        const have = rankOf(save.tracks, t.family);
+        return (
+          <span
+            key={t.family}
+            className={"house build-" + t.family + (t.family === house ? " house-lead" : "")}
+          >
+            <span className="house-name">{t.name}</span>
+            <span className="gear-pips">
+              {t.ranks.map((_, i) => (
+                <span key={i} className={"pip" + (i < have ? " pip-on" : "")} />
+              ))}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 export function SoundToggles({
   save,
@@ -46,15 +72,13 @@ export function SoundToggles({
   );
 }
 
-const FAMILIES_SHORT = { mason: "Mason", striker: "Striker", runner: "Runner" } as const;
-
 export function TitleScreen({
   save,
   onPlay,
   onLevels,
   onEndless,
-  onWorkshop,
   onReset,
+  onWeapon,
   onMusic,
   onSfx,
 }: {
@@ -62,8 +86,8 @@ export function TitleScreen({
   onPlay: (index: number) => void;
   onLevels: () => void;
   onEndless: () => void;
-  onWorkshop: () => void;
   onReset: () => void;
+  onWeapon: (id: WeaponId) => void;
   onMusic: (on: boolean) => void;
   onSfx: (on: boolean) => void;
 }) {
@@ -119,18 +143,22 @@ export function TitleScreen({
             </small>
           </span>
         </button>
-        <p className="weapon-blurb">
-          Carrying the {WEAPONS[save.weapon].name}, the{" "}
-          {FAMILIES_SHORT[WEAPONS[save.weapon].family]}'s weapon. Change it in the Workshop.
-        </p>
-        <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          className={"carrying weapon-" + WEAPONS[save.weapon].family + " weapon-on"}
+          onClick={() => onWeapon(nextWeapon(save.weapon))}
+          aria-label={`Carrying the ${WEAPONS[save.weapon].name}. Tap to change weapon.`}
+        >
+          <span className="carrying-name">
+            {WEAPONS[save.weapon].name}
+            <small>{FAMILIES[WEAPONS[save.weapon].family].name}'s weapon · tap to change</small>
+          </span>
+          <span className="carrying-creed">{WEAPONS[save.weapon].creed}</span>
+        </button>
+        <div className="grid grid-cols-2 gap-2">
           <button type="button" className="btn btn-stack" onClick={onLevels}>
             <LayoutGrid size={18} strokeWidth={2.2} />
             Skies
-          </button>
-          <button type="button" className="btn btn-stack" onClick={onWorkshop}>
-            <Wrench size={18} strokeWidth={2.2} />
-            Workshop
           </button>
           <button type="button" className="btn btn-stack" onClick={onEndless}>
             <InfinityIcon size={18} strokeWidth={2.2} />
@@ -202,6 +230,8 @@ export function LevelSelect({
           <StarIcon on size={13} /> {totalStars(save)} / {LEVELS.length * 3}
         </p>
       </div>
+
+      <Houses save={save} />
 
       <ol className="levels" ref={listRef}>
         {LEVELS.map((level, index) => {

@@ -202,10 +202,13 @@ export function buyRank(
   tracks: Tracks,
   family: Family,
   lit: number,
+  house: Family = family,
 ): { coins: number; tracks: Tracks } | null {
   const next = nextRank(tracks, family);
-  if (!next || coins < next.cost || rankNeeds(tracks, family, lit) > 0) return null;
-  return { coins: coins - next.cost, tracks: { ...tracks, [family]: rankOf(tracks, family) + 1 } };
+  if (!next || rankNeeds(tracks, family, lit) > 0) return null;
+  const price = priceFor(next.cost, family, house);
+  if (coins < price) return null;
+  return { coins: coins - price, tracks: { ...tracks, [family]: rankOf(tracks, family) + 1 } };
 }
 
 export function buyLevel(
@@ -213,11 +216,119 @@ export function buyLevel(
   levels: Levels,
   weapon: WeaponId,
   lit: number,
+  house: Family = WEAPON_FAMILY[weapon],
 ): { coins: number; levels: Levels } | null {
   const cost = nextLevelCost(levels, weapon);
-  if (cost === null || coins < cost || levelNeeds(levels, weapon, lit) > 0) return null;
-  return { coins: coins - cost, levels: { ...levels, [weapon]: levelOf(levels, weapon) + 1 } };
+  if (cost === null || levelNeeds(levels, weapon, lit) > 0) return null;
+  const price = priceFor(cost, WEAPON_FAMILY[weapon], house);
+  if (coins < price) return null;
+  return { coins: coins - price, levels: { ...levels, [weapon]: levelOf(levels, weapon) + 1 } };
 }
+
+/**
+ * Your house: the class you have built most. Ties go to the weapon you carry.
+ * Buying within your house is cheaper, so focusing is rewarded; buying across
+ * houses costs full price, which is the price of covering more skies.
+ */
+export function houseOf(tracks: Tracks, weapon: WeaponId): Family {
+  const families: Family[] = ["mason", "striker", "runner"];
+  const carried = WEAPON_FAMILY[weapon];
+  let best = carried;
+  let most = rankOf(tracks, carried);
+  for (const f of families) {
+    if (rankOf(tracks, f) > most) {
+      most = rankOf(tracks, f);
+      best = f;
+    }
+  }
+  return best;
+}
+
+const WEAPON_FAMILY: Record<WeaponId, Family> = {
+  buttress: "mason",
+  chisel: "striker",
+  slipstream: "runner",
+};
+
+export const HOUSE_DISCOUNT = 0.25;
+
+export function priceFor(base: number, family: Family, house: Family): number {
+  return family === house ? Math.round(base * (1 - HOUSE_DISCOUNT)) : base;
+}
+
+export type Offer = {
+  kind: "rank" | "level";
+  family: Family;
+  name: string;
+  effect: string;
+  price: number;
+  /** Discounted as a purchase within your house. */
+  house: boolean;
+  affordable: boolean;
+  /** Skies still to light before this opens; 0 when open. */
+  needs: number;
+};
+
+/**
+ * What the forge puts on the table after a summit: the next rank of every
+ * track and the next level of the carried weapon, priced for your house.
+ * Everything is shown, including what is locked, so the road ahead is visible.
+ */
+export function forgeOffers(
+  coins: number,
+  tracks: Tracks,
+  levels: Levels,
+  weapon: WeaponId,
+  lit: number,
+): Offer[] {
+  const house = houseOf(tracks, weapon);
+  const out: Offer[] = [];
+  for (const track of TRACKS) {
+    const next = nextRank(tracks, track.family);
+    if (!next) continue;
+    const price = priceFor(next.cost, track.family, house);
+    out.push({
+      kind: "rank",
+      family: track.family,
+      name: next.name,
+      effect: next.effect,
+      price,
+      house: track.family === house,
+      affordable: coins >= price,
+      needs: rankNeeds(tracks, track.family, lit),
+    });
+  }
+  const cost = nextLevelCost(levels, weapon);
+  if (cost !== null) {
+    const family = WEAPON_FAMILY[weapon];
+    const lv = levelOf(levels, weapon);
+    const price = priceFor(cost, family, house);
+    out.push({
+      kind: "level",
+      family,
+      name: `${WEAPON_NAMES[weapon]} level ${lv + 1}`,
+      effect: WEAPON_PERKS[weapon][lv]!,
+      price,
+      house: family === house,
+      affordable: coins >= price,
+      needs: levelNeeds(levels, weapon, lit),
+    });
+  }
+  // Open and affordable first, then open, then locked.
+  out.sort(
+    (a, b) =>
+      Number(a.needs > 0) - Number(b.needs > 0) ||
+      Number(!a.affordable) - Number(!b.affordable) ||
+      a.price - b.price,
+  );
+  return out;
+}
+
+const WEAPON_NAMES: Record<WeaponId, string> = {
+  buttress: "Buttress",
+  chisel: "Chisel",
+  slipstream: "Slipstream",
+};
 
 export type DropPay = {
   perfect: boolean;

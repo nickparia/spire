@@ -28,22 +28,15 @@ You carry one weapon, chosen on the title screen; it is your class:
 
 From the second sky on, every eight floors or so an ember hangs over the stack. Land with the groove under its line to claim it and the run pauses with three upgrades, one from each class. Miss it and it's gone. Three picks from one class unlock its capstone for the run. Upgrades reset every run; they are the build, not the progression. All of it is data in `src/game/build.ts`.
 
-## Coins and the workshop
+## Coins, houses and the forge
 
-Every slab that lands pays coins on the spot: more for a perfect, more again for a streak, a forge or a keystone, and all of it multiplied by Heat. Reaching a summit pays a purse on top. A fall keeps whatever the run had already paid.
+Every slab that lands pays coins on the spot, multiplied by Heat, and a summit pays a purse. There is no shop to visit: coins are spent where they are earned.
 
-Coins go two places:
-
-- **Class tracks.** Mason, Striker and Runner each have five ranks, bought in order and always on. Ranks are quality of life, never power: a starting shield, a forgiven fall, the perfect window drawn on the stack, shorter fuses, more coin. How the slab moves and how Heat builds belong to the run's picks alone. Ranks open up as skies are lit (rank one from the start, then after one, two, four and six skies).
-- **Weapon levels.** Each weapon climbs five levels, gated the same way. Levels two and four make Heat build faster; three and five add a perk. The weapon you carry is chosen in the workshop; it is your class, and each has a creed.
+- **The forge, on the summit card.** After lighting a sky you're offered the next rank of each class track and the next level of the weapon you carry. Ranks are quality of life (a starting shield, a forgiven fall, the perfect window drawn on the stack, shorter fuses, more coin), never power; power is what the run's picks are for. Ranks and levels open as skies are lit.
+- **Houses.** The class you have built most is your house, and anything bought within it costs a quarter less. Focusing pays; spreading across houses costs full price and buys cover against more skies. The weapon you carry (tap it on the title to change) breaks ties and has a creed.
+- **The rebuild, on the fall card.** See below.
 
 At the end of a run the game reads how you climbed and names it: a Runner didn't wait, a Striker landed it, a Mason held on.
-
-Prices, ranks and perks are data in `src/game/gear.ts`.
-
-## Falling slabs and wind
-
-On Gale Ridge (the fifth sky), in Apex's wind stretch and in every gust of endless, the slab hangs three floors above the stack and falls when you tap. Wind carries it sideways on the way down, so you release upwind. A streamer under the slab is blown the same way and its tip shows where the slab will land. The first three windy floors of Gale Ridge also outline the landing spot; after that you read the streamer. Wind holds its direction for three floors, and gets stronger as the level goes on.
 
 ## Rebuilding after a fall
 
