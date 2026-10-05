@@ -53,11 +53,13 @@ import {
   shade,
   shouldSpawnBomb,
   shouldSpawnMote,
+  SPLIT_TEMPO,
   swayOffset,
   tensionFor,
   tolerance,
   travelRate,
   type CourseId,
+  type DropResult,
   type Goals,
   type Plan,
   type RGB,
@@ -116,6 +118,7 @@ const TIPS = {
   bomb: "Bomb: bad. Don't tap. Wait for the fuse to burn out; tap early and it takes a bite.",
   fall: "The slab hangs above the stack now. Tap and it falls.",
   shrink: "A held slab wastes away. Drop it before it does.",
+  split: "Split: the slab is two halves on two clocks. Drop when both sit over their own side.",
   ember:
     "Ember: good. Land the slab on the outline under it to claim an upgrade. Miss it and it's gone.",
   wind: "Wind carries the slab as it falls. Drop when the streamer's tip is over the groove.",
@@ -211,6 +214,8 @@ type Slab = {
   ripple: number;
   /** A widening in progress: the width it grew from and how far along it is. */
   grow: { from: number; t: number } | null;
+  /** A split floor: the two pieces it is made of, when they don't touch. */
+  pieces: Piece[] | null;
   vx: number;
   vy: number;
   rot: number;
@@ -219,6 +224,8 @@ type Slab = {
   falling: boolean;
   key: boolean;
 };
+
+type Piece = { x: number; w: number };
 
 type Scrap = {
   x: number;
@@ -276,6 +283,11 @@ type Mover = {
   /** Width lost since the last chunk broke off, and which end breaks next. */
   crumb: number;
   crumbSide: number;
+  /** Split: the slab is two halves. `x` is the left half; these drive the right. */
+  split: boolean;
+  u2: number;
+  dir2: number;
+  x2: number;
 };
 
 type Mote = { x: number; y: number; kind: PickupKind };
@@ -358,6 +370,10 @@ export class SpireEngine {
     age: 0,
     crumb: 0,
     crumbSide: 1,
+    split: false,
+    u2: 0,
+    dir2: 1,
+    x2: 0,
   };
   private mote: Mote | null = null;
   private bomb: Bomb | null = null;
@@ -683,19 +699,26 @@ export class SpireEngine {
     return this.runTime;
   }
 
+  /** The offset a bot should close: the worse half when the slab is split. */
+  private probeOffset(prev: Slab): number {
+    if (!this.mover.split) return dropOffset(prev.x, prev.w, this.landingX(), this.mover.w);
+    const [l, r] = this.splitOffsets(prev);
+    return Math.abs(l) >= Math.abs(r) ? l : r;
+  }
+
   probe(): Probe {
     const prev = this.stack[this.stack.length - 1];
     return {
       phase: this.hudPhase(),
       floors: this.floors,
-      offset: prev ? dropOffset(prev.x, prev.w, this.landingX(), this.mover.w) : 0,
+      offset: prev ? this.probeOffset(prev) : 0,
       tol: this.tol,
       blocked:
         this.paused ||
         this.freeze > 0 ||
         this.mover.fallT >= 0 ||
         (!!this.bomb && this.bomb.fuse > 0),
-      pickup: this.mote ? this.landingX() + this.mover.w / 2 - this.mote.x : null,
+      pickup: this.mote ? this.landingCenter() - this.mote.x : null,
       time: this.runTime,
     };
   }
@@ -832,7 +855,7 @@ export class SpireEngine {
         slab.rgb = ramp(this.theme.slab, n / goal);
         this.stack.push(slab);
         const cx = slab.x + slab.w / 2;
-        this.fx.ring(cx, slab.y, mix(this.theme.accent, BONE, 0.4), slab.w * 0.7, 2);
+        this.fx.seam(cx, slab.y, slab.w * 1.3, mix(this.theme.accent, BONE, 0.5));
         this.fx.sparkle(cx, slab.y + 2, slab.w, mix(this.theme.accent, BONE, 0.55), 6);
         this.pulse = Math.max(this.pulse, 0.3);
         this.camDrop = 40;
@@ -892,6 +915,7 @@ export class SpireEngine {
       flash,
       ripple: -1,
       grow: null,
+      pieces: null,
       vx: 0,
       vy: 0,
       rot: 0,
@@ -954,6 +978,10 @@ export class SpireEngine {
       age: 0,
       crumb: 0,
       crumbSide: 1,
+      split: course === "split",
+      u2: dir > 0 ? 0.56 : -0.56,
+      dir2: -dir,
+      x2: 0,
     };
     if (this.floors === 1) this.explain("shrink");
     this.syncMoverX();
@@ -1089,11 +1117,12 @@ export class SpireEngine {
 
   /** Whether dropping now would be a perfect. */
   private lined(prev: Slab | undefined): boolean {
-    return (
-      !!prev &&
-      this.mover.fallT < 0 &&
-      Math.abs(dropOffset(prev.x, prev.w, this.landingX(), this.mover.w)) <= this.tol
-    );
+    if (!prev || this.mover.fallT >= 0) return false;
+    if (this.mover.split) {
+      const [l, r] = this.splitOffsets(prev);
+      return Math.abs(l) <= this.tol && Math.abs(r) <= this.tol;
+    }
+    return Math.abs(dropOffset(prev.x, prev.w, this.landingX(), this.mover.w)) <= this.tol;
   }
 
   /**
@@ -1133,9 +1162,35 @@ export class SpireEngine {
   private syncMoverX(): void {
     const m = this.mover;
     const center = m.center + this.sway();
+    if (m.split) {
+      // Each half runs its own lane, centred on its own side of the stack.
+      const hw = m.w / 2;
+      const span = m.halfSpan * 0.7;
+      const tL = (Math.max(-1, Math.min(1, m.u)) + 1) / 2;
+      const tR = (Math.max(-1, Math.min(1, m.u2)) + 1) / 2;
+      m.x = center - hw - span + tL * span * 2;
+      m.x2 = center - span + tR * span * 2;
+      return;
+    }
     const leftMin = center - m.halfSpan - m.w / 2;
     const t = (Math.max(-1, Math.min(1, m.u)) + 1) / 2;
     m.x = leftMin + t * (m.halfSpan * 2);
+  }
+
+  /** Signed offsets of each half from its home, for a split slab. */
+  private splitOffsets(prev: Slab): [number, number] {
+    const m = this.mover;
+    const hw = m.w / 2;
+    const left = m.x + hw / 2 - (prev.x + prev.w / 4);
+    const right = m.x2 + hw / 2 - (prev.x + (3 * prev.w) / 4);
+    return [left, right];
+  }
+
+  /** Where the slab's groove will land: the middle of both halves when split. */
+  private landingCenter(): number {
+    const m = this.mover;
+    if (m.split) return (m.x + m.x2 + m.w / 2) / 2;
+    return this.landingX() + m.w / 2;
   }
 
   private toleranceNow(): number {
@@ -1197,24 +1252,139 @@ export class SpireEngine {
       }
       this.syncMoverX();
     }
+    if (m.split) {
+      // The right half keeps a faster clock, so the two only line up now and then.
+      const rate2 = (2 / Math.max(0.2, m.period)) * SPLIT_TEMPO;
+      m.u2 += m.dir2 * rate2 * dt;
+      if (m.u2 >= 1) {
+        m.u2 = 1;
+        m.dir2 = -1;
+      } else if (m.u2 <= -1) {
+        m.u2 = -1;
+        m.dir2 = 1;
+      }
+      this.syncMoverX();
+    }
     this.tol = this.toleranceNow();
+  }
+
+  /**
+   * A split slab lands as two halves, each judged on its own side. Both home
+   * is a perfect; one off gets that side trimmed; a half with no support
+   * falls away and the floor is whatever is left.
+   */
+  private splitLanding(prev: Slab): {
+    result: DropResult;
+    landed: number;
+    pieces: Piece[] | null;
+  } {
+    const m = this.mover;
+    const hw = m.w / 2;
+    const [offL, offR] = this.splitOffsets(prev);
+    const halves = [
+      { x: m.x, off: offL, homeX: prev.x },
+      { x: m.x2, off: offR, homeX: prev.x + prev.w / 2 },
+    ].map((h) => ({
+      ...h,
+      result: resolveDrop({
+        prevX: h.homeX,
+        prevW: prev.w / 2,
+        moverX: h.x,
+        moverW: hw,
+        tol: this.tol,
+        startW: hw,
+        streak: 0,
+        forgeEvery: 0,
+      }),
+      landed: dropAccuracy(h.off, hw, this.tol),
+    }));
+    const kept = halves.filter((h) => h.result.ok);
+    if (kept.length === 0) return { result: { ok: false }, landed: 0, pieces: null };
+    const rgb = this.slabColor(this.floors + 1);
+    for (const h of halves) {
+      const r = h.result;
+      const dir = h.off < 0 ? -1 : 1;
+      if (!r.ok) {
+        // Nothing under it: the whole half goes.
+        this.scraps.push({
+          x: h.x,
+          y: m.y,
+          w: hw,
+          vx: dir * 120,
+          vy: 60,
+          rot: 0,
+          vr: dir * 3,
+          rgb,
+          life: 1.3,
+        });
+      } else if (r.scrap && r.scrap.w > 6) {
+        const out = r.scrap.x < r.x ? -1 : 1;
+        this.scraps.push({
+          x: r.scrap.x,
+          y: m.y,
+          w: r.scrap.w,
+          vx: out * (90 + Math.random() * 80),
+          vy: 80 + Math.random() * 60,
+          rot: 0,
+          vr: out * (2 + Math.random() * 3),
+          rgb,
+          life: 1.1,
+        });
+      }
+    }
+    const pieces: Piece[] = [];
+    for (const h of kept) if (h.result.ok) pieces.push({ x: h.result.x, w: h.result.w });
+    pieces.sort((a, b) => a.x - b.x);
+    const first = pieces[0]!;
+    const last = pieces[pieces.length - 1]!;
+    const x = first.x;
+    const w = last.x + last.w - x;
+    const perfect = halves.every((h) => h.result.ok && h.result.perfect);
+    const nextStreak = perfect ? this.streak + 1 : 0;
+    const touching = pieces.length < 2 || pieces[1]!.x - (first.x + first.w) < 1.5;
+    return {
+      result: {
+        ok: true,
+        perfect,
+        forged: false,
+        close: !perfect && halves.every((h) => h.result.ok && (h.result.perfect || h.result.close)),
+        x,
+        w,
+        streak: nextStreak,
+        scrap: null,
+        points: perfect ? 10 + 10 * nextStreak : 10,
+      },
+      landed: halves.reduce((sum, h) => sum + (h.result.ok ? h.landed : 0), 0) / halves.length,
+      pieces: touching ? null : pieces,
+    };
   }
 
   private place(): void {
     const prev = this.stack[this.stack.length - 1];
     if (!prev) return;
     const dx = dropOffset(prev.x, prev.w, this.mover.x, this.mover.w);
-    const result = resolveDrop({
-      prevX: prev.x,
-      prevW: prev.w,
-      moverX: this.mover.x,
-      moverW: this.mover.w,
-      tol: this.tol,
-      startW: this.startW,
-      streak: this.streak,
-      // Forging is Heat's job now, not the streak's.
-      forgeEvery: 0,
-    });
+    let pieces: Piece[] | null = null;
+    let result: DropResult;
+    let landed: number;
+    if (this.mover.split) {
+      const split = this.splitLanding(prev);
+      result = split.result;
+      landed = split.landed;
+      pieces = split.pieces;
+    } else {
+      result = resolveDrop({
+        prevX: prev.x,
+        prevW: prev.w,
+        moverX: this.mover.x,
+        moverW: this.mover.w,
+        tol: this.tol,
+        startW: this.startW,
+        streak: this.streak,
+        // Forging is Heat's job now, not the streak's.
+        forgeEvery: 0,
+      });
+      landed = result.ok ? dropAccuracy(dx, this.mover.w, this.tol) : 0;
+    }
 
     this.drops += 1;
     if (!result.ok) {
@@ -1225,11 +1395,11 @@ export class SpireEngine {
       } else this.die();
       return;
     }
-    const landed = dropAccuracy(dx, this.mover.w, this.tol);
     this.accuracySum += landed;
 
     const floor = this.stack.length;
     const slab = this.makeSlab(result.x, prev.y + SLAB_H, result.w, floor, 0, 1);
+    slab.pieces = pieces;
     slab.key = this.mover.keystone && result.perfect;
     let points = result.points;
     if (this.mover.keystone && result.perfect) points += result.points;
@@ -1452,7 +1622,7 @@ export class SpireEngine {
     const heat = Math.min(1, streak / 8);
     const keystone = this.mover.keystone;
     this.fx.burst(cx, slab.y + VISUAL_H / 2, slab.rgb, forged ? 28 : 16, 160);
-    this.fx.ring(cx, seam, mix(accent, BONE, 0.4), slab.w * (0.4 + heat * 0.2), 2 + heat);
+    this.fx.seam(cx, seam, slab.w * (1.3 + heat * 0.7), mix(accent, BONE, 0.5));
     this.fx.sparkle(cx, seam + 2, slab.w, mix(accent, BONE, 0.55), 8 + Math.round(heat * 14));
     this.pulse = Math.min(1, 0.35 + heat * 0.4);
     this.flash = forged ? 0.45 : 0.22;
@@ -1492,7 +1662,7 @@ export class SpireEngine {
   private collectMote(x: number, y: number): PickupKind | null {
     const mote = this.mote;
     if (!mote) return null;
-    const center = this.landingX() + this.mover.w / 2;
+    const center = this.landingCenter();
     if (Math.abs(center - mote.x) > this.kit.reach) {
       // Left behind: it winks out rather than just vanishing.
       this.fx.burst(mote.x, mote.y, [150, 150, 150], 6, 60);
@@ -1808,20 +1978,19 @@ export class SpireEngine {
         const armed =
           !!this.mote &&
           this.mover.fallT < 0 &&
-          Math.abs(this.landingX() + this.mover.w / 2 - this.mote.x) <= this.kit.reach;
+          Math.abs(this.landingCenter() - this.mote.x) <= this.kit.reach;
         if (armed && !this.moteArmed) this.sfx.lock();
         this.moteArmed = armed;
         if (this.mover.course === "beat") {
           const moving = beatPhase(this.clock, this.mover.period) < 0.58;
           if (moving && !this.beatOn) {
             this.sfx.pulse();
-            // Each jump throws a ring, so the rhythm is something you can see.
-            this.fx.ring(
+            // Each jump throws a flash under the slab, so the rhythm is something you can see.
+            this.fx.seam(
               this.mover.x + this.mover.w / 2,
-              this.mover.y + VISUAL_H / 2,
+              this.mover.y,
+              this.mover.w * 1.1,
               this.theme.accent,
-              this.mover.w * 0.45,
-              2,
             );
           }
           this.beatOn = moving;
@@ -2022,7 +2191,7 @@ export class SpireEngine {
     this.drawGround(ctx);
     this.drawGhost(ctx);
     this.drawSummitLine(ctx);
-    if (this.kit.sight) this.drawSight(ctx);
+    if (this.kit.sight && !this.mover.split) this.drawSight(ctx);
     this.drawPlinth(ctx);
     if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
     this.drawAura(ctx);
@@ -2268,6 +2437,13 @@ export class SpireEngine {
     const settled = slab.anim >= 1 || this.reduceMotion;
     const scaleY = settled ? 1 : 0.74 + 0.26 * easeOutBack(Math.min(1, slab.anim));
     const body = slab.flash > 0 ? mix(slab.rgb, [255, 255, 255], slab.flash * 0.82) : slab.rgb;
+    if (slab.pieces && !slab.falling) {
+      for (const piece of slab.pieces) {
+        const px = s.x + (piece.x - slab.x);
+        this.paintSlab(ctx, px, s.y, piece.w, VISUAL_H, body, scaleY, 0, false);
+      }
+      return;
+    }
     if (slab.grow && !this.reduceMotion) {
       // Mid-reinforcement: narrower than its final width, ends glowing.
       const t = 1 - (1 - slab.grow.t) ** 3;
@@ -2357,6 +2533,41 @@ export class SpireEngine {
         accent,
         this.reduceMotion,
       );
+    }
+    if (m.split) {
+      // Two halves, each with the ghost of its own home on the stack.
+      const prev = this.stack[this.stack.length - 1];
+      const hw = m.w / 2;
+      if (prev) {
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.strokeStyle = "#f6f1e8";
+        ctx.setLineDash([4, 4]);
+        for (const homeX of [prev.x + prev.w / 4 - hw / 2, prev.x + (3 * prev.w) / 4 - hw / 2]) {
+          const h = this.worldToScreen(homeX, m.y);
+          ctx.strokeRect(h.x, h.y - VISUAL_H, hw, VISUAL_H);
+        }
+        ctx.restore();
+      }
+      const s2 = this.worldToScreen(m.x2, m.y);
+      const [offL, offR] = prev ? this.splitOffsets(prev) : [99, 99];
+      for (const [sx, off] of [
+        [s.x, offL],
+        [s2.x, offR],
+      ] as const) {
+        const home = Math.abs(off) <= this.tol;
+        if (home && !this.reduceMotion) {
+          ctx.save();
+          ctx.shadowColor = rgbCss(accent, 0.8);
+          ctx.shadowBlur = 14;
+          this.paintSlab(ctx, sx, s.y, hw, VISUAL_H, mix(rgb, [255, 255, 255], 0.35), 1, 0, true);
+          ctx.restore();
+        } else {
+          this.paintSlab(ctx, sx, s.y, hw, VISUAL_H, rgb, 1, 0, false);
+        }
+      }
+      ctx.restore();
+      return;
     }
     if (m.course === "sway") {
       const home = this.worldToScreen(m.center - m.w / 2, m.y);

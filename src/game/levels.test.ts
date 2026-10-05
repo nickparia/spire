@@ -135,13 +135,14 @@ describe("hazards", () => {
 
 describe("endless", () => {
   it("keeps the original cadence: four plain floors, then a new course every five", () => {
-    expect([0, 3, 4, 8, 9, 14, 34].map(ENDLESS_PLAN.courseAt)).toEqual([
+    expect([0, 3, 4, 8, 9, 14, 34, 39].map(ENDLESS_PLAN.courseAt)).toEqual([
       "slide",
       "slide",
       "gust",
       "gust",
       "beat",
       "sway",
+      "split",
       "gust",
     ]);
   });

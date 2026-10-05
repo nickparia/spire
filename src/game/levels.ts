@@ -148,7 +148,7 @@ export const LEVELS: LevelDef[] = [
     blurb: "Every sky, one after another.",
     theme: "apex",
     floors: 32,
-    courses: ["gust", "beat", "sway", "rush", "breath", "eclipse"],
+    courses: ["gust", "beat", "sway", "rush", "breath", "eclipse", "split"],
     period: [0.9, 0.68],
     wind: [40, 48],
     picks: 8,
@@ -245,6 +245,7 @@ const COURSE_THEME: Record<CourseId, ThemeId> = {
   rush: "canyon",
   breath: "glacier",
   eclipse: "eclipse",
+  split: "apex",
 };
 
 /** In endless each course brings its own sky. */

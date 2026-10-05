@@ -45,6 +45,10 @@ Prices, ranks and perks are data in `src/game/gear.ts`.
 
 On Gale Ridge (the fifth sky), in Apex's wind stretch and in every gust of endless, the slab hangs three floors above the stack and falls when you tap. Wind carries it sideways on the way down, so you release upwind. A streamer under the slab is blown the same way and its tip shows where the slab will land. The first three windy floors of Gale Ridge also outline the landing spot; after that you read the streamer. Wind holds its direction for three floors, and gets stronger as the level goes on.
 
+## Split slabs
+
+On the last stretch of Apex, and late in endless, the slab splits into two halves on two clocks: the left half slides at one speed, the right at another, each over its own side of the stack. One tap drops both. Both home is a perfect; one off gets that side trimmed; a half with nothing under it falls away and the floor is whatever is left, drawn in two pieces when they don't touch.
+
 ## Pickups and hazards
 
 Each keeps the same colour and shape in every sky.

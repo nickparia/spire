@@ -56,7 +56,7 @@ export function ramp(stops: readonly [RGB, RGB, RGB], t: number): RGB {
   return mix(stops[1], stops[2], (u - 0.5) / 0.5);
 }
 
-export type CourseId = "slide" | "gust" | "beat" | "sway" | "rush" | "breath" | "eclipse";
+export type CourseId = "slide" | "gust" | "beat" | "sway" | "rush" | "breath" | "eclipse" | "split";
 
 export const COURSE_CYCLE: readonly CourseId[] = [
   "gust",
@@ -65,6 +65,7 @@ export const COURSE_CYCLE: readonly CourseId[] = [
   "rush",
   "breath",
   "eclipse",
+  "split",
 ];
 
 export function courseLabel(id: CourseId): string {
@@ -74,7 +75,8 @@ export function courseLabel(id: CourseId): string {
   if (id === "sway") return "Sway";
   if (id === "rush") return "Rush";
   if (id === "breath") return "Breath";
-  return "Eclipse";
+  if (id === "eclipse") return "Eclipse";
+  return "Split";
 }
 
 export function courseHint(id: CourseId): string {
@@ -84,7 +86,8 @@ export function courseHint(id: CourseId): string {
   if (id === "sway") return "The groove walks";
   if (id === "rush") return "Bursts through center";
   if (id === "breath") return "Holds at the walls";
-  return "Tap the flare";
+  if (id === "eclipse") return "Tap the flare";
+  return "Two halves, two clocks";
 }
 
 /**
@@ -250,6 +253,9 @@ export function graceFor(period: number, course: CourseId = "slide"): number {
   if (course === "beat") return base + 0.5;
   return base;
 }
+
+/** How much faster the right half runs than the left when a slab is split. */
+export const SPLIT_TEMPO = 1.38;
 
 export const SHRINK_RATE = 0.07;
 export const SHRINK_FLOOR = 0.5;

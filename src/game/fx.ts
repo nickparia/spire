@@ -19,6 +19,9 @@ type Spark = {
   glow: boolean;
 };
 
+/** A flash along a seam: a line of light that spreads from the centre and fades. */
+type Seam = { x: number; y: number; w: number; life: number; max: number; rgb: RGB };
+
 type Ring = {
   x: number;
   y: number;
@@ -60,6 +63,7 @@ const TAU = Math.PI * 2;
 export class Fx {
   private sparks: Spark[] = [];
   private rings: Ring[] = [];
+  private seams: Seam[] = [];
   private rays: Rays[] = [];
   private confetti: Confetto[] = [];
   /** Scales particle counts down for prefers-reduced-motion. */
@@ -68,6 +72,7 @@ export class Fx {
   clear(): void {
     this.sparks.length = 0;
     this.rings.length = 0;
+    this.seams.length = 0;
     this.rays.length = 0;
     this.confetti.length = 0;
   }
@@ -117,6 +122,10 @@ export class Fx {
         glow: true,
       });
     }
+  }
+
+  seam(x: number, y: number, w: number, rgb: RGB): void {
+    this.seams.push({ x, y, w, life: 0.32, max: 0.32, rgb });
   }
 
   ring(x: number, y: number, rgb: RGB, reach: number, width = 3): void {
@@ -192,6 +201,11 @@ export class Fx {
       r.life -= dt;
       if (r.life <= 0) this.rings.splice(i, 1);
     }
+    for (let i = this.seams.length - 1; i >= 0; i--) {
+      const f = this.seams[i]!;
+      f.life -= dt;
+      if (f.life <= 0) this.seams.splice(i, 1);
+    }
     for (let i = this.rays.length - 1; i >= 0; i--) {
       const r = this.rays[i]!;
       r.life -= dt;
@@ -232,6 +246,20 @@ export class Fx {
         ctx.fill();
       }
       ctx.restore();
+    }
+    for (const f of this.seams) {
+      const s = project(f.x, f.y);
+      const age = 1 - f.life / f.max;
+      const spread = 1 - (1 - age) ** 2;
+      const half = (f.w / 2) * spread;
+      const g = ctx.createLinearGradient(s.x - half, 0, s.x + half, 0);
+      g.addColorStop(0, rgbCss(f.rgb, 0));
+      g.addColorStop(0.5, rgbCss(f.rgb, 0.95 * (1 - age)));
+      g.addColorStop(1, rgbCss(f.rgb, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(s.x - half, s.y - 2, half * 2, 4);
+      ctx.fillStyle = rgbCss(f.rgb, 0.35 * (1 - age));
+      ctx.fillRect(s.x - half, s.y - 7, half * 2, 14);
     }
     for (const r of this.rings) {
       const s = project(r.x, r.y);
