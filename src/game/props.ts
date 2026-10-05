@@ -63,6 +63,9 @@ export type PickupView = {
   floorY: number;
   /** Width of the slab that will land, for the outline of where it must go. */
   w: number;
+  /** The slab below, in screen px: anything landing outside it is cut off. */
+  stackX: number;
+  stackW: number;
   /** True while the slab's groove is close enough to take it. */
   armed: boolean;
   clock: number;
@@ -95,15 +98,47 @@ export function drawPickup(ctx: CanvasRenderingContext2D, v: PickupView): void {
   ctx.setLineDash([]);
 
   // Where the slab has to land to take it: an outline the slab's own size,
-  // which fills the moment the slab is over it.
+  // which fills the moment the slab is over it. The part that hangs past the
+  // stack is hatched and priced, because that part gets cut off.
   const pulse = v.calm ? 1 : 0.85 + 0.15 * Math.sin(v.clock * 6);
+  const left = v.x - v.w / 2;
   ctx.fillStyle = rgbCss(rgb, v.armed ? 0.3 : 0.1 * pulse);
-  ctx.fillRect(v.x - v.w / 2, padTop, v.w, 24);
+  ctx.fillRect(left, padTop, v.w, 24);
   ctx.strokeStyle = rgbCss(rgb, v.armed ? 1 : 0.75);
   ctx.lineWidth = v.armed ? 2.5 : 1.5;
   if (!v.armed) ctx.setLineDash([6, 5]);
-  ctx.strokeRect(v.x - v.w / 2 + 1, padTop + 1, v.w - 2, 22);
+  ctx.strokeRect(left + 1, padTop + 1, v.w - 2, 22);
   ctx.setLineDash([]);
+  const overLeft = Math.max(0, v.stackX - left);
+  const overRight = Math.max(0, left + v.w - (v.stackX + v.stackW));
+  const over = Math.max(overLeft, overRight);
+  if (over > 2) {
+    const ox = overLeft > overRight ? left : left + v.w - over;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(ox, padTop, over, 24);
+    ctx.clip();
+    ctx.fillStyle = "rgba(255,80,60,0.28)";
+    ctx.fillRect(ox, padTop, over, 24);
+    ctx.strokeStyle = "rgba(255,120,100,0.8)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = ox - 24; x < ox + over + 24; x += 6) {
+      ctx.moveTo(x, padTop + 24);
+      ctx.lineTo(x + 24, padTop);
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.font = `800 10px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(10,8,6,0.7)";
+    const cost = `−${Math.round((over / v.w) * 100)}%`;
+    ctx.strokeText(cost, ox + over / 2, padTop + 34);
+    ctx.fillStyle = "#ff8f7a";
+    ctx.fillText(cost, ox + over / 2, padTop + 34);
+  }
   ctx.font = `800 ${v.armed ? 13 : 11}px ${FONT}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
