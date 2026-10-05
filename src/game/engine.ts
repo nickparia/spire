@@ -35,7 +35,11 @@ import {
   courseHint,
   courseLabel,
   dropAccuracy,
+  dropOffset,
   fallDuration,
+  graceFor,
+  heldWidth,
+  QUICK_GROW,
   fallShare,
   goalsFor,
   isKeystone,
@@ -68,9 +72,11 @@ import {
   drawWalls,
   drawWindLane,
   LULL_RGB,
+  pickupRgb,
   SHIELD_RGB,
+  type PickupKind,
 } from "./props";
-import { loadSave, recordRun, storeSave, type RunOutcome, type Save } from "./save";
+import { loadSave, nextLevelIndex, recordRun, storeSave, type RunOutcome, type Save } from "./save";
 import { Sfx } from "./sfx";
 import { rgbCss, THEMES, type Theme } from "./themes";
 
@@ -97,6 +103,8 @@ const TIPS = {
   lull: "Lull: drop with the groove under its line. The next slab moves slowly.",
   bomb: "Bomb: wait for the fuse to burn out. Tap early and it takes a bite.",
   fall: "The slab hangs above the stack now. Tap and it falls.",
+  shrink: "A held slab wastes away. Drop it before it does.",
+  ember: "Ember: drop with the groove under its line to claim an upgrade. Miss it and it's gone.",
   wind: "Wind carries the slab as it falls. Drop when the streamer's tip is over the groove.",
 } as const;
 
@@ -242,9 +250,13 @@ type Mover = {
   fallT: number;
   fallTime: number;
   fallFrom: number;
+  /** Width when it appeared; it shrinks from this the longer it is held. */
+  w0: number;
+  /** Seconds it has been held. */
+  age: number;
 };
 
-type Mote = { x: number; y: number; kind: "shield" | "lull" };
+type Mote = { x: number; y: number; kind: PickupKind };
 type Bomb = { x: number; y: number; fuse: number; max: number; flash: number };
 
 function easeOutBack(t: number): number {
@@ -320,6 +332,8 @@ export class SpireEngine {
     fallT: -1,
     fallTime: 0,
     fallFrom: 0,
+    w0: 160,
+    age: 0,
   };
   private mote: Mote | null = null;
   private bomb: Bomb | null = null;
@@ -335,6 +349,10 @@ export class SpireEngine {
   private slip = 0;
   private shields = 0;
   private shieldAge = 0;
+  /** The title's self-building spire. */
+  private demoAge = 0;
+  private demoNext = 0;
+  private demoLit = false;
   private runCoins = 0;
   private lull = false;
   private moteArmed = false;
@@ -403,7 +421,7 @@ export class SpireEngine {
 
   start(): void {
     this.resize();
-    this.showMenu(0);
+    this.showMenu(nextLevelIndex(this.save));
     this.running = true;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
@@ -614,7 +632,7 @@ export class SpireEngine {
     return {
       phase: this.hudPhase(),
       floors: this.floors,
-      offset: prev ? this.landingX() - prev.x : 0,
+      offset: prev ? dropOffset(prev.x, prev.w, this.landingX(), this.mover.w) : 0,
       tol: this.tol,
       blocked:
         this.paused ||
@@ -722,20 +740,71 @@ export class SpireEngine {
         : Math.max(220, Math.min(300, this.viewW * 0.26));
     this.startW *= this.kit.footing;
     this.stack = [this.makeSlab(-this.startW / 2, 0, this.startW, 0, 1, 0)];
-    if (phase === "menu") this.buildShowpiece();
+    this.demoAge = 0;
+    this.demoNext = 0.8;
+    this.demoLit = false;
     this.spawnMover();
     this.emit();
   }
 
-  /** A small finished stack behind the menus, in the selected sky's colours. */
-  private buildShowpiece(): void {
-    const floors = 6;
-    const offsets = [0, 7, -5, 4, -3, 2, 0];
-    for (let i = 1; i <= floors; i++) {
-      const w = this.startW * (1 - i * 0.075);
-      const slab = this.makeSlab(-w / 2 + offsets[i]!, i * SLAB_H, w, i, 1, 0);
-      slab.rgb = ramp(this.theme.slab, i / floors);
-      this.stack.push(slab);
+  /**
+   * The title's living spire: behind the menu a stack builds itself, lights
+   * its beacon, and after a moment begins again. It is the game's promise
+   * shown rather than told.
+   */
+  private attract(dt: number): void {
+    const goal = 12;
+    this.demoAge += dt;
+    const top = this.stack[this.stack.length - 1]!;
+    if (!this.demoLit) {
+      if (this.stack.length <= goal) {
+        this.demoNext -= dt;
+        if (this.demoNext > 0) return;
+        const n = this.stack.length;
+        const drift = this.reduceMotion ? 0 : (Math.random() - 0.5) * 8;
+        const slab = this.makeSlab(top.x + drift, top.y + SLAB_H, top.w, n, 0, 1);
+        slab.rgb = ramp(this.theme.slab, n / goal);
+        this.stack.push(slab);
+        const cx = slab.x + slab.w / 2;
+        this.fx.ring(cx, slab.y, mix(this.theme.accent, BONE, 0.4), slab.w * 0.7, 2);
+        this.fx.sparkle(cx, slab.y + 2, slab.w, mix(this.theme.accent, BONE, 0.55), 6);
+        this.pulse = Math.max(this.pulse, 0.3);
+        this.camDrop = 40;
+        this.demoNext = 0.5 + Math.random() * 0.3;
+        return;
+      }
+      this.demoLit = true;
+      this.demoAge = 0;
+      const cx = top.x + top.w / 2;
+      const crown = top.y + VISUAL_H;
+      this.fx.rayBurst(cx, crown, this.theme.accent, 240, 18);
+      this.fx.ring(cx, crown, BONE, 200, 5);
+      this.fx.sparkle(cx, crown, top.w, mix(this.theme.accent, BONE, 0.5), 30);
+      for (let i = 0; i < this.stack.length; i++) this.stack[i]!.ripple = i * 0.035;
+      this.pulse = 1;
+      this.shellsLeft = this.reduceMotion ? 1 : 5;
+      this.nextShell = 0.5;
+      return;
+    }
+    if (this.shellsLeft > 0 && this.demoAge >= this.nextShell) {
+      this.shellsLeft -= 1;
+      this.nextShell += 0.4 + Math.random() * 0.4;
+      const palette: RGB[] = [this.theme.accent, BONE, this.theme.slab[1]];
+      this.fx.firework(
+        this.camX + (Math.random() - 0.5) * this.vw * 0.7,
+        top.y + 80 + Math.random() * 140,
+        palette[this.shellsLeft % palette.length]!,
+        0.7 + Math.random() * 0.4,
+      );
+    }
+    if (this.demoAge > 6) {
+      // Begin again: the camera eases back down to a fresh foundation.
+      this.stack = [this.makeSlab(-this.startW / 2, 0, this.startW, 0, 1, 0)];
+      this.fx.clear();
+      this.demoLit = false;
+      this.demoAge = 0;
+      this.demoNext = 1.2;
+      this.curtain = 0.5;
     }
   }
 
@@ -810,7 +879,10 @@ export class SpireEngine {
       fallT: -1,
       fallTime: fallDuration(fall?.hover ?? 0),
       fallFrom: 0,
+      w0: w,
+      age: 0,
     };
+    if (this.floors === 1) this.explain("shrink");
     this.syncMoverX();
     this.tol = this.toleranceNow();
     this.wasInZone = false;
@@ -824,14 +896,15 @@ export class SpireEngine {
         this.float("WIND SHIFTS", center, prev.y + SLAB_H + fall.hover + 62, false, 18);
       }
     }
-    if (shouldSpawnMote(this.plan, this.floors)) {
+    const ember = this.plan.pickAt(this.floors) && this.phase !== "menu";
+    if (ember || shouldSpawnMote(this.plan, this.floors)) {
       // Just outside the perfect window: taking it costs a sliver of slab.
       const nudge = Math.min(halfSpan * 0.5, Math.max(this.tol + 26, w * 0.22));
       const side = this.floors % 8 === 1 ? 1 : -1;
       this.mote = {
         x: center + side * nudge,
         y: prev.y + SLAB_H + VISUAL_H + 34,
-        kind: this.floors % 8 === 1 ? "shield" : "lull",
+        kind: ember ? "ember" : this.floors % 8 === 1 ? "shield" : "lull",
       };
       this.explain(this.mote.kind);
     }
@@ -907,6 +980,7 @@ export class SpireEngine {
       top.w = w;
       const m = this.mover;
       m.w = w;
+      m.w0 = w;
       m.halfSpan = Math.max(w * 0.98, 80);
       this.syncMoverX();
     }
@@ -936,7 +1010,11 @@ export class SpireEngine {
 
   /** Whether dropping now would be a perfect. */
   private lined(prev: Slab | undefined): boolean {
-    return !!prev && this.mover.fallT < 0 && Math.abs(this.landingX() - prev.x) <= this.tol;
+    return (
+      !!prev &&
+      this.mover.fallT < 0 &&
+      Math.abs(dropOffset(prev.x, prev.w, this.landingX(), this.mover.w)) <= this.tol
+    );
   }
 
   /**
@@ -992,6 +1070,19 @@ export class SpireEngine {
 
   private advanceMover(dt: number): void {
     const m = this.mover;
+    // Waiting has a price: once the run is live the held slab wastes away,
+    // crumbling at both ends so the loss is seen as it happens.
+    if (this.phase === "play") {
+      m.age += dt;
+      const w = heldWidth(m.w0, m.age, m.period);
+      if (w < m.w - 0.01) {
+        if (!this.reduceMotion && Math.random() < dt * 14) {
+          const side = Math.random() < 0.5 ? m.x : m.x + m.w;
+          this.fx.burst(side, m.y + VISUAL_H / 2, this.slabColor(this.floors + 1), 2, 70);
+        }
+        m.w = w;
+      }
+    }
     const rate = travelRate(m.course, m.dir, m.wind, m.u, m.period, this.clock);
     m.pxSpeed = m.halfSpan * rate;
     const du = m.dir * rate * dt;
@@ -1014,7 +1105,7 @@ export class SpireEngine {
   private place(): void {
     const prev = this.stack[this.stack.length - 1];
     if (!prev) return;
-    const dx = this.mover.x - prev.x;
+    const dx = dropOffset(prev.x, prev.w, this.mover.x, this.mover.w);
     const result = resolveDrop({
       prevX: prev.x,
       prevW: prev.w,
@@ -1134,7 +1225,13 @@ export class SpireEngine {
       this.float("FAST", slab.x - 30, slab.y + 14, false, 15);
     }
     const grabbed = this.collectMote(cx, slab.y);
-    if (!result.perfect && result.close && !grabbed) this.float("CLOSE", cx, slab.y + 34, false);
+    if (!result.perfect && result.close && grabbed === null) {
+      this.float("CLOSE", cx, slab.y + 34, false);
+    }
+    // The other side of wasting away: a clean drop inside the grace grows a little.
+    if (clean && this.mover.age <= graceFor(this.mover.period) && slab.w < this.startW) {
+      this.widen(slab, Math.min(this.startW, slab.w * QUICK_GROW));
+    }
     if (this.heat >= 1) this.fire(slab);
     if (
       this.tune.shieldEvery > 0 &&
@@ -1154,7 +1251,7 @@ export class SpireEngine {
       return;
     }
     storeSave(this.save);
-    if (this.plan.pickAt(this.floors)) {
+    if (grabbed === "ember") {
       this.openPicks();
       return;
     }
@@ -1199,6 +1296,7 @@ export class SpireEngine {
     const m = this.mover;
     if (m.fallT < 0 && this.phase !== "pick") {
       m.w = w;
+      m.w0 = w;
       m.center = slab.x + w / 2;
       m.halfSpan = Math.max(w * 0.98, 80);
       this.syncMoverX();
@@ -1266,19 +1364,20 @@ export class SpireEngine {
   }
 
   /** Takes the pickup if the slab landed under its line. Returns whether it did. */
-  private collectMote(x: number, y: number): boolean {
+  private collectMote(x: number, y: number): PickupKind | null {
     const mote = this.mote;
-    if (!mote) return false;
+    if (!mote) return null;
     const center = this.landingX() + this.mover.w / 2;
     if (Math.abs(center - mote.x) > this.kit.reach) {
       // Left behind: it winks out rather than just vanishing.
       this.fx.burst(mote.x, mote.y, [150, 150, 150], 6, 60);
-      return false;
+      if (mote.kind === "ember") this.float("EMBER LOST", mote.x, mote.y + 20, false, 15);
+      return null;
     }
     this.mote = null;
     this.score += 15;
     this.pay(3, x + this.mover.w / 2, y + 26);
-    const rgb = mote.kind === "shield" ? SHIELD_RGB : LULL_RGB;
+    const rgb = pickupRgb(mote.kind);
     this.fx.burst(mote.x, mote.y, rgb, 22, 220);
     this.fx.ring(mote.x, mote.y, rgb, 90, 4);
     this.fx.ring(x, y, rgb, this.mover.w * 0.9, 3);
@@ -1293,12 +1392,15 @@ export class SpireEngine {
       this.shieldAge = 0;
       this.sfx.shieldUp();
       this.float("SHIELD UP", x, y + 62, false, 24);
-    } else {
+    } else if (mote.kind === "lull") {
       this.lull = true;
       this.sfx.slow();
       this.float("SLOWED", x, y + 62, false, 24);
+    } else {
+      this.sfx.chime();
+      this.float("EMBER CLAIMED", x, y + 62, true, 24);
     }
-    return true;
+    return mote.kind;
   }
 
   /** A shield turns a miss into a narrow slab instead of a fall. */
@@ -1663,6 +1765,7 @@ export class SpireEngine {
       if (f.life <= 0) this.floaters.splice(i, 1);
     }
 
+    if (this.phase === "menu") this.attract(dt);
     if (this.phase === "won") this.celebrate(dt);
     else if (prev && this.phase !== "fall") {
       const seam = prev.y + SLAB_H;
@@ -1782,7 +1885,7 @@ export class SpireEngine {
     this.drawGhost(ctx);
     this.drawSummitLine(ctx);
     this.drawPlinth(ctx);
-    if (this.phase === "won") this.drawBeacon(ctx);
+    if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
     this.drawAura(ctx);
 
     const prev = this.stack[this.stack.length - 1];
@@ -1924,7 +2027,7 @@ export class SpireEngine {
     ctx.lineTo(this.vw - 28, y);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.font = '600 11px "Outfit Variable", Outfit, system-ui, sans-serif';
+    ctx.font = '600 11px system-ui, -apple-system, "Helvetica Neue", sans-serif';
     ctx.fillStyle = text;
     ctx.textAlign = "left";
     ctx.fillText(label, 28, y - 6);
@@ -1949,7 +2052,8 @@ export class SpireEngine {
     if (!top) return;
     const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H);
     const flicker = this.reduceMotion ? 1 : 0.8 + 0.2 * Math.sin(this.clock * 5.5);
-    const a = Math.min(1, this.wonAge / 0.45) * flicker;
+    const age = this.phase === "menu" ? this.demoAge : this.wonAge;
+    const a = Math.min(1, age / 0.45) * flicker;
     const foot = top.w * 0.5;
     const head = top.w * 1.4 + 90;
     ctx.save();
@@ -2287,7 +2391,7 @@ export class SpireEngine {
       const age = f.max - f.life;
       const pop = this.reduceMotion ? 1 : 1 + 0.45 * Math.max(0, 1 - age / 0.14);
       ctx.globalAlpha = Math.max(0, Math.min(1, f.life / (f.max * 0.6)));
-      ctx.font = `700 ${Math.round(f.size * pop)}px "Outfit Variable", Outfit, system-ui, sans-serif`;
+      ctx.font = `800 ${Math.round(f.size * pop)}px system-ui, -apple-system, "Helvetica Neue", sans-serif`;
       ctx.lineWidth = 4;
       ctx.strokeStyle = "rgba(10,8,6,0.55)";
       ctx.strokeText(f.text, s.x, s.y);

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   dropAccuracy,
+  dropOffset,
   fallDuration,
+  graceFor,
+  heldWidth,
   fallShare,
   formatPercent,
   formatTime,
@@ -50,6 +53,36 @@ describe("resolveDrop", () => {
     const third = resolveDrop({ ...base, moverX: 0, streak: 2 });
     expect(first.ok && first.points).toBe(20);
     expect(third.ok && third.points).toBe(40);
+  });
+});
+
+describe("a held slab", () => {
+  it("keeps its width through the grace, then wastes away to a floor", () => {
+    expect(heldWidth(100, 0, 1)).toBe(100);
+    expect(heldWidth(100, 0.85, 1)).toBe(100);
+    expect(heldWidth(100, 1.85, 1)).toBeCloseTo(93);
+    expect(heldWidth(100, 60, 1)).toBe(50);
+  });
+
+  it("has a grace that scales with the slab's pace", () => {
+    expect(graceFor(1)).toBeCloseTo(0.85);
+    expect(heldWidth(100, graceFor(1), 1)).toBe(100);
+  });
+
+  it("gets a shorter grace when the slab moves faster", () => {
+    expect(heldWidth(100, 1, 0.5)).toBeLessThan(heldWidth(100, 1, 1.1));
+  });
+
+  it("lands a shrunken perfect centred on the groove, and keeps it narrow", () => {
+    const r = resolveDrop({ ...base, moverW: 80, moverX: 10 });
+    expect(dropOffset(0, 100, 10, 80)).toBe(0);
+    expect(r).toMatchObject({ ok: true, perfect: true, x: 10, w: 80 });
+  });
+
+  it("judges by the groove, not the left edge", () => {
+    expect(resolveDrop({ ...base, moverW: 60, moverX: 20 }).ok && true).toBe(true);
+    const r = resolveDrop({ ...base, moverW: 60, moverX: 20 });
+    expect(r.ok && r.perfect).toBe(true);
   });
 });
 

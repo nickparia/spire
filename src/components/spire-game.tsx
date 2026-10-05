@@ -40,6 +40,15 @@ const INITIAL: Hud = {
 
 type Menu = "title" | "levels" | "workshop";
 
+/** Text colour that reads on the sky's accent: dark on a pale accent, white on a deep one. */
+function onAccent(css: string): string {
+  const m = /(\d+),(\d+),(\d+)/.exec(css);
+  if (!m) return "#fff";
+  const [r, g, b] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luma > 0.6 ? "#14100d" : "#fff";
+}
+
 export function SpireGame() {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -192,7 +201,7 @@ export function SpireGame() {
     <div
       ref={rootRef}
       className="game-root"
-      style={{ "--color-ember": hud.accent } as CSSProperties}
+      style={{ "--color-ember": hud.accent, "--on-ember": onAccent(hud.accent) } as CSSProperties}
       onPointerDown={(event) => {
         const target = event.target as HTMLElement;
         if (target.closest("button, [data-ui]")) {

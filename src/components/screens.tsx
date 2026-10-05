@@ -70,16 +70,30 @@ export function TitleScreen({
   const next = nextLevelIndex(save);
   const level = LEVELS[next]!;
   const stars = totalStars(save);
+  const lit = LEVELS.filter((l) => save.levels[l.id]?.clear).length;
   const started = Object.keys(save.levels).length > 0;
   return (
     <div className="screen screen-in" data-ui>
       <div className="flex items-start justify-between">
-        <div className="boot">
-          <p className="kicker">Stack the sky</p>
-          <h1 className="wordmark">Spire</h1>
-          <p className="boot-copy">
-            Tap to drop the slab. Each sky keeps a different time. Climb fast, land clean.
+        <div className="title-top">
+          <p className="kicker title-kicker">Relight the sky</p>
+          <h1 className="wordmark" data-text="Spire">
+            Spire
+          </h1>
+          <p className="title-copy">
+            Something put the skies out. Stack the Spire high enough to light them again, one sky at
+            a time.
           </p>
+          <div className="beacons" aria-label={`${lit} of ${LEVELS.length} skies lit`}>
+            <span className="beacons-row" aria-hidden="true">
+              {LEVELS.map((l, i) => (
+                <span key={l.id} className={"beacon" + (i < lit ? " beacon-lit" : "")} />
+              ))}
+            </span>
+            <span className="kicker">
+              {lit === 0 ? "No skies lit yet" : `${lit} of ${LEVELS.length} skies lit`}
+            </span>
+          </div>
         </div>
         <SoundToggles save={save} onMusic={onMusic} onSfx={onSfx} />
       </div>
@@ -87,7 +101,7 @@ export function TitleScreen({
       <div className="flex-1" />
 
       <div className="menu">
-        <div className="flex items-center justify-between">
+        <div className="menu-row">
           <p className="kicker menu-stars">
             <StarIcon on size={13} /> {stars} / {LEVELS.length * 3}
           </p>
@@ -109,24 +123,25 @@ export function TitleScreen({
                 onClick={() => onWeapon(id)}
               >
                 <span className="weapon-name">{w.name}</span>
-                <small>{on ? w.blurb : FAMILIES_SHORT[w.family]}</small>
+                <small>{FAMILIES_SHORT[w.family]}</small>
               </button>
             );
           })}
         </div>
+        <p className="weapon-blurb">{WEAPONS[save.weapon].blurb}</p>
         <button type="button" className="btn btn-primary" onClick={() => onPlay(next)}>
           <Play size={18} strokeWidth={2.4} fill="currentColor" />
           <span>
             {started ? "Continue" : "Play"}
             <small>
-              Level {next + 1} · {level.name}
+              Sky {next + 1} · {level.name}
             </small>
           </span>
         </button>
         <div className="grid grid-cols-3 gap-2">
           <button type="button" className="btn btn-stack" onClick={onLevels}>
             <LayoutGrid size={18} strokeWidth={2.2} />
-            Levels
+            Skies
           </button>
           <button type="button" className="btn btn-stack" onClick={onWorkshop}>
             <Wrench size={18} strokeWidth={2.2} />
@@ -137,9 +152,6 @@ export function TitleScreen({
             Endless
           </button>
         </div>
-        {save.endless.best > 0 ? (
-          <p className="kicker text-center">Endless best {save.endless.best}</p>
-        ) : null}
       </div>
     </div>
   );
@@ -183,7 +195,7 @@ export function LevelSelect({
         <IconButton label="Back" onPress={onBack}>
           <ChevronLeft size={20} strokeWidth={2.2} />
         </IconButton>
-        <p className="kicker">Levels</p>
+        <p className="kicker">Skies</p>
         <p className="kicker menu-stars">
           <StarIcon on size={13} /> {totalStars(save)} / {LEVELS.length * 3}
         </p>

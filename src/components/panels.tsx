@@ -72,7 +72,7 @@ function Build({ families }: { families: Record<Family, number> }) {
 export function PickPanel({ hud, onChoose }: { hud: Hud; onChoose: (index: number) => void }) {
   return (
     <section className="panel panel-in" aria-label="Choose an upgrade" data-ui>
-      <p className="kicker">Floor {hud.floors} · choose one</p>
+      <p className="kicker">Ember claimed · choose one</p>
       <div className="mt-3 flex flex-col gap-2">
         {hud.offers.map((id, index) => {
           const def = upgrade(id);

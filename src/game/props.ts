@@ -9,9 +9,28 @@ import { rgbCss } from "./themes";
 export const SHIELD_RGB: RGB = [110, 200, 255];
 export const LULL_RGB: RGB = [132, 240, 170];
 export const BOMB_RGB: RGB = [255, 72, 48];
+export const EMBER_RGB: RGB = [255, 178, 66];
+
+export type PickupKind = "shield" | "lull" | "ember";
+
+export function pickupRgb(kind: PickupKind): RGB {
+  return kind === "shield" ? SHIELD_RGB : kind === "lull" ? LULL_RGB : EMBER_RGB;
+}
+
+function flamePath(ctx: CanvasRenderingContext2D, s: number): void {
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.quadraticCurveTo(s * 0.9, -s * 0.2, s * 0.7, s * 0.4);
+  ctx.quadraticCurveTo(s * 0.5, s * 1.05, 0, s * 1.05);
+  ctx.quadraticCurveTo(-s * 0.75, s * 1.05, -s * 0.7, s * 0.3);
+  ctx.quadraticCurveTo(-s * 0.65, -s * 0.2, -s * 0.2, -s * 0.45);
+  ctx.quadraticCurveTo(-s * 0.1, -s * 0.1, 0.1 * s, 0);
+  ctx.quadraticCurveTo(s * 0.2, -s * 0.5, 0, -s);
+  ctx.closePath();
+}
 
 const TAU = Math.PI * 2;
-const FONT = '"Outfit Variable", Outfit, system-ui, sans-serif';
+const FONT = 'system-ui, -apple-system, "Helvetica Neue", sans-serif';
 
 function shieldPath(ctx: CanvasRenderingContext2D, s: number): void {
   ctx.beginPath();
@@ -36,7 +55,7 @@ function hourglassPath(ctx: CanvasRenderingContext2D, s: number): void {
 }
 
 export type PickupView = {
-  kind: "shield" | "lull";
+  kind: PickupKind;
   /** Screen position of the badge. */
   x: number;
   y: number;
@@ -53,7 +72,7 @@ export type PickupView = {
  * drop: that is the whole rule, and the line is there to say so.
  */
 export function drawPickup(ctx: CanvasRenderingContext2D, v: PickupView): void {
-  const rgb = v.kind === "shield" ? SHIELD_RGB : LULL_RGB;
+  const rgb = pickupRgb(v.kind);
   const bob = v.calm ? 0 : Math.sin(v.clock * 3.2) * 3;
   const y = v.y + bob;
   const r = 15;
@@ -103,8 +122,15 @@ export function drawPickup(ctx: CanvasRenderingContext2D, v: PickupView): void {
     ctx.fill();
     ctx.fillStyle = "rgba(14,11,9,0.55)";
     ctx.fillRect(-0.8, -5.5, 1.6, 11);
-  } else {
+  } else if (v.kind === "lull") {
     hourglassPath(ctx, 7);
+    ctx.fill();
+  } else {
+    flamePath(ctx, 7.5);
+    ctx.fill();
+    ctx.fillStyle = "#fff4d6";
+    ctx.beginPath();
+    ctx.arc(0, 3.5, 2.4, 0, TAU);
     ctx.fill();
   }
 
@@ -113,7 +139,7 @@ export function drawPickup(ctx: CanvasRenderingContext2D, v: PickupView): void {
   ctx.textBaseline = "alphabetic";
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(10,8,6,0.6)";
-  const label = v.kind === "shield" ? "SHIELD" : "LULL";
+  const label = v.kind === "shield" ? "SHIELD" : v.kind === "lull" ? "LULL" : "EMBER";
   ctx.strokeText(label, 0, -r - 6);
   ctx.fillStyle = "#f6f1e8";
   ctx.fillText(label, 0, -r - 6);

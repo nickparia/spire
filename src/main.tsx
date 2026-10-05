@@ -1,5 +1,3 @@
-import "@fontsource-variable/fraunces";
-import "@fontsource-variable/outfit";
 import "./styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

@@ -216,19 +216,49 @@ export function tolerance(speed: number, floors: number, w: number): number {
   return Math.min(w * 0.42, Math.max(10, px));
 }
 
+/**
+ * How far the moving slab's centre is from the groove below it. The two can
+ * differ in width (a slab shrinks while it is held), so grooves, not edges,
+ * are what have to line up.
+ */
+export function dropOffset(prevX: number, prevW: number, moverX: number, moverW: number): number {
+  return moverX + moverW / 2 - (prevX + prevW / 2);
+}
+
+/**
+ * Width of a held slab after `age` seconds. It keeps its full width through a
+ * grace long enough for the first pass, then wastes away, never below half.
+ */
+export function heldWidth(w: number, age: number, period: number): number {
+  const keep = Math.max(SHRINK_FLOOR, 1 - SHRINK_RATE * Math.max(0, age - graceFor(period)));
+  return w * keep;
+}
+
+/** Seconds a held slab keeps its full width: enough for the first pass. */
+export function graceFor(period: number): number {
+  return 0.35 + 0.5 * period;
+}
+
+export const SHRINK_RATE = 0.07;
+export const SHRINK_FLOOR = 0.5;
+/** A clean drop inside the grace grows the slab by this much, up to its start. */
+export const QUICK_GROW = 1.03;
+
 export function resolveDrop(input: DropInput): DropResult {
   const { prevX, prevW, moverX, moverW, tol, startW, streak } = input;
-  const dx = moverX - prevX;
+  const dx = dropOffset(prevX, prevW, moverX, moverW);
 
   if (Math.abs(dx) <= tol) {
     const nextStreak = streak + 1;
     const every = input.forgeEvery ?? FORGE_EVERY;
     const forged = every > 0 && nextStreak % every === 0;
-    let w = prevW;
-    let x = prevX;
+    // A perfect keeps the slab you dropped, centred on the groove: a slab that
+    // wasted away while you waited stays narrow.
+    let w = Math.min(prevW, moverW);
+    let x = prevX + (prevW - w) / 2;
     if (forged) {
-      const grown = Math.min(startW, prevW * (input.forgeGrow ?? FORGE_GROW));
-      if (grown > prevW + 0.4) {
+      const grown = Math.min(startW, w * (input.forgeGrow ?? FORGE_GROW));
+      if (grown > w + 0.4) {
         w = grown;
         x = prevX + prevW / 2 - w / 2;
       }

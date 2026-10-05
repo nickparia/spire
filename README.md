@@ -10,6 +10,10 @@ One-thumb stacking game. Tap to drop the slab onto the stack. Land it inside the
 
 Runs in a browser and as a native iOS app from the same code.
 
+## Holding a slab
+
+A slab keeps its full width for a short grace, long enough for its first pass, then wastes away at about 7% a second, never below half. A clean drop inside the grace grows it 3% instead, up to its starting width. Waiting is a choice with a price.
+
 ## Heat, weapons and upgrades
 
 Heat is the one meter. A perfect adds a lot, a clean landing a little, a fast drop (within 0.9 s of the last) a little more, and a miss costs some. When it fills, the forge fires and so does the weapon you carry. Heat also multiplies the coins each drop pays.
@@ -22,7 +26,7 @@ You carry one weapon, chosen on the title screen; it is your class:
 | Chisel | Striker | Charges: the next perfect pays triple, and no bomb can land until then |
 | Slipstream | Runner | Time slows and the wind drops for the next three slabs |
 
-On levels with picks (Gale Ridge, every six floors) the run pauses and offers three upgrades, one from each class. Three picks from one class unlock its capstone for the run. Upgrades reset every run; they are the build, not the progression. All of it is data in `src/game/build.ts`.
+On levels with picks (Gale Ridge, every six floors) an ember hangs over the stack. Land with the groove under its line to claim it and the run pauses with three upgrades, one from each class. Miss it and it's gone. Three picks from one class unlock its capstone for the run. Upgrades reset every run; they are the build, not the progression. All of it is data in `src/game/build.ts`.
 
 ## Coins and the workshop
 
