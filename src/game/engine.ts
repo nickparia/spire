@@ -971,11 +971,10 @@ export class SpireEngine {
     }
     const ember = this.plan.pickAt(this.floors) && this.phase !== "menu";
     if (ember || shouldSpawnMote(this.plan, this.floors)) {
-      // Just outside the perfect window: taking it costs a sliver of slab.
-      const nudge = Math.min(halfSpan * 0.5, Math.max(this.tol + 26, w * 0.22));
-      const side = this.floors % 8 === 1 ? 1 : -1;
+      // Straight over the groove: the outline on the stack is exactly where a
+      // clean drop lands, so "land here" is always true.
       this.mote = {
-        x: center + side * nudge,
+        x: center,
         y: prev.y + SLAB_H + VISUAL_H + 34,
         kind: ember ? "ember" : this.floors % 8 === 1 ? "shield" : "lull",
       };
