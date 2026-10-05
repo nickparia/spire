@@ -20,8 +20,6 @@ export type LevelDef = {
   wind?: [number, number];
   /** Floors between upgrade picks. Omit for a level with no picks. */
   picks?: number;
-  /** The physics prototype: slabs with weight that lean, slide and topple. */
-  physics?: boolean;
   keystones: boolean;
   motes: boolean;
   bombs: boolean;
@@ -47,11 +45,10 @@ export const LEVELS: LevelDef[] = [
     floors: 14,
     courses: ["slide"],
     period: [1.1, 0.98],
-    physics: true,
     keystones: false,
     motes: false,
     bombs: false,
-    parTime: 14,
+    parTime: 24,
     parAccuracy: 0.86,
   },
   {
@@ -66,7 +63,7 @@ export const LEVELS: LevelDef[] = [
     keystones: false,
     motes: true,
     bombs: false,
-    parTime: 16,
+    parTime: 32,
     parAccuracy: 0.88,
   },
   {
@@ -81,7 +78,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: false,
-    parTime: 21,
+    parTime: 36,
     parAccuracy: 0.88,
   },
   {
@@ -96,7 +93,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 24,
+    parTime: 39,
     parAccuracy: 0.89,
   },
   {
@@ -112,7 +109,7 @@ export const LEVELS: LevelDef[] = [
     keystones: false,
     motes: true,
     bombs: false,
-    parTime: 35,
+    parTime: 42,
     parAccuracy: 0.82,
   },
   {
@@ -127,7 +124,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 48,
+    parTime: 98,
     parAccuracy: 0.89,
   },
   {
@@ -142,7 +139,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 25,
+    parTime: 40,
     parAccuracy: 0.9,
   },
   {
@@ -158,7 +155,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 33,
+    parTime: 107,
     parAccuracy: 0.9,
   },
 ];
@@ -205,8 +202,8 @@ export function levelPlan(level: LevelDef, index: number): Plan {
     },
     difficulty: index * 6,
     // Slow enough to outbuild with steady play, never slow enough to ignore.
-    darkRate: Math.min(22, 10 + index * 1.5),
-    physics: Boolean(level.physics),
+    darkRate: Math.min(24, 12 + index * 1.5),
+    physics: true,
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
     themeAt: () => level.theme,
@@ -234,8 +231,8 @@ export const ENDLESS_PLAN: Plan = {
       : null,
   periodAt: (floors) => Math.max(0.4, 1.06 * Math.pow(0.988, floors)),
   difficulty: 0,
-  darkRate: 12,
-  physics: false,
+  darkRate: 14,
+  physics: true,
   hazardsAt: () => ({ keystones: true, motes: true, bombs: true }),
   span: ENDLESS_SPAN,
   themeAt: (floors) => endlessTheme(endlessCourseAt(floors)),

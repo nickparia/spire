@@ -1130,6 +1130,28 @@ export class SpireEngine {
     if (!bomb || !top) return;
     this.bomb = null;
     this.tip = "";
+    if (this.stage) {
+      // With weight in play a blast shoves the top of the spire sideways.
+      const side = bomb.x < top.x + top.w / 2 ? 1 : -1;
+      if (top.body !== null) this.stage.shove(top.body, side * 150);
+      for (let i = 0; i < 2; i++) {
+        this.scraps.push({
+          x: top.x + (side < 0 ? top.w - 12 : 0),
+          y: top.y + 4,
+          w: 12,
+          vx: side * (120 + Math.random() * 80),
+          vy: 160 + Math.random() * 60,
+          rot: 0,
+          vr: side * 5,
+          rgb: top.rgb,
+          life: 1,
+        });
+      }
+      top.flash = 1;
+      this.trauma = Math.min(1, this.trauma + 0.5);
+      this.float("BLAST", top.x + top.w / 2, top.y + 48, false, 24);
+      return;
+    }
     const w = Math.max(Math.min(top.w, MIN_W + 8), top.w * 0.8);
     const cut = (top.w - w) / 2;
     if (cut > 0.5) {
@@ -1552,11 +1574,27 @@ export class SpireEngine {
     let pieces: Piece[] | null = null;
     let result: DropResult;
     let landed: number;
+    /** The right half of a split slab on the stage, dropped as its own body. */
+    let half: { x: number; w: number } | null = null;
     if (this.stage) {
       // On the stage the slab keeps its whole width and falls as it is; a
-      // perfect is let go dead centre, anything else lands where it was.
-      const perfect = Math.abs(dx) <= this.tol;
-      const x = perfect ? prev.x + prev.w / 2 - this.mover.w / 2 : this.mover.x;
+      // perfect is let go dead centre, anything else lands where it was. A
+      // split slab is two halves, each judged on its own side.
+      const m = this.mover;
+      let perfect: boolean;
+      let x: number;
+      if (m.split) {
+        const [offL, offR] = this.splitOffsets(prev);
+        perfect = Math.abs(offL) <= this.tol && Math.abs(offR) <= this.tol;
+        x = perfect ? prev.x : m.x;
+        half = {
+          x: perfect ? prev.x + prev.w / 2 : m.x2,
+          w: m.w / 2,
+        };
+      } else {
+        perfect = Math.abs(dx) <= this.tol;
+        x = perfect ? prev.x + prev.w / 2 - m.w / 2 : m.x;
+      }
       const nextStreak = perfect ? this.streak + 1 : 0;
       result = {
         ok: true,
@@ -1564,7 +1602,7 @@ export class SpireEngine {
         forged: false,
         close: !perfect && Math.abs(dx) <= this.tol * 2.15,
         x,
-        w: this.mover.w,
+        w: half ? m.w / 2 : m.w,
         streak: nextStreak,
         scrap: null,
         points: perfect ? 10 + 10 * nextStreak : 10,
@@ -1616,6 +1654,11 @@ export class SpireEngine {
     let points = result.points;
     if (this.mover.keystone && result.perfect) points += result.points;
     this.stack.push(slab);
+    if (this.stage && half) {
+      const other = this.makeSlab(half.x, this.mover.y, half.w, floor, 1, 1);
+      other.body = this.stage.drop(half.x, this.mover.y, half.w, VISUAL_H);
+      this.stack.push(other);
+    }
     this.floors = floor;
     this.score += points;
     this.streak = result.streak;

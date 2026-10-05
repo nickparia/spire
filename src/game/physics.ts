@@ -79,6 +79,17 @@ export class Stage {
     return id;
   }
 
+  /** A sideways shove at a slab's top edge, in px/s of speed, enough to start a lean. */
+  shove(id: number, vx: number): void {
+    const body = this.bodies.get(id);
+    const size = this.sizes.get(id);
+    if (!body || !size || !body.isDynamic()) return;
+    body.setAwake(true);
+    const p = body.getPosition();
+    const at = new Vec2(p.x, p.y + size.h / 2 / SCALE);
+    body.applyLinearImpulse(new Vec2((vx / SCALE) * body.getMass(), 0), at, true);
+  }
+
   remove(id: number): void {
     const body = this.bodies.get(id);
     if (body) this.world.destroyBody(body);

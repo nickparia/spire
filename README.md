@@ -1,12 +1,12 @@
 # Spire
 
-One-thumb stacking game. Tap to drop the slab onto the stack. Land it inside the groove for a perfect; five perfects in a row forge the slab wider. Miss by a little and the overhang is cut off. Miss by a lot and the spire falls.
+One-thumb stacking game with real weight. Tap to drop the slab onto the stack. Land it inside the groove for a perfect and it seats dead centre; land it off and it sits where it fell, and the spire starts to lean. Lean far enough and it topples, but a topple is not the end: the rubble sets where it lands and you build on from there, while the Dark climbs from below. The only way to the summit is a column that stands.
 
 - **Eight levels**, each with its own sky, its own rhythm for the moving slab, and a summit to reach.
 - **A clock and an accuracy score** on every run, with your best of each kept per level.
 - **Three stars per level**: reach the summit, hit the accuracy target, beat the par time.
 - **Endless mode**: the original climb, where the sky changes every five floors.
-- **Music that follows the slab**: calm at full width, faster and harder as it narrows.
+- **Music that follows the Dark**: calm with a clear gap, faster and harder as it closes.
 
 Runs in a browser and as a native iOS app from the same code.
 
@@ -14,9 +14,9 @@ Runs in a browser and as a native iOS app from the same code.
 
 Once a run is live, the Dark climbs the tower from below, faster on later skies. Perfects, keystones and the forge push it back down; clean drops push a little. If it reaches the top slab, it takes the tower. The gap is shown in the HUD, and the music and the screen's edges tighten as it closes. Rates and pushes are `darkRate` per level and `DARK_PUSH` in `src/game/logic.ts`.
 
-## Holding a slab
+## Weight
 
-A slab keeps its full width for a short grace, long enough for its first pass, then wastes away at about 7% a second, never below half. A clean drop inside the grace grows it 3% instead, up to its starting width. Waiting is a choice with a price.
+Slabs are rigid bodies (Box2D via `planck`, in `src/game/physics.ts`). A slab keeps its whole width; where it lands is where it sits. A plumb line hangs from the top slab, faint while the spire is true and red with the angle once it tilts. A topple plays in slow motion, and rubble that comes to rest on the ground is set in place so the heap becomes a base you can read. The column above it stays live and can topple again. Floors are counted from the settled top, so a topple costs height and time rather than the run.
 
 ## Heat, weapons and upgrades
 
@@ -42,13 +42,9 @@ Every slab that lands pays coins on the spot, multiplied by Heat, and a summit p
 
 At the end of a run the game reads how you climbed and names it: a Runner didn't wait, a Striker landed it, a Mason held on.
 
-## Rebuilding after a fall
-
-Once per run, if the Mason's free Second Wind isn't still owed, a fall offers a paid rebuild for six seconds: 20 coins plus 3 per floor. The tower stands back up with its top slab narrowed, Heat and the streak reset. A rebuilt run can still light the sky and set an accuracy record, but the pace star is forfeited.
-
 ## Split slabs
 
-On the last stretch of Apex, and late in endless, the slab splits into two halves on two clocks: the left half slides at one speed, the right at another, each over its own side of the stack. One tap drops both. Both home is a perfect; one off gets that side trimmed; a half with nothing under it falls away and the floor is whatever is left, drawn in two pieces when they don't touch.
+On the last stretch of Apex, and late in endless, the slab splits into two halves on two clocks: the left half slides at one speed, the right at another, each over its own side of the stack. One tap drops both halves as two bodies. Both home is a perfect and they seat side by side; anything else lands where it was and leans the spire.
 
 ## Pickups and hazards
 
@@ -56,9 +52,9 @@ Each keeps the same colour and shape in every sky.
 
 | | What to do | What it does |
 | --- | --- | --- |
-| **Shield** (blue) | Drop with the slab's groove under its line | Saves one miss. A bubble sits over the stack until it is used |
+| **Shield** (blue) | Drop with the slab's groove under its line | A bubble sits over the stack. (Carried over from the precision game; its role on a weighted spire is still open) |
 | **Lull** (green) | Drop with the slab's groove under its line | The next slab moves slowly |
-| **Bomb** (red) | Wait for the fuse to burn out | Tap early and it blows a fifth off the top slab and ends your streak |
+| **Bomb** (red) | Wait for the fuse to burn out | Tap early and the blast shoves the top of the spire sideways and ends your streak |
 
 Pickups hang just outside the perfect window, so taking one costs a sliver of slab. The first three times each appears, a one-line tip explains it.
 
@@ -141,7 +137,7 @@ The game draws to one canvas. React only renders the interface on top and never 
 ### Tuning
 
 - **Levels**: `src/game/levels.ts`. Length, speed, which hazards appear, and the two star targets are plain numbers per level.
-- **Par times** were set by running a bot through every level: three quarters of the way from a flawless first-pass run to one that always waits for the second pass. Adjust `parTime` if they feel wrong in the hand.
+- **Par times** are a flawless bot's time on each sky plus a quarter. Adjust `parTime` if they feel wrong in the hand.
 - **Skies**: `src/game/themes.ts`. A theme is data; adding one does not need new drawing code unless it needs a new kind of scenery.
 - **Music**: `src/game/music.ts`. Tension comes from `tensionFor()` in `logic.ts`, which maps the slab's remaining width to 0..1.
 
