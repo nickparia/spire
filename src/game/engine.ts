@@ -137,6 +137,8 @@ export type LevelResult = {
   goals: Goals;
   outcome: RunOutcome;
   coins: Payout;
+  /** The run used a paid rebuild, which forfeits the pace star. */
+  rebuilt: boolean;
 };
 
 export type Hud = {
@@ -183,6 +185,8 @@ export type Hud = {
   /** The current sky's accent, as a CSS colour. */
   accent: string;
   result: LevelResult | null;
+  /** A paid rebuild on offer after a fall, with the seconds left to take it. */
+  rescue: { price: number; seconds: number } | null;
 };
 
 export type EngineEvents = {
@@ -392,6 +396,9 @@ export class SpireEngine {
   private shields = 0;
   private shieldAge = 0;
   private secondWindUsed = false;
+  /** The paid continue: offered once, and it costs the pace star. */
+  private rescue: { price: number; until: number; stack: { x: number; y: number }[] } | null = null;
+  private rebuilt = false;
   private fastDrops = 0;
   private calledCutter = false;
   /** The title's self-building spire. */
@@ -523,7 +530,8 @@ export class SpireEngine {
       return;
     }
     if (this.phase === "fall") {
-      if (this.fallAge >= 0.68) this.retry();
+      // While a rebuild is on offer, a stray tap must not throw it away.
+      if (this.fallAge >= 0.68 && !this.rescueOpen()) this.retry();
       return;
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
@@ -805,6 +813,8 @@ export class SpireEngine {
     this.shields = phase === "ready" ? this.kit.shields : 0;
     this.secondWindUsed = false;
     this.calledCutter = false;
+    this.rescue = null;
+    this.rebuilt = false;
     this.fastDrops = 0;
     this.shieldAge = 0;
     this.runCoins = 0;
@@ -1739,12 +1749,83 @@ export class SpireEngine {
     this.emit();
   }
 
+  /** Price of a rebuild at this height: cheap low down, dear near the summit. */
+  private rescuePrice(): number {
+    return 20 + 3 * this.floors;
+  }
+
+  private rescueOpen(): boolean {
+    return !!this.rescue && this.fallAge < this.rescue.until;
+  }
+
+  /**
+   * Pays to stand the tower back up after a fall. Once per run, never while
+   * a free Second Wind is still owed, and it forfeits the pace star.
+   */
+  rebuild(): boolean {
+    const offer = this.rescue;
+    if (this.phase !== "fall" || !offer || !this.rescueOpen()) return false;
+    if (this.save.coins < offer.price) {
+      this.sfx.sputter();
+      return false;
+    }
+    this.wake();
+    this.save.coins -= offer.price;
+    this.rescue = null;
+    this.rebuilt = true;
+    this.phase = "play";
+    this.scraps = [];
+    this.fx.clear();
+    for (let i = 0; i < this.stack.length; i++) {
+      const slab = this.stack[i]!;
+      const was = offer.stack[i]!;
+      slab.x = was.x;
+      slab.y = was.y;
+      slab.rot = 0;
+      slab.vx = 0;
+      slab.vy = 0;
+      slab.vr = 0;
+      slab.falling = false;
+      slab.fallDelay = 0;
+      slab.ripple = (this.stack.length - 1 - i) * 0.03;
+    }
+    // Stood back up narrower, the way a shield save leaves it.
+    const top = this.stack[this.stack.length - 1]!;
+    if (this.stack.length > 1) {
+      const w = Math.max(MIN_W + 8, top.w * 0.6);
+      top.x = top.x + top.w / 2 - w / 2;
+      top.w = w;
+      top.pieces = null;
+    }
+    this.streak = 0;
+    this.heat = 0;
+    this.trauma = 0.6;
+    this.flash = 0.4;
+    this.float("REBUILT", top.x + top.w / 2, top.y + 48, true, 28);
+    this.sfx.buy();
+    this.sfx.forge();
+    haptics.success();
+    this.music.setMood("play");
+    this.music.setTension(tensionFor(top.w, this.startW));
+    this.spawnMover();
+    this.commit();
+    this.emit();
+    return true;
+  }
+
   private die(): void {
     this.phase = "fall";
     this.fallAge = 0;
     this.hint = false;
     this.bomb = null;
     this.freeze = 0;
+    // The offer to rebuild, if a free save isn't still owed and it can be paid for.
+    const owed = this.kit.secondWind && !this.secondWindUsed;
+    const price = this.rescuePrice();
+    this.rescue =
+      !this.rebuilt && !owed && this.stack.length > 1 && this.save.coins >= price
+        ? { price, until: 6, stack: this.stack.map((s) => ({ x: s.x, y: s.y })) }
+        : null;
     const rgb = this.slabColor(this.floors + 1);
     this.scraps.push({
       x: this.mover.x,
@@ -1780,6 +1861,8 @@ export class SpireEngine {
     const level = LEVELS[this.levelIndex]!;
     const accuracy = this.accuracy();
     const goals = goalsFor(this.runTime, accuracy, level.parTime, level.parAccuracy);
+    // A rebuilt run can still light the sky, but it was not a clean climb.
+    if (this.rebuilt) goals.swift = false;
     const outcome = recordRun(this.save, level.id, this.runTime, accuracy, goals);
     this.result = {
       levelIndex: this.levelIndex,
@@ -1791,6 +1874,7 @@ export class SpireEngine {
       goals,
       outcome,
       coins: this.paySummit(accuracy, goals, outcome),
+      rebuilt: this.rebuilt,
     };
     this.phase = "won";
     this.wonAge = 0;
@@ -1932,6 +2016,9 @@ export class SpireEngine {
           : null,
       accent: rgbCss(this.theme.accent),
       result: this.result,
+      rescue: this.rescueOpen()
+        ? { price: this.rescue!.price, seconds: Math.ceil(this.rescue!.until - this.fallAge) }
+        : null,
     });
   }
 
@@ -2028,7 +2115,15 @@ export class SpireEngine {
     }
 
     if (this.phase === "fall") {
+      const before = this.fallAge;
       this.fallAge += dt;
+      // Keep the countdown on the fall card ticking.
+      if (
+        this.rescue &&
+        Math.ceil(this.rescue.until - before) !== Math.ceil(this.rescue.until - this.fallAge)
+      ) {
+        this.emit();
+      }
       for (const slab of this.stack) {
         if (!slab.falling) continue;
         slab.fallDelay -= dt;

@@ -247,14 +247,30 @@ export function OverPanel({
   hud,
   onRetry,
   onQuit,
+  onRebuild,
 }: {
   hud: Hud;
   onRetry: () => void;
   onQuit: () => void;
+  onRebuild: () => void;
 }) {
   const level = hud.mode === "level";
+  const rescue = hud.rescue;
   return (
     <section className="panel panel-in" aria-live="polite">
+      {rescue ? (
+        <div className="rescue" data-ui>
+          <button type="button" className="btn btn-primary" onClick={onRebuild} autoFocus>
+            <span>
+              Rebuild and carry on
+              <small>
+                <Coin size={13} /> {rescue.price} · once per run · no pace star
+              </small>
+            </span>
+          </button>
+          <p className="rescue-timer">{rescue.seconds}s</p>
+        </div>
+      ) : null}
       <p className="kicker">The spire fell</p>
       {level ? (
         <p className="score mt-1">
@@ -294,7 +310,7 @@ export function OverPanel({
           {level ? "Levels" : "Menu"}
         </button>
       </div>
-      <p className="tap-hint mt-3">Tap anywhere to retry</p>
+      {rescue ? null : <p className="tap-hint mt-3">Tap anywhere to retry</p>}
     </section>
   );
 }
@@ -401,6 +417,7 @@ export function ResultsPanel({
         </Goal>
         <Goal done={goals.swift} fresh={outcome.fresh.swift}>
           Finish in {formatTime(level.parTime)}
+          {result.rebuilt ? " · forfeited by the rebuild" : ""}
         </Goal>
       </ul>
       <Purse result={result} />

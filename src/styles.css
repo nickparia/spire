@@ -406,6 +406,39 @@
   text-transform: uppercase;
 }
 
+.rescue {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.rescue .btn-primary {
+  background: var(--color-gold);
+  color: #14100d;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 28px -12px var(--color-gold);
+}
+
+.rescue .btn-primary small {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0.85;
+}
+
+.rescue-timer {
+  min-width: 2.4rem;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-gold);
+  text-align: center;
+}
+
 .style-line {
   margin: 0.5rem 0 0;
   font-size: 14px;

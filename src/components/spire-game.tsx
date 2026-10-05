@@ -36,6 +36,7 @@ const INITIAL: Hud = {
   families: { mason: 0, striker: 0, runner: 0 },
   offers: [],
   style: null,
+  rescue: null,
   accent: "rgb(255,77,26)",
   result: null,
 };
@@ -275,7 +276,14 @@ export function SpireGame() {
           <PickPanel hud={hud} onChoose={(i) => engineRef.current?.choose(i)} />
         ) : null}
 
-        {hud.phase === "over" ? <OverPanel hud={hud} onRetry={retry} onQuit={quit} /> : null}
+        {hud.phase === "over" ? (
+          <OverPanel
+            hud={hud}
+            onRetry={retry}
+            onQuit={quit}
+            onRebuild={() => engineRef.current?.rebuild()}
+          />
+        ) : null}
 
         {hud.phase === "won" && hud.result ? (
           <ResultsPanel
