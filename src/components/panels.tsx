@@ -23,7 +23,7 @@ import {
 import { nextWeapon } from "./use-count-up";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
-import { formatPercent, formatTime, starCount } from "@/game/logic";
+import { formatPercent, formatTime, KINDS, starCount } from "@/game/logic";
 import type { Save } from "@/game/save";
 import { Clock, Coin, Goal, IconButton, Stars } from "./bits";
 import { SoundToggles } from "./screens";
@@ -120,6 +120,52 @@ export function PickPanel({ hud, onChoose }: { hud: Hud; onChoose: (index: numbe
   );
 }
 
+/** The hand: three slabs to choose from, held at the bottom where the thumb is. */
+export function Hand({ hud, onPick }: { hud: Hud; onPick: (index: number) => void }) {
+  const held = hud.hand[hud.handSel];
+  return (
+    <div className="hand-wrap" data-ui>
+      <p className="hand-blurb">{held ? KINDS[held].blurb : ""}</p>
+      <div className="hand" role="radiogroup" aria-label="Slab in hand">
+        {hud.hand.map((kind, i) => {
+          const def = KINDS[kind];
+          const on = i === hud.handSel;
+          return (
+            <button
+              key={i}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              className={"card card-" + kind + (on ? " card-on" : "")}
+              onClick={() => onPick(i)}
+            >
+              <span className="card-slab" aria-hidden="true" />
+              <span className="card-name">{def.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** A spirit level for the tower: the bubble drifts the way the spire leans. */
+function Level({ lean }: { lean: number }) {
+  const danger = Math.abs(lean) > 0.6;
+  return (
+    <div
+      className={"lean" + (danger ? " lean-danger" : "")}
+      role="meter"
+      aria-label="Lean"
+      aria-valuemin={-1}
+      aria-valuemax={1}
+      aria-valuenow={Number(lean.toFixed(2))}
+    >
+      <span className="lean-bubble" style={{ left: `${50 + lean * 44}%` }} />
+    </div>
+  );
+}
+
 /** The strip across the top during a run: progress, the clock, and how clean you are. */
 export function RunHud({
   hud,
@@ -170,6 +216,7 @@ export function RunHud({
         {hud.relic ? <p className="relic">{hud.relic}</p> : null}
         {hud.hold ? <p className="relic">Wait</p> : null}
         {started || hud.heat > 0 ? <Heat hud={hud} /> : null}
+        {hud.hand.length > 0 ? <Level lean={hud.lean} /> : null}
         <Build ranks={hud.ranks} families={hud.families} />
       </div>
 
