@@ -36,6 +36,7 @@ const INITIAL: Hud = {
   style: null,
   house: "mason",
   coins: 0,
+  darkGap: null,
   rescue: null,
   accent: "rgb(255,77,26)",
   result: null,

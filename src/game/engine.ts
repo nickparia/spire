@@ -40,6 +40,8 @@ import {
   courseHint,
   courseLabel,
   dropAccuracy,
+  DARK_PUSH,
+  DARK_START,
   dropOffset,
   fallDuration,
   FORGE_GROW,
@@ -121,6 +123,7 @@ const TIPS = {
   bomb: "Bomb: bad. Don't tap. Wait for the fuse to burn out; tap early and it takes a bite.",
   fall: "The slab hangs above the stack now. Tap and it falls.",
   shrink: "A held slab wastes away. Drop it before it does.",
+  dark: "The Dark is rising from below. Perfects and the forge push it back. Don't let it reach the top.",
   split: "Split: the slab is two halves on two clocks. Drop when both sit over their own side.",
   ember:
     "Ember: good. Land the slab on the outline under it to claim an upgrade. Miss it and it's gone.",
@@ -191,6 +194,8 @@ export type Hud = {
   house: Family;
   /** Coins in the wallet. */
   coins: number;
+  /** Floors between the Dark and the top of the stack; null when it isn't rising. */
+  darkGap: number | null;
   /** The current sky's accent, as a CSS colour. */
   accent: string;
   result: LevelResult | null;
@@ -409,6 +414,9 @@ export class SpireEngine {
   private rescue: { price: number; until: number; stack: { x: number; y: number }[] } | null = null;
   private rebuilt = false;
   private fastDrops = 0;
+  /** Height of the Dark's surface, world px, and where it is drawn as it eases there. */
+  private dark = DARK_START;
+  private darkShown = DARK_START;
   private calledCutter = false;
   /** The title's self-building spire. */
   private demoAge = 0;
@@ -837,6 +845,8 @@ export class SpireEngine {
     this.rescue = null;
     this.rebuilt = false;
     this.fastDrops = 0;
+    this.dark = DARK_START;
+    this.darkShown = DARK_START;
     this.shieldAge = 0;
     this.runCoins = 0;
     this.lull = false;
@@ -1015,6 +1025,7 @@ export class SpireEngine {
       x2: 0,
     };
     if (this.floors === 1) this.explain("shrink");
+    if (this.floors === 2 && this.plan.darkRate > 0) this.explain("dark");
     this.syncMoverX();
     this.tol = this.toleranceNow();
     this.wasInZone = false;
@@ -1137,6 +1148,44 @@ export class SpireEngine {
     haptics.heavy();
     this.music.setTension(tensionFor(top.w, this.startW));
     this.emit();
+  }
+
+  /** Light pushes the Dark down, never below where it started. */
+  private pushDark(px: number): void {
+    if (this.plan.darkRate <= 0 || px <= 0) return;
+    this.dark = Math.max(DARK_START, this.dark - px);
+  }
+
+  /** Floors of tower still above the Dark. */
+  private darkGap(): number {
+    const top = this.stack[this.stack.length - 1];
+    if (!top) return 0;
+    return (top.y + SLAB_H - this.dark) / SLAB_H;
+  }
+
+  /**
+   * The Dark climbs while the run is live. It takes the tower when it reaches
+   * the top slab's seat; a near miss is what the music and the edges play on.
+   */
+  private riseDark(dt: number): void {
+    if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0) {
+      this.dark += this.plan.darkRate * dt;
+      const top = this.stack[this.stack.length - 1]!;
+      if (this.dark >= top.y + SLAB_H * 0.5) {
+        this.dark = top.y + SLAB_H * 0.5;
+        this.float("TAKEN BY THE DARK", top.x + top.w / 2, top.y + 60, false, 24);
+        this.die();
+        for (const slab of this.stack) {
+          slab.vy = -80 - Math.random() * 40;
+          slab.vx *= 0.3;
+        }
+        return;
+      }
+      const gap = this.darkGap();
+      if (gap < 3) this.strain = Math.max(this.strain, 1 - gap / 3);
+    }
+    const k = 1 - Math.exp(-(this.darkShown < this.dark ? 4 : 7) * dt);
+    this.darkShown += (this.dark - this.darkShown) * k;
   }
 
   /** Where the slab's left edge will be once it has landed. */
@@ -1476,6 +1525,12 @@ export class SpireEngine {
       gain += HEAT.fast * this.tune.heatFast;
       this.fastDrops += 1;
     }
+    // Light pushes the Dark back down the tower.
+    let push = 0;
+    if (result.perfect) push += slab.key ? DARK_PUSH.keystone : DARK_PUSH.perfect;
+    else if (clean) push += DARK_PUSH.clean;
+    if (fast) push += DARK_PUSH.fast;
+    this.pushDark(push);
     const heatBefore = this.heat;
     this.heat = clamp01(this.heat + (gain > 0 ? gain * this.kit.charge : gain));
     const struck = this.charged && result.perfect;
@@ -1576,6 +1631,7 @@ export class SpireEngine {
   /** Full Heat: the forge fires, and so does the weapon you carry. */
   private fire(slab: Slab): void {
     this.heat = 0;
+    this.pushDark(DARK_PUSH.forge);
     const cx = slab.x + slab.w / 2;
     const seam = slab.y;
     const grow = FORGE_GROW + this.tune.forgeBonus;
@@ -1901,6 +1957,7 @@ export class SpireEngine {
     this.result.offers = this.offersNow();
     this.phase = "won";
     this.wonAge = 0;
+    this.dark = DARK_START - 400;
     this.camAtWin = this.camY;
     this.mote = null;
     this.bomb = null;
@@ -2039,6 +2096,7 @@ export class SpireEngine {
           : null,
       house: houseOf(this.save.tracks, this.save.weapon),
       coins: this.save.coins,
+      darkGap: this.plan.darkRate > 0 && live ? Math.max(0, Math.floor(this.darkGap())) : null,
       accent: rgbCss(this.theme.accent),
       result: this.result,
       rescue: this.rescueOpen()
@@ -2114,6 +2172,7 @@ export class SpireEngine {
     // The clock runs from the first drop, and never during a hit-stop: a
     // perfect must not cost time for the freeze frame that celebrates it.
     if (this.phase === "play" && this.freeze <= 0) this.runTime += dt;
+    this.riseDark(dt);
 
     const flareGoal = inZone && this.mover.course === "eclipse" && this.phase !== "menu" ? 1 : 0;
     this.flare += (flareGoal - this.flare) * Math.min(1, dt * 14);
@@ -2322,6 +2381,7 @@ export class SpireEngine {
     for (const slab of this.stack) this.drawSlab(ctx, slab, inZone && slab === prev);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
+    if (this.plan.darkRate > 0 && this.phase !== "menu") this.drawDark(ctx);
     if (this.shields > 0 && prev && this.phase !== "fall") {
       const dome = this.worldToScreen(prev.x + prev.w / 2, prev.y + VISUAL_H / 2);
       drawShieldDome(ctx, dome.x, dome.y, prev.w, this.clock, this.shieldAge);
@@ -2392,6 +2452,51 @@ export class SpireEngine {
     ctx.globalAlpha = this.fade;
     ctx.drawImage(this.fadeCanvas, 0, 0, view.w, view.h);
     ctx.restore();
+  }
+
+  /** The Dark: a bank of it, with a lit, restless edge, eating the tower from below. */
+  private drawDark(ctx: CanvasRenderingContext2D): void {
+    const surface = this.worldToScreen(0, this.darkShown).y;
+    if (surface < -120) return;
+    const clock = this.reduceMotion ? 0 : this.clock;
+    const soft = 70;
+    const g = ctx.createLinearGradient(0, surface - soft, 0, surface + 30);
+    g.addColorStop(0, "rgba(14,6,26,0)");
+    g.addColorStop(0.55, "rgba(14,6,26,0.78)");
+    g.addColorStop(1, "rgba(10,4,20,0.96)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-120, surface - soft, this.vw + 240, this.vh - surface + soft + 160);
+    // The edge: a few slow waves of violet light along the surface.
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let band = 0; band < 2; band++) {
+      ctx.beginPath();
+      const amp = 6 + band * 4;
+      const lift = band * 9;
+      for (let x = -40; x <= this.vw + 40; x += 12) {
+        const y =
+          surface -
+          lift +
+          Math.sin(x * 0.021 + clock * (1.1 + band * 0.4)) * amp +
+          Math.sin(x * 0.053 - clock * 0.7) * 3;
+        if (x === -40) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = `rgba(150,80,220,${0.35 - band * 0.12})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Motes drifting up off it when it is close to the top.
+    if (!this.reduceMotion && this.darkGap() < 4 && Math.random() < 0.3) {
+      this.fx.sparkle(
+        this.camX + (Math.random() - 0.5) * this.vw * 0.6,
+        this.darkShown + 10,
+        40,
+        [150, 80, 220],
+        1,
+      );
+    }
   }
 
   private drawGround(ctx: CanvasRenderingContext2D): void {

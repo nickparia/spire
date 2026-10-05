@@ -201,6 +201,8 @@ export function levelPlan(level: LevelDef, index: number): Plan {
       return from + (to - from) * t;
     },
     difficulty: index * 6,
+    // Slow enough to outbuild with steady play, never slow enough to ignore.
+    darkRate: Math.min(22, 10 + index * 1.5),
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
     themeAt: () => level.theme,
@@ -228,6 +230,7 @@ export const ENDLESS_PLAN: Plan = {
       : null,
   periodAt: (floors) => Math.max(0.4, 1.06 * Math.pow(0.988, floors)),
   difficulty: 0,
+  darkRate: 12,
   hazardsAt: () => ({ keystones: true, motes: true, bombs: true }),
   span: ENDLESS_SPAN,
   themeAt: (floors) => endlessTheme(endlessCourseAt(floors)),

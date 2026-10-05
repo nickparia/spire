@@ -134,6 +134,8 @@ export type Plan = {
   periodAt: (floors: number) => number;
   /** Shifts the perfect window: later levels start with a tighter one. */
   difficulty: number;
+  /** How fast the Dark climbs the tower, px per second; 0 keeps it away. */
+  darkRate: number;
   hazardsAt: (floors: number) => Hazards;
   /** Floors one sky lasts, which paces how its backdrop deepens. */
   span: number;
@@ -256,6 +258,21 @@ export function graceFor(period: number, course: CourseId = "slide"): number {
 
 /** How much faster the right half runs than the left when a slab is split. */
 export const SPLIT_TEMPO = 1.38;
+
+/**
+ * The Dark: it climbs the tower from below, and light pushes it back. How
+ * far each kind of drop pushes it down, in px.
+ */
+export const DARK_PUSH = {
+  perfect: 42,
+  clean: 12,
+  fast: 10,
+  keystone: 56,
+  forge: 150,
+} as const;
+
+/** Where the Dark starts, px below the foundation. */
+export const DARK_START = -96;
 
 export const SHRINK_RATE = 0.07;
 export const SHRINK_FLOOR = 0.5;

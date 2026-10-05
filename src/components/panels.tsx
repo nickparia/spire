@@ -180,6 +180,14 @@ export function RunHud({
         </p>
         <p className="kicker mt-2">Accuracy</p>
         <p className="stat-num">{started ? formatPercent(hud.accuracy) : "—"}</p>
+        {hud.darkGap !== null && started ? (
+          <>
+            <p className="kicker mt-2">The Dark</p>
+            <p className={"stat-num dark-gap" + (hud.darkGap <= 3 ? " dark-near" : "")}>
+              {hud.darkGap} {hud.darkGap === 1 ? "floor" : "floors"} below
+            </p>
+          </>
+        ) : null}
         <p className="stat-num purse-live mt-2" aria-label={`${hud.runCoins} coins this run`}>
           <Coin size={14} />
           <span key={hud.runCoins} className="score-pop inline-block">
