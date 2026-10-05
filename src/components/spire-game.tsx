@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { emptySave, isUnlocked, nextLevelIndex, type Save } from "@/game/save";
-import { Hand, OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
+import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { LevelSelect, TitleScreen } from "./screens";
 
 const INITIAL: Hud = {
@@ -36,9 +36,6 @@ const INITIAL: Hud = {
   style: null,
   house: "mason",
   coins: 0,
-  hand: [],
-  handSel: 0,
-  lean: 0,
   rescue: null,
   accent: "rgb(255,77,26)",
   result: null,
@@ -179,10 +176,6 @@ export function SpireGame() {
         else if (now.hud.phase === "won" || now.hud.phase === "over") quit();
       } else if (event.code === "Digit1" || event.code === "Digit2" || event.code === "Digit3") {
         if (now.hud.phase === "pick") engine.choose(Number(event.code.slice(-1)) - 1);
-      } else if (event.code === "KeyQ" || event.code === "KeyW" || event.code === "KeyE") {
-        // Q, W, E pick the first, second and third card of the hand.
-        const index = { KeyQ: 0, KeyW: 1, KeyE: 2 }[event.code];
-        engine.pickHand(index);
       } else if (event.code === "KeyR") {
         if (now.hud.phase !== "menu") retry();
       } else if (event.code === "KeyM") {
@@ -247,10 +240,6 @@ export function SpireGame() {
         ) : null}
 
         {hud.phase !== "menu" ? <div className="flex-1" /> : null}
-
-        {running && hud.hand.length > 0 && !hud.paused ? (
-          <Hand hud={hud} onPick={(i) => engineRef.current?.pickHand(i)} />
-        ) : null}
 
         {running && hud.tip && !hud.paused ? (
           <p key={hud.tip} className="tip panel-in" role="status">

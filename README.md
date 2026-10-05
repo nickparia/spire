@@ -10,10 +10,6 @@ One-thumb stacking game. Tap to drop the slab onto the stack. Land it inside the
 
 Runs in a browser and as a native iOS app from the same code.
 
-## Prototype: a hand of slabs, and a tower that leans (the Foundry)
-
-On the first sky you hold three slabs and tap a card to choose which one is moving: **Stone** (plain), **Anchor** (narrower, slower, never crumbles, three times the weight), **Feather** (wider, light, pays double and heats faster on a perfect, shatters on a miss). Used cards are replaced. Every slab's weight and position count: build off to one side and the spire shears that way, which moves the groove you have to hit; past the limit it topples. Fixing a lean means putting weight on the other side, which costs width. Q, W and E pick cards on a keyboard. The rules are in `KINDS` and `leanOf` in `src/game/logic.ts`.
-
 ## Holding a slab
 
 A slab keeps its full width for a short grace, long enough for its first pass, then wastes away at about 7% a second, never below half. A clean drop inside the grace grows it 3% instead, up to its starting width. Waiting is a choice with a price.

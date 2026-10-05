@@ -20,8 +20,6 @@ export type LevelDef = {
   wind?: [number, number];
   /** Floors between upgrade picks. Omit for a level with no picks. */
   picks?: number;
-  /** The building prototype: a hand of three slab kinds and a tower that leans. */
-  hand?: boolean;
   keystones: boolean;
   motes: boolean;
   bombs: boolean;
@@ -47,7 +45,6 @@ export const LEVELS: LevelDef[] = [
     floors: 14,
     courses: ["slide"],
     period: [1.1, 0.98],
-    hand: true,
     keystones: false,
     motes: false,
     bombs: false,
@@ -211,7 +208,6 @@ export function levelPlan(level: LevelDef, index: number): Plan {
     gateAt: () => level.floors,
     pickAt: (floors) =>
       !!level.picks && floors > 0 && floors < level.floors && floors % level.picks === 0,
-    hand: Boolean(level.hand),
   };
 }
 
@@ -239,7 +235,6 @@ export const ENDLESS_PLAN: Plan = {
   shadeAt: (floor) => (floor < 5 ? (floor / 5) * 0.6 : 0.1 + (((floor - 5) % 5) / 4) * 0.8),
   gateAt: () => 0,
   pickAt: () => false,
-  hand: false,
 };
 
 const COURSE_THEME: Record<CourseId, ThemeId> = {

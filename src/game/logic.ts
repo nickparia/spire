@@ -144,79 +144,7 @@ export type Plan = {
   gateAt: (floors: number) => number;
   /** Whether placing this many floors pauses the run for an upgrade pick. */
   pickAt: (floors: number) => boolean;
-  /** The building prototype: a hand of slab kinds, and a tower that leans. */
-  hand: boolean;
 };
-
-/** The three slabs you can hold. Which one you drop is the decision. */
-export type SlabKind = "stone" | "anchor" | "feather";
-
-export type KindDef = {
-  name: string;
-  blurb: string;
-  /** Width as a share of the slab below. */
-  width: number;
-  /** How much it counts toward the lean. */
-  weight: number;
-  /** Multiplier on the slide period: above 1 is slower. */
-  pace: number;
-  /** Whether it wastes away while held. */
-  shrinks: boolean;
-};
-
-export const KINDS: Record<SlabKind, KindDef> = {
-  stone: { name: "Stone", blurb: "Plain and true.", width: 1, weight: 1, pace: 1, shrinks: true },
-  anchor: {
-    name: "Anchor",
-    blurb: "Narrow, slow, never crumbles. Three times the weight: sets a lean right.",
-    width: 0.85,
-    weight: 3,
-    pace: 1.3,
-    shrinks: false,
-  },
-  feather: {
-    name: "Feather",
-    blurb: "Wide and light. A perfect pays double and heats faster; a miss shatters it.",
-    width: 1.1,
-    weight: 0.3,
-    pace: 0.9,
-    shrinks: true,
-  },
-};
-
-/** Draws the next card: mostly stone, with an anchor or a feather now and then. */
-export function drawKind(rand: number): SlabKind {
-  return rand < 0.5 ? "stone" : rand < 0.75 ? "anchor" : "feather";
-}
-
-/** Lean angle, as a tangent, at which the tower topples. */
-export const LEAN_MAX = 0.2;
-/** Slabs from the top that decide the lean: the stack's live part. */
-export const LEAN_DEPTH = 8;
-
-/**
- * How far the top of the stack leans, as a tangent, from where the weight of
- * its top few slabs sits against the slab beneath them. Positive leans right.
- */
-export function leanOf(
-  slabs: readonly { x: number; w: number; weight: number }[],
-  startW: number,
-): number {
-  if (slabs.length < 2) return 0;
-  const from = Math.max(0, slabs.length - 1 - LEAN_DEPTH);
-  const base = slabs[from]!;
-  const ref = base.x + base.w / 2;
-  let moment = 0;
-  let mass = 0;
-  for (let i = from + 1; i < slabs.length; i++) {
-    const s = slabs[i]!;
-    moment += s.weight * (s.x + s.w / 2 - ref);
-    mass += s.weight;
-  }
-  if (mass <= 0) return 0;
-  const offset = moment / mass / Math.max(1, startW);
-  return Math.max(-LEAN_MAX * 1.5, Math.min(LEAN_MAX * 1.5, offset * 0.6));
-}
 
 export type Hazards = { keystones: boolean; motes: boolean; bombs: boolean };
 

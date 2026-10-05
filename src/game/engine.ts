@@ -40,12 +40,8 @@ import {
   courseHint,
   courseLabel,
   dropAccuracy,
-  drawKind,
   dropOffset,
   fallDuration,
-  KINDS,
-  LEAN_MAX,
-  leanOf,
   FORGE_GROW,
   graceFor,
   heldWidth,
@@ -68,7 +64,6 @@ import {
   type CourseId,
   type DropResult,
   type Goals,
-  type SlabKind,
   type Plan,
   type RGB,
 } from "./logic";
@@ -127,7 +122,6 @@ const TIPS = {
   fall: "The slab hangs above the stack now. Tap and it falls.",
   shrink: "A held slab wastes away. Drop it before it does.",
   split: "Split: the slab is two halves on two clocks. Drop when both sit over their own side.",
-  hand: "Three slabs in hand. Tap one to hold it, tap anywhere to drop it. Weight on one side leans the spire; lean too far and it topples.",
   ember:
     "Ember: good. Land the slab on the outline under it to claim an upgrade. Miss it and it's gone.",
   wind: "Wind carries the slab as it falls. Drop when the streamer's tip is over the groove.",
@@ -197,11 +191,6 @@ export type Hud = {
   house: Family;
   /** Coins in the wallet. */
   coins: number;
-  /** The hand of slab kinds, empty when the sky doesn't deal one, and which is held. */
-  hand: SlabKind[];
-  handSel: number;
-  /** Lean of the tower as a share of what topples it, -1..1. */
-  lean: number;
   /** The current sky's accent, as a CSS colour. */
   accent: string;
   result: LevelResult | null;
@@ -247,8 +236,6 @@ type Slab = {
   fallDelay: number;
   falling: boolean;
   key: boolean;
-  /** How much it counts toward the lean. */
-  weight: number;
 };
 
 type Piece = { x: number; w: number };
@@ -287,8 +274,6 @@ type Mover = {
   halfSpan: number;
   center: number;
   period: number;
-  /** Period before the held slab's kind slowed or quickened it. */
-  basePeriod: number;
   pxSpeed: number;
   wind: number;
   course: CourseId;
@@ -383,7 +368,6 @@ export class SpireEngine {
     halfSpan: 80,
     center: 0,
     period: 1,
-    basePeriod: 1,
     pxSpeed: 200,
     wind: 1,
     course: "slide",
@@ -425,10 +409,6 @@ export class SpireEngine {
   private rescue: { price: number; until: number; stack: { x: number; y: number }[] } | null = null;
   private rebuilt = false;
   private fastDrops = 0;
-  private hand: SlabKind[] = [];
-  private handSel = 0;
-  /** Tangent of the tower's lean; judging and drawing both use it. */
-  private leanTan = 0;
   private calledCutter = false;
   /** The title's self-building spire. */
   private demoAge = 0;
@@ -750,8 +730,7 @@ export class SpireEngine {
 
   /** The offset a bot should close: the worse half when the slab is split. */
   private probeOffset(prev: Slab): number {
-    const seat = this.seat(prev);
-    if (!this.mover.split) return dropOffset(seat.x, seat.w, this.landingX(), this.mover.w);
+    if (!this.mover.split) return dropOffset(prev.x, prev.w, this.landingX(), this.mover.w);
     const [l, r] = this.splitOffsets(prev);
     return Math.abs(l) >= Math.abs(r) ? l : r;
   }
@@ -858,9 +837,6 @@ export class SpireEngine {
     this.rescue = null;
     this.rebuilt = false;
     this.fastDrops = 0;
-    this.leanTan = 0;
-    this.hand = this.plan.hand ? ["stone", drawKind(Math.random()), drawKind(Math.random())] : [];
-    this.handSel = 0;
     this.shieldAge = 0;
     this.runCoins = 0;
     this.lull = false;
@@ -978,7 +954,6 @@ export class SpireEngine {
       fallDelay: 0,
       falling: false,
       key: false,
-      weight: 1,
     };
   }
 
@@ -991,11 +966,10 @@ export class SpireEngine {
 
   private spawnMover(): void {
     const prev = this.stack[this.stack.length - 1]!;
-    const seat = this.seat(prev);
     const w = prev.w;
     const course = this.plan.courseAt(this.floors);
     const halfSpan = Math.max(w * 0.98, 80);
-    const center = seat.x + seat.w / 2;
+    const center = prev.x + prev.w / 2;
     this.dir = -this.dir;
     const dir = this.dir;
     const fall = this.plan.fallAt(this.floors);
@@ -1017,7 +991,6 @@ export class SpireEngine {
       halfSpan,
       center,
       period,
-      basePeriod: period,
       pxSpeed: halfSpan * travelRate(course, dir, this.wind, 0, period, this.clock),
       wind: this.wind,
       course,
@@ -1042,10 +1015,6 @@ export class SpireEngine {
       x2: 0,
     };
     if (this.floors === 1) this.explain("shrink");
-    if (this.plan.hand) {
-      this.applyKind();
-      if (this.floors === 0) this.explain("hand");
-    }
     this.syncMoverX();
     this.tol = this.toleranceNow();
     this.wasInZone = false;
@@ -1170,59 +1139,6 @@ export class SpireEngine {
     this.emit();
   }
 
-  /** Sideways shift of the stack at height `y` from its lean. */
-  private shear(y: number): number {
-    return y * this.leanTan;
-  }
-
-  /** The slab below as the held slab meets it: shifted by the lean at that height. */
-  private seat(prev: Slab): { x: number; w: number } {
-    return { x: prev.x + this.shear(prev.y + SLAB_H), w: prev.w };
-  }
-
-  /** The kind of slab being held, or stone where no hand is dealt. */
-  private kind(): SlabKind {
-    return this.hand[this.handSel] ?? "stone";
-  }
-
-  /** Chooses a card from the hand; the moving slab takes its width and pace at once. */
-  pickHand(index: number): void {
-    if (this.phase !== "ready" && this.phase !== "play") return;
-    const m = this.mover;
-    if (!this.hand[index] || index === this.handSel || m.fallT >= 0) return;
-    this.wake();
-    this.handSel = index;
-    this.applyKind();
-    this.sfx.ui();
-    this.emit();
-  }
-
-  private applyKind(): void {
-    const m = this.mover;
-    const prev = this.stack[this.stack.length - 1];
-    if (!prev) return;
-    const def = KINDS[this.kind()];
-    m.w0 = Math.min(this.startW, prev.w * def.width);
-    m.w = def.shrinks
-      ? heldWidth(m.w0, m.age, m.period, this.kit.shrink, this.kit.grace, m.course)
-      : m.w0;
-    m.period = m.basePeriod * def.pace;
-    m.halfSpan = Math.max(m.w * 0.98, 80);
-    this.syncMoverX();
-  }
-
-  /** Settles the lean after a placement; too far and the spire goes over. */
-  private settleLean(): boolean {
-    if (!this.plan.hand) return false;
-    const before = this.leanTan;
-    this.leanTan = leanOf(this.stack, this.startW);
-    if (Math.abs(this.leanTan - before) > 0.02) {
-      this.camDrop = Math.max(this.camDrop, 40);
-      if (Math.abs(this.leanTan) > LEAN_MAX * 0.6) this.sfx.sputter();
-    }
-    return Math.abs(this.leanTan) >= LEAN_MAX;
-  }
-
   /** Where the slab's left edge will be once it has landed. */
   private landingX(): number {
     const m = this.mover;
@@ -1237,8 +1153,7 @@ export class SpireEngine {
       const [l, r] = this.splitOffsets(prev);
       return Math.abs(l) <= this.tol && Math.abs(r) <= this.tol;
     }
-    const seat = this.seat(prev);
-    return Math.abs(dropOffset(seat.x, seat.w, this.landingX(), this.mover.w)) <= this.tol;
+    return Math.abs(dropOffset(prev.x, prev.w, this.landingX(), this.mover.w)) <= this.tol;
   }
 
   /**
@@ -1297,9 +1212,8 @@ export class SpireEngine {
   private splitOffsets(prev: Slab): [number, number] {
     const m = this.mover;
     const hw = m.w / 2;
-    const seat = this.seat(prev);
-    const left = m.x + hw / 2 - (seat.x + seat.w / 4);
-    const right = m.x2 + hw / 2 - (seat.x + (3 * seat.w) / 4);
+    const left = m.x + hw / 2 - (prev.x + prev.w / 4);
+    const right = m.x2 + hw / 2 - (prev.x + (3 * prev.w) / 4);
     return [left, right];
   }
 
@@ -1327,9 +1241,7 @@ export class SpireEngine {
     // time is not held against the slab.
     if (this.phase === "play" && !(this.bomb && this.bomb.fuse > 0)) {
       m.age += dt;
-      const w = KINDS[this.kind()].shrinks
-        ? heldWidth(m.w0, m.age, m.period, this.kit.shrink, this.kit.grace, m.course)
-        : m.w;
+      const w = heldWidth(m.w0, m.age, m.period, this.kit.shrink, this.kit.grace, m.course);
       if (w < m.w - 0.01) {
         m.crumb += m.w - w;
         m.w = w;
@@ -1401,8 +1313,8 @@ export class SpireEngine {
     const hw = m.w / 2;
     const [offL, offR] = this.splitOffsets(prev);
     const halves = [
-      { x: m.x, off: offL, homeX: this.seat(prev).x },
-      { x: m.x2, off: offR, homeX: this.seat(prev).x + prev.w / 2 },
+      { x: m.x, off: offL, homeX: prev.x },
+      { x: m.x2, off: offR, homeX: prev.x + prev.w / 2 },
     ].map((h) => ({
       ...h,
       result: resolveDrop({
@@ -1481,8 +1393,7 @@ export class SpireEngine {
   private place(): void {
     const prev = this.stack[this.stack.length - 1];
     if (!prev) return;
-    const seat = this.seat(prev);
-    const dx = dropOffset(seat.x, seat.w, this.mover.x, this.mover.w);
+    const dx = dropOffset(prev.x, prev.w, this.mover.x, this.mover.w);
     let pieces: Piece[] | null = null;
     let result: DropResult;
     let landed: number;
@@ -1493,8 +1404,8 @@ export class SpireEngine {
       pieces = split.pieces;
     } else {
       result = resolveDrop({
-        prevX: seat.x,
-        prevW: seat.w,
+        prevX: prev.x,
+        prevW: prev.w,
         moverX: this.mover.x,
         moverW: this.mover.w,
         tol: this.tol,
@@ -1518,31 +1429,8 @@ export class SpireEngine {
     this.accuracySum += landed;
 
     const floor = this.stack.length;
-    // Stored where it sits on the stack, with the lean's shift at this height taken back out.
-    const lift = this.shear(prev.y + SLAB_H);
-    const slab = this.makeSlab(result.x - lift, prev.y + SLAB_H, result.w, floor, 0, 1);
-    slab.pieces = pieces ? pieces.map((p) => ({ x: p.x - lift, w: p.w })) : null;
-    const held = this.kind();
-    slab.weight = KINDS[held].weight;
-    if (held === "feather" && !result.perfect) {
-      // Too light to take a knock: it shatters, and most of it goes.
-      const w = Math.max(MIN_W + 4, slab.w * 0.65);
-      const cut = slab.w - w;
-      this.scraps.push({
-        x: slab.x + lift + slab.w - cut,
-        y: slab.y,
-        w: cut,
-        vx: 120,
-        vy: 120,
-        rot: 0,
-        vr: 4,
-        rgb: slab.rgb,
-        life: 1,
-      });
-      slab.w = w;
-      this.float("SHATTERED", slab.x + lift + w / 2, slab.y + 52, false, 20);
-      this.sfx.shieldBreak();
-    }
+    const slab = this.makeSlab(result.x, prev.y + SLAB_H, result.w, floor, 0, 1);
+    slab.pieces = pieces;
     slab.key = this.mover.keystone && result.perfect;
     let points = result.points;
     if (this.mover.keystone && result.perfect) points += result.points;
@@ -1581,9 +1469,8 @@ export class SpireEngine {
       this.runTime - this.lastLand <= this.tune.fastWindow + this.kit.fastBonus;
     this.lastLand = this.runTime;
     let gain = 0;
-    if (result.perfect) {
-      gain += HEAT.perfect * this.tune.heatPerfect * (held === "feather" ? 1.5 : 1);
-    } else if (clean) gain += HEAT.clean * this.tune.heatClean;
+    if (result.perfect) gain += HEAT.perfect * this.tune.heatPerfect;
+    else if (clean) gain += HEAT.clean * this.tune.heatClean;
     else gain += HEAT.miss * this.tune.heatMiss;
     if (fast) {
       gain += HEAT.fast * this.tune.heatFast;
@@ -1636,9 +1523,7 @@ export class SpireEngine {
       accuracy: landed,
     });
     pay *= 1 + heatBefore;
-    if (result.perfect) {
-      pay *= this.tune.perfectPay * this.kit.perfectPay * (held === "feather" ? 2 : 1);
-    }
+    if (result.perfect) pay *= this.tune.perfectPay * this.kit.perfectPay;
     if (fast) pay += this.tune.fastPay;
     if (struck) pay *= this.kit.chiselPay;
     this.pay(pay, result.x + result.w, slab.y);
@@ -1680,33 +1565,12 @@ export class SpireEngine {
       return;
     }
     storeSave(this.save);
-    if (this.plan.hand) {
-      this.hand.splice(this.handSel, 1);
-      this.hand.push(drawKind(Math.random()));
-      this.handSel = 0;
-      if (this.settleLean()) {
-        this.topple();
-        return;
-      }
-    }
     if (grabbed === "ember") {
       this.openPicks();
       return;
     }
     this.spawnMover();
     this.emit();
-  }
-
-  /** The lean has gone past what stone can hold: the spire goes over sideways. */
-  private topple(): void {
-    const side = Math.sign(this.leanTan) || 1;
-    const top = this.stack[this.stack.length - 1]!;
-    this.float("TOPPLED", top.x + top.w / 2 + this.shear(top.y), top.y + 50, false, 28);
-    this.die();
-    for (const slab of this.stack) {
-      slab.vx = side * (40 + slab.y * 0.5);
-      slab.vr = side * 1.5;
-    }
   }
 
   /** Full Heat: the forge fires, and so does the weapon you carry. */
@@ -1760,7 +1624,7 @@ export class SpireEngine {
     if (m.fallT < 0 && this.phase !== "pick") {
       m.w = w;
       m.w0 = w;
-      m.center = slab.x + w / 2 + this.shear(slab.y + SLAB_H);
+      m.center = slab.x + w / 2;
       m.halfSpan = Math.max(w * 0.98, 80);
       this.syncMoverX();
     }
@@ -2175,9 +2039,6 @@ export class SpireEngine {
           : null,
       house: houseOf(this.save.tracks, this.save.weapon),
       coins: this.save.coins,
-      hand: this.phase === "ready" || this.phase === "play" ? this.hand : [],
-      handSel: this.handSel,
-      lean: this.leanTan / LEAN_MAX,
       accent: rgbCss(this.theme.accent),
       result: this.result,
       rescue: this.rescueOpen()
@@ -2336,7 +2197,7 @@ export class SpireEngine {
     else if (prev && this.phase !== "fall") {
       const seam = prev.y + SLAB_H;
       const targetY = Math.max(0, seam - this.viewH * LEAD) + this.camDrop;
-      const targetX = prev.x + prev.w / 2 + this.shear(prev.y);
+      const targetX = prev.x + prev.w / 2;
       const k = 1 - Math.exp(-5.2 * dt);
       this.camY += (targetY - this.camY) * k;
       this.camX += (targetX - this.camX) * k;
@@ -2462,10 +2323,7 @@ export class SpireEngine {
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
     if (this.shields > 0 && prev && this.phase !== "fall") {
-      const dome = this.worldToScreen(
-        prev.x + prev.w / 2 + this.shear(prev.y),
-        prev.y + VISUAL_H / 2,
-      );
+      const dome = this.worldToScreen(prev.x + prev.w / 2, prev.y + VISUAL_H / 2);
       drawShieldDome(ctx, dome.x, dome.y, prev.w, this.clock, this.shieldAge);
     }
     if (live) this.drawCourseCues(ctx);
@@ -2679,7 +2537,7 @@ export class SpireEngine {
     if (this.streak < 2 || this.phase !== "play") return;
     const top = this.stack[this.stack.length - 1];
     if (!top) return;
-    const s = this.worldToScreen(top.x + top.w / 2 + this.shear(top.y), top.y + VISUAL_H / 2);
+    const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
     const breathe = this.reduceMotion ? 1 : 0.85 + 0.15 * Math.sin(this.clock * 4);
     const reach = Math.min(210, 90 + this.streak * 15);
     const a = Math.min(0.4, 0.07 * this.streak) * breathe;
@@ -2694,7 +2552,7 @@ export class SpireEngine {
   }
 
   private drawSlab(ctx: CanvasRenderingContext2D, slab: Slab, hotGroove: boolean): void {
-    const s = this.worldToScreen(slab.x + (slab.falling ? 0 : this.shear(slab.y)), slab.y);
+    const s = this.worldToScreen(slab.x, slab.y);
     if (s.y < -80 || s.y - VISUAL_H > this.vh + 120) return;
     const settled = slab.anim >= 1 || this.reduceMotion;
     const scaleY = settled ? 1 : 0.74 + 0.26 * easeOutBack(Math.min(1, slab.anim));
@@ -2943,7 +2801,7 @@ export class SpireEngine {
       y: s.y,
       floorY: this.worldToScreen(0, top.y + VISUAL_H).y,
       w: this.mover.w,
-      stackX: this.worldToScreen(top.x + this.shear(top.y + SLAB_H), 0).x,
+      stackX: this.worldToScreen(top.x, 0).x,
       stackW: top.w,
       armed: this.moteArmed,
       clock: this.clock,
