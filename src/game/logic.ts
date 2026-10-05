@@ -1,12 +1,10 @@
+import type { ThemeId } from "./themes";
+
 export type RGB = [number, number, number];
 
 export const MIN_W = 16;
 export const FORGE_EVERY = 5;
 export const FORGE_GROW = 1.14;
-
-const CLAY: RGB = [176, 78, 52];
-const EMBER: RGB = [255, 77, 26];
-const BONE: RGB = [246, 241, 232];
 
 export type DropInput = {
   prevX: number;
@@ -16,6 +14,10 @@ export type DropInput = {
   tol: number;
   startW: number;
   streak: number;
+  /** Width multiplier for a forge. Defaults to FORGE_GROW. */
+  forgeGrow?: number;
+  /** Perfects in a row that trigger a forge. Defaults to FORGE_EVERY; 0 turns forging off. */
+  forgeEvery?: number;
 };
 
 export type Scrap = { x: number; w: number };
@@ -34,6 +36,10 @@ export type DropResult =
       points: number;
     };
 
+export function clamp01(t: number): number {
+  return Math.max(0, Math.min(1, t));
+}
+
 export function mix(a: RGB, b: RGB, t: number): RGB {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
@@ -43,26 +49,23 @@ export function shade(c: RGB, amount: number): RGB {
   return mix(c, [20, 14, 10], Math.min(1, -amount));
 }
 
-export function slabRgb(floor: number): RGB {
-  const t = 1 - Math.exp(-Math.max(0, floor) / 36);
-  if (t < 0.5) return mix(CLAY, EMBER, t / 0.5);
-  return mix(EMBER, BONE, ((t - 0.5) / 0.5) * 0.82);
+/** Three-stop colour ramp, `t` in 0..1. */
+export function ramp(stops: readonly [RGB, RGB, RGB], t: number): RGB {
+  const u = clamp01(t);
+  if (u < 0.5) return mix(stops[0], stops[1], u / 0.5);
+  return mix(stops[1], stops[2], (u - 0.5) / 0.5);
 }
 
 export type CourseId = "slide" | "gust" | "beat" | "sway" | "rush" | "breath" | "eclipse";
 
-const COURSE_CYCLE: CourseId[] = ["gust", "beat", "sway", "rush", "breath", "eclipse"];
-const COURSE_SPAN = 5;
-
-/** First flights are plain. Then the sky changes every five floors. */
-export function courseFor(floors: number): CourseId {
-  if (floors < 4) return "slide";
-  return COURSE_CYCLE[Math.floor((floors - 4) / COURSE_SPAN) % COURSE_CYCLE.length]!;
-}
-
-export function courseChanges(floors: number): boolean {
-  return floors >= 4 && (floors - 4) % COURSE_SPAN === 0;
-}
+export const COURSE_CYCLE: readonly CourseId[] = [
+  "gust",
+  "beat",
+  "sway",
+  "rush",
+  "breath",
+  "eclipse",
+];
 
 export function courseLabel(id: CourseId): string {
   if (id === "slide") return "Slide";
@@ -76,7 +79,7 @@ export function courseLabel(id: CourseId): string {
 
 export function courseHint(id: CourseId): string {
   if (id === "slide") return "Even pace";
-  if (id === "gust") return "Fast with the wind";
+  if (id === "gust") return "The wind carries the fall";
   if (id === "beat") return "Rests, then jumps";
   if (id === "sway") return "The groove walks";
   if (id === "rush") return "Bursts through center";
@@ -84,18 +87,84 @@ export function courseHint(id: CourseId): string {
   return "Tap the flare";
 }
 
-export function isKeystone(floors: number): boolean {
-  return floors > 0 && floors % 8 === 7;
+/**
+ * What a run asks of you, floor by floor. Levels and endless both reduce to
+ * one of these, so the engine never has to know which mode it is in.
+ */
+/** A slab that hangs above the stack and falls when released. */
+export type Fall = {
+  /** How far above its seat the slab hangs, px. */
+  hover: number;
+  /** How far the wind carries it sideways on the way down, px. 0 is still air. */
+  drift: number;
+  /** Outline where it will land. On while the idea is new, then taken away. */
+  guide: boolean;
+};
+
+/** Height a falling slab hangs at: three floors. */
+export const HOVER = 84;
+const FALL_G = 1800;
+
+/** Seconds a slab takes to fall `hover` px from rest. */
+export function fallDuration(hover: number): number {
+  return Math.sqrt((2 * Math.max(0, hover)) / FALL_G);
 }
 
-export function shouldSpawnMote(floors: number): boolean {
-  if (floors < 5 || isKeystone(floors) || courseChanges(floors)) return false;
+/**
+ * Share of the fall completed after `t` of `duration` seconds, 0..1. Gravity
+ * and a steady wind both act from rest, so height lost and sideways drift
+ * follow this same curve and the slab travels a straight slanted line.
+ */
+export function fallShare(t: number, duration: number): number {
+  if (duration <= 0) return 1;
+  const k = clamp01(t / duration);
+  return k * k;
+}
+
+export type Plan = {
+  /** Floors to place to finish. 0 means the run never ends. */
+  goal: number;
+  courseAt: (floors: number) => CourseId;
+  /** Whether the slab on this floor falls, and how the wind treats it. */
+  fallAt: (floors: number) => Fall | null;
+  /** Seconds for the slab to travel one way. */
+  periodAt: (floors: number) => number;
+  /** Shifts the perfect window: later levels start with a tighter one. */
+  difficulty: number;
+  hazardsAt: (floors: number) => Hazards;
+  /** Floors one sky lasts, which paces how its backdrop deepens. */
+  span: number;
+  themeAt: (floors: number) => ThemeId;
+  /** Where on the sky's slab colour ramp this floor sits, 0..1. */
+  shadeAt: (floor: number) => number;
+  /** The floor count that ends the current stretch, or 0 if nothing does. */
+  gateAt: (floors: number) => number;
+  /** Whether placing this many floors pauses the run for an upgrade pick. */
+  pickAt: (floors: number) => boolean;
+};
+
+export type Hazards = { keystones: boolean; motes: boolean; bombs: boolean };
+
+export function courseChanges(plan: Plan, floors: number): boolean {
+  return floors > 0 && plan.courseAt(floors) !== plan.courseAt(floors - 1);
+}
+
+export function isKeystone(plan: Plan, floors: number): boolean {
+  return plan.hazardsAt(floors).keystones && floors > 0 && floors % 8 === 7;
+}
+
+export function shouldSpawnMote(plan: Plan, floors: number): boolean {
+  if (!plan.hazardsAt(floors).motes || floors < 5) return false;
+  if (isKeystone(plan, floors) || courseChanges(plan, floors)) return false;
   return floors % 4 === 1;
 }
 
 /** A bomb parks over the groove. You wait it out before the next drop. */
-export function shouldSpawnBomb(floors: number): boolean {
-  if (floors < 6 || isKeystone(floors) || courseChanges(floors) || shouldSpawnMote(floors)) return false;
+export function shouldSpawnBomb(plan: Plan, floors: number): boolean {
+  if (!plan.hazardsAt(floors).bombs || floors < 6) return false;
+  if (isKeystone(plan, floors) || courseChanges(plan, floors) || shouldSpawnMote(plan, floors)) {
+    return false;
+  }
   return floors % 3 === 0;
 }
 
@@ -105,7 +174,7 @@ export function beatHz(period: number): number {
 }
 
 export function beatPhase(clock: number, period: number): number {
-  return ((clock * beatHz(period)) % 1 + 1) % 1;
+  return (((clock * beatHz(period)) % 1) + 1) % 1;
 }
 
 /** How fast `u` (-1..1) moves. Each course keeps a different time. */
@@ -118,7 +187,7 @@ export function travelRate(
   clock: number,
 ): number {
   let rate = 2 / Math.max(0.2, period);
-  if (course === "gust") rate *= dir === wind ? 1.85 : 0.52;
+  if (course === "gust") rate *= dir === wind ? 1.35 : 0.7;
   if (course === "rush") rate *= 0.34 + 1.2 * (1 - Math.min(1, Math.abs(u)));
   if (course === "beat") {
     const phase = beatPhase(clock, period);
@@ -137,11 +206,6 @@ export function swayOffset(course: CourseId, clock: number, w: number): number {
   return Math.sin(clock * 1.55) * Math.min(34, w * 0.2);
 }
 
-/** Seconds for the slab to travel one way. Eases in, then hardens. */
-export function periodFor(floors: number): number {
-  return Math.max(0.4, 1.06 * Math.pow(0.988, floors));
-}
-
 /**
  * Perfect window in pixels. Tuned as a shrinking slice of time so late-game
  * speed doesn't make the zone invisible — you still have to meet it.
@@ -158,11 +222,12 @@ export function resolveDrop(input: DropInput): DropResult {
 
   if (Math.abs(dx) <= tol) {
     const nextStreak = streak + 1;
-    const forged = nextStreak % FORGE_EVERY === 0;
+    const every = input.forgeEvery ?? FORGE_EVERY;
+    const forged = every > 0 && nextStreak % every === 0;
     let w = prevW;
     let x = prevX;
     if (forged) {
-      const grown = Math.min(startW, prevW * FORGE_GROW);
+      const grown = Math.min(startW, prevW * (input.forgeGrow ?? FORGE_GROW));
       if (grown > prevW + 0.4) {
         w = grown;
         x = prevX + prevW / 2 - w / 2;
@@ -206,4 +271,52 @@ export function resolveDrop(input: DropInput): DropResult {
     scrap,
     points: 10,
   };
+}
+
+/**
+ * How much of the slab landed, 0..1. Anything inside the perfect window counts
+ * as dead centre, so accuracy and the PERFECT call never disagree.
+ */
+export function dropAccuracy(dx: number, moverW: number, tol: number): number {
+  const off = Math.abs(dx);
+  if (off <= tol) return 1;
+  return clamp01(1 - off / Math.max(1, moverW));
+}
+
+/**
+ * Musical tension, 0..1, from how much of the slab is left. Full width is
+ * calm; a sliver is the top of the scale. Curved so the first cuts register.
+ */
+export function tensionFor(w: number, startW: number): number {
+  const span = Math.max(1, startW - MIN_W);
+  return Math.pow(clamp01(1 - (w - MIN_W) / span), 0.8);
+}
+
+export type Goals = { clear: boolean; precise: boolean; swift: boolean };
+
+/** Stars for a finished run: one for the summit, one for precision, one for pace. */
+export function goalsFor(
+  time: number,
+  accuracy: number,
+  parTime: number,
+  parAccuracy: number,
+): Goals {
+  return { clear: true, precise: accuracy >= parAccuracy, swift: time <= parTime };
+}
+
+export function starCount(goals: Goals): number {
+  return Number(goals.clear) + Number(goals.precise) + Number(goals.swift);
+}
+
+/** `83.42` → `1:23.42`. Run clocks are short, so hundredths matter. */
+export function formatTime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds * 100 + 1e-6));
+  const cs = total % 100;
+  const s = Math.floor(total / 100) % 60;
+  const m = Math.floor(total / 6000);
+  return `${m}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
+}
+
+export function formatPercent(ratio: number): string {
+  return `${Math.floor(clamp01(ratio) * 100 + 1e-6)}%`;
 }
