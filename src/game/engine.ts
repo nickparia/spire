@@ -70,6 +70,7 @@ import {
   type RGB,
 } from "./logic";
 import { Music } from "./music";
+import { Stage } from "./physics";
 import {
   BOMB_RGB,
   drawBomb,
@@ -201,6 +202,8 @@ export type Hud = {
   result: LevelResult | null;
   /** A paid rebuild on offer after a fall, with the seconds left to take it. */
   rescue: { price: number; seconds: number } | null;
+  /** True when the Dark, not a missed drop, ended the run. */
+  taken: boolean;
 };
 
 export type EngineEvents = {
@@ -241,6 +244,8 @@ type Slab = {
   fallDelay: number;
   falling: boolean;
   key: boolean;
+  /** Its rigid body on the physics stage, when the sky runs one. */
+  body: number | null;
 };
 
 type Piece = { x: number; w: number };
@@ -413,7 +418,10 @@ export class SpireEngine {
   /** The paid continue: offered once, and it costs the pace star. */
   private rescue: { price: number; until: number; stack: { x: number; y: number }[] } | null = null;
   private rebuilt = false;
+  private taken = false;
   private fastDrops = 0;
+  /** The rigid-body stage, on skies that run physics. */
+  private stage: Stage | null = null;
   /** Height of the Dark's surface, world px, and where it is drawn as it eases there. */
   private dark = DARK_START;
   private darkShown = DARK_START;
@@ -636,7 +644,7 @@ export class SpireEngine {
     this.picks[id] = (this.picks[id] ?? 0) + 1;
     this.tune = tuneFor(this.picks);
     this.offers = [];
-    const top = this.stack[this.stack.length - 1]!;
+    const top = this.peak()!;
     const cx = top.x + top.w / 2;
     if (id === "shield") {
       this.shields = Math.min(MAX_SHIELDS, this.shields + 1);
@@ -744,7 +752,7 @@ export class SpireEngine {
   }
 
   probe(): Probe {
-    const prev = this.stack[this.stack.length - 1];
+    const prev = this.peak();
     return {
       phase: this.hudPhase(),
       floors: this.floors,
@@ -870,6 +878,11 @@ export class SpireEngine {
         : Math.max(220, Math.min(300, this.viewW * 0.26));
     this.startW *= this.kit.footing;
     this.stack = [this.makeSlab(-this.startW / 2, 0, this.startW, 0, 1, 0)];
+    this.stage = null;
+    if (this.plan.physics && phase === "ready") {
+      this.stage = new Stage();
+      this.stack[0]!.body = this.stage.addStatic(-this.startW / 2, 0, this.startW, VISUAL_H);
+    }
     this.demoAge = 0;
     this.demoNext = 0.8;
     this.demoLit = false;
@@ -885,7 +898,7 @@ export class SpireEngine {
   private attract(dt: number): void {
     const goal = 12;
     this.demoAge += dt;
-    const top = this.stack[this.stack.length - 1]!;
+    const top = this.peak()!;
     if (!this.demoLit) {
       if (this.stack.length <= goal) {
         this.demoNext -= dt;
@@ -964,6 +977,7 @@ export class SpireEngine {
       fallDelay: 0,
       falling: false,
       key: false,
+      body: null,
     };
   }
 
@@ -975,7 +989,7 @@ export class SpireEngine {
   }
 
   private spawnMover(): void {
-    const prev = this.stack[this.stack.length - 1]!;
+    const prev = this.peak()!;
     const w = prev.w;
     const course = this.plan.courseAt(this.floors);
     const halfSpan = Math.max(w * 0.98, 80);
@@ -995,7 +1009,7 @@ export class SpireEngine {
     this.mover = {
       u: dir > 0 ? -0.56 : 0.56,
       x: 0,
-      y: prev.y + SLAB_H + (fall?.hover ?? 0),
+      y: this.seatY() + (fall?.hover ?? 0) + (this.stage ? SLAB_H * 3 : 0),
       w,
       dir,
       halfSpan,
@@ -1105,7 +1119,7 @@ export class SpireEngine {
    */
   private detonate(): void {
     const bomb = this.bomb;
-    const top = this.stack[this.stack.length - 1];
+    const top = this.peak();
     if (!bomb || !top) return;
     this.bomb = null;
     this.tip = "";
@@ -1150,6 +1164,75 @@ export class SpireEngine {
     this.emit();
   }
 
+  /**
+   * The slab everything builds on: the highest one at rest. Without physics
+   * that is simply the last one placed.
+   */
+  private peak(): Slab {
+    if (!this.stage) return this.stack[this.stack.length - 1]!;
+    let best = this.stack[0]!;
+    let top = -Infinity;
+    for (const slab of this.stack) {
+      if (slab.body === null) continue;
+      const view = this.stage.read(slab.body);
+      if (!view || !view.resting) continue;
+      const t = this.stage.topOf(slab.body);
+      if (t > top) {
+        top = t;
+        best = slab;
+      }
+    }
+    return best;
+  }
+
+  /** World height a new slab's bottom sits at when it lands on the peak. */
+  private seatY(): number {
+    const top = this.peak();
+    if (this.stage && top.body !== null) return this.stage.topOf(top.body) + (SLAB_H - VISUAL_H);
+    return top.y + SLAB_H;
+  }
+
+  /** Floors of height reached: on the stage, measured; otherwise counted. */
+  private floorsNow(): number {
+    if (!this.stage) return this.floors;
+    return Math.max(0, Math.round(this.seatY() / SLAB_H));
+  }
+
+  /** Steps the stage and reads the bodies back into their slabs. */
+  private settle(dt: number): void {
+    const stage = this.stage;
+    if (!stage) return;
+    stage.step(dt);
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      const slab = this.stack[i]!;
+      if (slab.body === null) continue;
+      const view = stage.read(slab.body);
+      if (!view) continue;
+      if (i > 0 && (view.cy < -300 || Math.abs(view.cx) > 1600)) {
+        // Gone over the edge of the world: let it go.
+        stage.remove(slab.body);
+        this.stack.splice(i, 1);
+        continue;
+      }
+      slab.x = view.cx - view.w / 2;
+      slab.y = view.cy - view.h / 2;
+      slab.rot = view.angle;
+    }
+    if (this.phase === "play" || this.phase === "ready") {
+      // The held slab rides two floors above whatever is resting highest.
+      const want = this.seatY() + SLAB_H * 2 + (this.mover.fallT >= 0 ? 0 : 0);
+      if (this.mover.fallT < 0) this.mover.y += (want - this.mover.y) * Math.min(1, dt * 8);
+    }
+    if (this.phase === "play") {
+      const reached = this.floorsNow();
+      if (reached !== this.floors) {
+        this.floors = reached;
+        this.emit();
+      }
+      if (this.plan.goal > 0 && reached >= this.plan.goal) this.win();
+    }
+  }
+
   /** Light pushes the Dark down, never below where it started. */
   private pushDark(px: number): void {
     if (this.plan.darkRate <= 0 || px <= 0) return;
@@ -1158,7 +1241,7 @@ export class SpireEngine {
 
   /** Floors of tower still above the Dark. */
   private darkGap(): number {
-    const top = this.stack[this.stack.length - 1];
+    const top = this.peak();
     if (!top) return 0;
     return (top.y + SLAB_H - this.dark) / SLAB_H;
   }
@@ -1170,11 +1253,12 @@ export class SpireEngine {
   private riseDark(dt: number): void {
     if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0) {
       this.dark += this.plan.darkRate * dt;
-      const top = this.stack[this.stack.length - 1]!;
+      const top = this.peak()!;
       if (this.dark >= top.y + SLAB_H * 0.5) {
         this.dark = top.y + SLAB_H * 0.5;
         this.float("TAKEN BY THE DARK", top.x + top.w / 2, top.y + 60, false, 24);
         this.die();
+        this.taken = true;
         for (const slab of this.stack) {
           slab.vy = -80 - Math.random() * 40;
           slab.vx *= 0.3;
@@ -1226,7 +1310,7 @@ export class SpireEngine {
 
   private advanceFall(dt: number): void {
     const m = this.mover;
-    const prev = this.stack[this.stack.length - 1];
+    const prev = this.peak();
     if (!prev) return;
     m.fallT += dt;
     const k = fallShare(m.fallT, m.fallTime);
@@ -1288,7 +1372,7 @@ export class SpireEngine {
     // Every few pixels lost, a chunk breaks off one end and tumbles away, so
     // the loss is something you watch. A lit bomb forces the wait, so that
     // time is not held against the slab.
-    if (this.phase === "play" && !(this.bomb && this.bomb.fuse > 0)) {
+    if (this.phase === "play" && !this.stage && !(this.bomb && this.bomb.fuse > 0)) {
       m.age += dt;
       const w = heldWidth(m.w0, m.age, m.period, this.kit.shrink, this.kit.grace, m.course);
       if (w < m.w - 0.01) {
@@ -1440,13 +1524,31 @@ export class SpireEngine {
   }
 
   private place(): void {
-    const prev = this.stack[this.stack.length - 1];
+    const prev = this.peak();
     if (!prev) return;
     const dx = dropOffset(prev.x, prev.w, this.mover.x, this.mover.w);
     let pieces: Piece[] | null = null;
     let result: DropResult;
     let landed: number;
-    if (this.mover.split) {
+    if (this.stage) {
+      // On the stage the slab keeps its whole width and falls as it is; a
+      // perfect is let go dead centre, anything else lands where it was.
+      const perfect = Math.abs(dx) <= this.tol;
+      const x = perfect ? prev.x + prev.w / 2 - this.mover.w / 2 : this.mover.x;
+      const nextStreak = perfect ? this.streak + 1 : 0;
+      result = {
+        ok: true,
+        perfect,
+        forged: false,
+        close: !perfect && Math.abs(dx) <= this.tol * 2.15,
+        x,
+        w: this.mover.w,
+        streak: nextStreak,
+        scrap: null,
+        points: perfect ? 10 + 10 * nextStreak : 10,
+      };
+      landed = dropAccuracy(dx, this.mover.w, this.tol);
+    } else if (this.mover.split) {
       const split = this.splitLanding(prev);
       result = split.result;
       landed = split.landed;
@@ -1477,8 +1579,16 @@ export class SpireEngine {
     }
     this.accuracySum += landed;
 
-    const floor = this.stack.length;
-    const slab = this.makeSlab(result.x, prev.y + SLAB_H, result.w, floor, 0, 1);
+    const floor = this.stage ? this.floorsNow() + 1 : this.stack.length;
+    const slab = this.makeSlab(
+      result.x,
+      this.stage ? this.mover.y : prev.y + SLAB_H,
+      result.w,
+      floor,
+      this.stage ? 1 : 0,
+      1,
+    );
+    if (this.stage) slab.body = this.stage.drop(result.x, this.mover.y, result.w, VISUAL_H);
     slab.pieces = pieces;
     slab.key = this.mover.keystone && result.perfect;
     let points = result.points;
@@ -1615,7 +1725,7 @@ export class SpireEngine {
     this.camDrop = 64;
     this.music.setTension(tensionFor(slab.w, this.startW));
 
-    if (this.plan.goal > 0 && this.floors >= this.plan.goal) {
+    if (!this.stage && this.plan.goal > 0 && this.floors >= this.plan.goal) {
       this.win();
       return;
     }
@@ -1867,7 +1977,7 @@ export class SpireEngine {
       slab.ripple = (this.stack.length - 1 - i) * 0.03;
     }
     // Stood back up narrower, the way a shield save leaves it.
-    const top = this.stack[this.stack.length - 1]!;
+    const top = this.peak()!;
     if (this.stack.length > 1) {
       const w = Math.max(MIN_W + 8, top.w * 0.6);
       top.x = top.x + top.w / 2 - w / 2;
@@ -1892,6 +2002,7 @@ export class SpireEngine {
 
   private die(): void {
     this.phase = "fall";
+    this.taken = false;
     this.fallAge = 0;
     this.hint = false;
     this.bomb = null;
@@ -1900,7 +2011,7 @@ export class SpireEngine {
     const owed = this.kit.secondWind && !this.secondWindUsed;
     const price = this.rescuePrice();
     this.rescue =
-      !this.rebuilt && !owed && this.stack.length > 1 && this.save.coins >= price
+      !this.stage && !this.rebuilt && !owed && this.stack.length > 1 && this.save.coins >= price
         ? { price, until: 6, stack: this.stack.map((s) => ({ x: s.x, y: s.y })) }
         : null;
     const rgb = this.slabColor(this.floors + 1);
@@ -1917,6 +2028,7 @@ export class SpireEngine {
     });
     for (let i = 0; i < this.stack.length; i++) {
       const slab = this.stack[i]!;
+      if (slab.body !== null) continue;
       const fromTop = this.stack.length - 1 - i;
       slab.falling = true;
       slab.fallDelay = fromTop * 0.028;
@@ -1963,7 +2075,7 @@ export class SpireEngine {
     this.bomb = null;
     this.freeze = 0;
 
-    const top = this.stack[this.stack.length - 1]!;
+    const top = this.peak()!;
     const cx = top.x + top.w / 2;
     const crown = top.y + VISUAL_H;
     // Pull back far enough to stand the whole spire above the results card.
@@ -2102,6 +2214,7 @@ export class SpireEngine {
       rescue: this.rescueOpen()
         ? { price: this.rescue!.price, seconds: Math.ceil(this.rescue!.until - this.fallAge) }
         : null,
+      taken: this.taken,
     });
   }
 
@@ -2136,12 +2249,12 @@ export class SpireEngine {
     this.pulse = Math.max(0, this.pulse - dt * 2.2);
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
-    const prev = this.stack[this.stack.length - 1];
+    const prev = this.peak();
     let inZone = false;
     if (aiming && this.freeze <= 0) {
       if (this.mover.fallT >= 0) this.advanceFall(dt);
       else this.advanceMover(dt);
-      inZone = this.cued() && this.lined(this.stack[this.stack.length - 1]);
+      inZone = this.cued() && this.lined(this.peak());
       if (this.phase !== "menu") {
         if (inZone && !this.wasInZone) this.sfx.tick();
         this.wasInZone = inZone;
@@ -2172,6 +2285,7 @@ export class SpireEngine {
     // The clock runs from the first drop, and never during a hit-stop: a
     // perfect must not cost time for the freeze frame that celebrates it.
     if (this.phase === "play" && this.freeze <= 0) this.runTime += dt;
+    if (this.phase !== "won") this.settle(dt);
     this.riseDark(dt);
 
     const flareGoal = inZone && this.mover.course === "eclipse" && this.phase !== "menu" ? 1 : 0;
@@ -2284,7 +2398,7 @@ export class SpireEngine {
         haptics.light();
       }
     }
-    const top = this.stack[this.stack.length - 1]!;
+    const top = this.peak()!;
     if (this.shellsLeft > 0 && this.wonAge >= this.nextShell) {
       this.shellsLeft -= 1;
       this.nextShell += 0.26 + Math.random() * 0.34;
@@ -2375,7 +2489,7 @@ export class SpireEngine {
     if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
     this.drawAura(ctx);
 
-    const prev = this.stack[this.stack.length - 1];
+    const prev = this.peak();
     const inZone = aiming && this.phase !== "menu" && this.cued() && this.lined(prev);
 
     for (const slab of this.stack) this.drawSlab(ctx, slab, inZone && slab === prev);
@@ -2530,7 +2644,7 @@ export class SpireEngine {
   /** Sight: the perfect window, drawn on the top of the stack. */
   private drawSight(ctx: CanvasRenderingContext2D): void {
     if (this.phase !== "ready" && this.phase !== "play") return;
-    const top = this.stack[this.stack.length - 1];
+    const top = this.peak();
     if (!top) return;
     const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H);
     const half = Math.min(top.w / 2, this.tol);
@@ -2597,7 +2711,7 @@ export class SpireEngine {
 
   /** A column of light off the finished spire. */
   private drawBeacon(ctx: CanvasRenderingContext2D): void {
-    const top = this.stack[this.stack.length - 1];
+    const top = this.peak();
     if (!top) return;
     const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H);
     const flicker = this.reduceMotion ? 1 : 0.8 + 0.2 * Math.sin(this.clock * 5.5);
@@ -2640,7 +2754,7 @@ export class SpireEngine {
   /** Heat behind the top of the stack that builds with the streak. */
   private drawAura(ctx: CanvasRenderingContext2D): void {
     if (this.streak < 2 || this.phase !== "play") return;
-    const top = this.stack[this.stack.length - 1];
+    const top = this.peak();
     if (!top) return;
     const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
     const breathe = this.reduceMotion ? 1 : 0.85 + 0.15 * Math.sin(this.clock * 4);
@@ -2657,6 +2771,17 @@ export class SpireEngine {
   }
 
   private drawSlab(ctx: CanvasRenderingContext2D, slab: Slab, hotGroove: boolean): void {
+    if (slab.body !== null && slab.floor > 0) {
+      const c = this.worldToScreen(slab.x + slab.w / 2, slab.y + VISUAL_H / 2);
+      if (c.y < -80 || c.y > this.vh + 120) return;
+      const body = slab.flash > 0 ? mix(slab.rgb, [255, 255, 255], slab.flash * 0.82) : slab.rgb;
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(-slab.rot);
+      this.paintSlab(ctx, -slab.w / 2, VISUAL_H / 2, slab.w, VISUAL_H, body, 1, 0, hotGroove);
+      ctx.restore();
+      return;
+    }
     const s = this.worldToScreen(slab.x, slab.y);
     if (s.y < -80 || s.y - VISUAL_H > this.vh + 120) return;
     const settled = slab.anim >= 1 || this.reduceMotion;
@@ -2761,7 +2886,7 @@ export class SpireEngine {
     }
     if (m.split) {
       // Two halves, each with the ghost of its own home on the stack.
-      const prev = this.stack[this.stack.length - 1];
+      const prev = this.peak();
       const hw = m.w / 2;
       if (prev) {
         ctx.save();
@@ -2879,7 +3004,7 @@ export class SpireEngine {
 
   private drawBomb(ctx: CanvasRenderingContext2D): void {
     const bomb = this.bomb;
-    const top = this.stack[this.stack.length - 1];
+    const top = this.peak();
     if (!bomb || !top) return;
     const s = this.worldToScreen(bomb.x, bomb.y);
     drawBomb(ctx, {
@@ -2897,7 +3022,7 @@ export class SpireEngine {
 
   private drawMote(ctx: CanvasRenderingContext2D): void {
     const mote = this.mote;
-    const top = this.stack[this.stack.length - 1];
+    const top = this.peak();
     if (!mote || !top) return;
     const s = this.worldToScreen(mote.x, mote.y);
     drawPickup(ctx, {

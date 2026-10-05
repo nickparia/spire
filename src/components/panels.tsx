@@ -284,7 +284,7 @@ export function OverPanel({
           <p className="rescue-timer">{rescue.seconds}s</p>
         </div>
       ) : null}
-      <p className="kicker">The spire fell</p>
+      <p className="kicker">{hud.taken ? "Taken by the Dark" : "The spire fell"}</p>
       {level ? (
         <p className="score mt-1">
           {hud.floors}

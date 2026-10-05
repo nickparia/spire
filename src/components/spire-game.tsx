@@ -38,6 +38,7 @@ const INITIAL: Hud = {
   coins: 0,
   darkGap: null,
   rescue: null,
+  taken: false,
   accent: "rgb(255,77,26)",
   result: null,
 };

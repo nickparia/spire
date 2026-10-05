@@ -136,6 +136,8 @@ export type Plan = {
   difficulty: number;
   /** How fast the Dark climbs the tower, px per second; 0 keeps it away. */
   darkRate: number;
+  /** Slabs are rigid bodies: they lean, slide and topple, and rubble can be built on. */
+  physics: boolean;
   hazardsAt: (floors: number) => Hazards;
   /** Floors one sky lasts, which paces how its backdrop deepens. */
   span: number;

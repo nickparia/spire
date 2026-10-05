@@ -20,6 +20,8 @@ export type LevelDef = {
   wind?: [number, number];
   /** Floors between upgrade picks. Omit for a level with no picks. */
   picks?: number;
+  /** The physics prototype: slabs with weight that lean, slide and topple. */
+  physics?: boolean;
   keystones: boolean;
   motes: boolean;
   bombs: boolean;
@@ -45,6 +47,7 @@ export const LEVELS: LevelDef[] = [
     floors: 14,
     courses: ["slide"],
     period: [1.1, 0.98],
+    physics: true,
     keystones: false,
     motes: false,
     bombs: false,
@@ -203,6 +206,7 @@ export function levelPlan(level: LevelDef, index: number): Plan {
     difficulty: index * 6,
     // Slow enough to outbuild with steady play, never slow enough to ignore.
     darkRate: Math.min(22, 10 + index * 1.5),
+    physics: Boolean(level.physics),
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
     themeAt: () => level.theme,
@@ -231,6 +235,7 @@ export const ENDLESS_PLAN: Plan = {
   periodAt: (floors) => Math.max(0.4, 1.06 * Math.pow(0.988, floors)),
   difficulty: 0,
   darkRate: 12,
+  physics: false,
   hazardsAt: () => ({ keystones: true, motes: true, bombs: true }),
   span: ENDLESS_SPAN,
   themeAt: (floors) => endlessTheme(endlessCourseAt(floors)),
