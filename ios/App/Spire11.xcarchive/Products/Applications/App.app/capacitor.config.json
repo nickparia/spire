@@ -1,0 +1,14 @@
+{
+	"appId": "com.nickprince.spire",
+	"appName": "Spire",
+	"webDir": "dist",
+	"backgroundColor": "#12100e",
+	"ios": {
+		"contentInset": "never",
+		"scrollEnabled": false,
+		"backgroundColor": "#12100e"
+	},
+	"packageClassList": [
+		"HapticsPlugin"
+	]
+}

@@ -469,6 +469,10 @@ export class SpireEngine {
   private nextShell = 0;
   private starCues: number[] = [];
   private camX = 0;
+  /** On the stage: where the camera, the held slab and the floor count rest, updated only once the slabs have settled. */
+  private seat = { x: 0, y: SLAB_H };
+  /** Seconds of slow motion left while a topple plays out. */
+  private slowmo = 0;
   private camY = 0;
   private camDrop = 0;
   private look = 0;
@@ -883,6 +887,9 @@ export class SpireEngine {
       this.stage = new Stage();
       this.stack[0]!.body = this.stage.addStatic(-this.startW / 2, 0, this.startW, VISUAL_H);
     }
+    this.seat = { x: 0, y: SLAB_H };
+    this.slowmo = 0;
+    this.taken = false;
     this.demoAge = 0;
     this.demoNext = 0.8;
     this.demoLit = false;
@@ -1195,14 +1202,22 @@ export class SpireEngine {
   /** Floors of height reached: on the stage, measured; otherwise counted. */
   private floorsNow(): number {
     if (!this.stage) return this.floors;
-    return Math.max(0, Math.round(this.seatY() / SLAB_H));
+    return Math.max(0, Math.round(this.seat.y / SLAB_H));
   }
 
   /** Steps the stage and reads the bodies back into their slabs. */
   private settle(dt: number): void {
     const stage = this.stage;
     if (!stage) return;
-    stage.step(dt);
+    // A topple plays out slowly enough to watch.
+    this.slowmo = Math.max(0, this.slowmo - dt);
+    stage.step(this.slowmo > 0 ? dt * 0.3 : dt);
+    if (stage.takeTopple() && this.phase === "play") {
+      this.slowmo = 0.8;
+      const top = this.peak();
+      this.float("TOPPLE", top.x + top.w / 2, top.y + 50, false, 22);
+      this.sfx.fail();
+    }
     for (let i = this.stack.length - 1; i >= 0; i--) {
       const slab = this.stack[i]!;
       if (slab.body === null) continue;
@@ -1218,10 +1233,14 @@ export class SpireEngine {
       slab.y = view.cy - view.h / 2;
       slab.rot = view.angle;
     }
-    if (this.phase === "play" || this.phase === "ready") {
-      // The held slab rides two floors above whatever is resting highest.
-      const want = this.seatY() + SLAB_H * 2 + (this.mover.fallT >= 0 ? 0 : 0);
-      if (this.mover.fallT < 0) this.mover.y += (want - this.mover.y) * Math.min(1, dt * 8);
+    if (stage.settled()) {
+      const top = this.peak();
+      this.seat = { x: top.x + top.w / 2, y: this.seatY() };
+    }
+    if ((this.phase === "play" || this.phase === "ready") && this.mover.fallT < 0) {
+      // The held slab rides two floors above the settled top.
+      const want = this.seat.y + SLAB_H * 2;
+      this.mover.y += (want - this.mover.y) * Math.min(1, dt * 6);
     }
     if (this.phase === "play") {
       const reached = this.floorsNow();
@@ -1243,7 +1262,8 @@ export class SpireEngine {
   private darkGap(): number {
     const top = this.peak();
     if (!top) return 0;
-    return (top.y + SLAB_H - this.dark) / SLAB_H;
+    const seat = this.stage ? this.seat.y : top.y + SLAB_H;
+    return (seat - this.dark) / SLAB_H;
   }
 
   /**
@@ -1254,11 +1274,13 @@ export class SpireEngine {
     if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0) {
       this.dark += this.plan.darkRate * dt;
       const top = this.peak()!;
-      if (this.dark >= top.y + SLAB_H * 0.5) {
-        this.dark = top.y + SLAB_H * 0.5;
-        this.float("TAKEN BY THE DARK", top.x + top.w / 2, top.y + 60, false, 24);
-        this.die();
+      // On the stage the Dark judges the settled top, never a slab mid-topple.
+      const seat = this.stage ? this.seat.y : top.y + SLAB_H;
+      if (this.dark >= seat - SLAB_H * 0.5) {
+        this.dark = seat - SLAB_H * 0.5;
+        this.float("TAKEN BY THE DARK", top.x + top.w / 2, seat + 40, false, 24);
         this.taken = true;
+        this.die();
         for (const slab of this.stack) {
           slab.vy = -80 - Math.random() * 40;
           slab.vx *= 0.3;
@@ -1674,7 +1696,7 @@ export class SpireEngine {
         10,
         120,
       );
-      this.trauma = Math.min(1, this.trauma + 0.28);
+      if (!this.stage) this.trauma = Math.min(1, this.trauma + 0.28);
       this.freeze = this.reduceMotion ? 0.015 : 0.04;
       haptics.light();
     }
@@ -1823,7 +1845,7 @@ export class SpireEngine {
     this.fx.sparkle(cx, seam + 2, slab.w, mix(accent, BONE, 0.55), 8 + Math.round(heat * 14));
     this.pulse = Math.min(1, 0.35 + heat * 0.4);
     this.flash = forged ? 0.45 : 0.22;
-    this.trauma = Math.min(1, this.trauma + (forged ? 0.45 : 0.22));
+    if (!this.stage) this.trauma = Math.min(1, this.trauma + (forged ? 0.45 : 0.22));
     this.freeze = this.reduceMotion ? 0.02 : forged ? 0.09 : 0.055;
 
     if (forged) {
@@ -2002,7 +2024,6 @@ export class SpireEngine {
 
   private die(): void {
     this.phase = "fall";
-    this.taken = false;
     this.fallAge = 0;
     this.hint = false;
     this.bomb = null;
@@ -2368,10 +2389,10 @@ export class SpireEngine {
     if (this.phase === "menu") this.attract(dt);
     if (this.phase === "won") this.celebrate(dt);
     else if (prev && this.phase !== "fall") {
-      const seam = prev.y + SLAB_H;
+      const seam = this.stage ? this.seat.y : prev.y + SLAB_H;
       const targetY = Math.max(0, seam - this.viewH * LEAD) + this.camDrop;
-      const targetX = prev.x + prev.w / 2;
-      const k = 1 - Math.exp(-5.2 * dt);
+      const targetX = this.stage ? this.seat.x : prev.x + prev.w / 2;
+      const k = 1 - Math.exp(-(this.stage ? 3 : 5.2) * dt);
       this.camY += (targetY - this.camY) * k;
       this.camX += (targetX - this.camX) * k;
       // The far scenery leans a little against the slab's travel.
@@ -2493,6 +2514,7 @@ export class SpireEngine {
     const inZone = aiming && this.phase !== "menu" && this.cued() && this.lined(prev);
 
     for (const slab of this.stack) this.drawSlab(ctx, slab, inZone && slab === prev);
+    if (this.stage && aiming && this.phase !== "menu") this.drawPlumb(ctx, prev);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
     if (this.plan.darkRate > 0 && this.phase !== "menu") this.drawDark(ctx);
@@ -2767,6 +2789,35 @@ export class SpireEngine {
     g.addColorStop(1, rgbCss(this.theme.accent, 0));
     ctx.fillStyle = g;
     ctx.fillRect(s.x - reach, s.y - reach, reach * 2, reach * 2);
+    ctx.restore();
+  }
+
+  /**
+   * A plumb line from the top slab shows the lean: faint while the spire is
+   * true, red with the angle once it is tilting enough to matter.
+   */
+  private drawPlumb(ctx: CanvasRenderingContext2D, top: Slab): void {
+    if (top.body === null || top.floor === 0) return;
+    const deg = Math.abs((top.rot * 180) / Math.PI);
+    const c = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
+    const foot = this.worldToScreen(top.x + top.w / 2, 0);
+    const tilt = clamp01((deg - 1.5) / 6);
+    ctx.save();
+    ctx.strokeStyle = tilt > 0 ? `rgba(255,90,60,${0.25 + tilt * 0.6})` : "rgba(255,245,230,0.24)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y);
+    ctx.lineTo(c.x, Math.min(foot.y, this.vh + 10));
+    ctx.stroke();
+    if (deg >= 1.5) {
+      ctx.setLineDash([]);
+      ctx.font = '700 13px system-ui, -apple-system, "Helvetica Neue", sans-serif';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = `rgba(255,${Math.round(200 - tilt * 120)},${Math.round(170 - tilt * 110)},0.95)`;
+      ctx.fillText(`${deg.toFixed(0)}° lean`, c.x + top.w / 2 + 10, c.y);
+    }
     ctx.restore();
   }
 
