@@ -4,6 +4,7 @@ import {
   BASE_TUNING,
   CAPSTONES,
   familyCount,
+  styleOf,
   hasCapstone,
   HEAT,
   offer,
@@ -19,11 +20,12 @@ import {
 } from "./build";
 import { Fx } from "./fx";
 import {
+  BASE_REACH,
+  buyLevel,
+  buyRank,
   dropCoins,
   kitFor,
-  purchase,
   summitCoins,
-  type GearId,
   type Kit,
   type Payout,
 } from "./gear";
@@ -37,6 +39,7 @@ import {
   dropAccuracy,
   dropOffset,
   fallDuration,
+  FORGE_GROW,
   graceFor,
   heldWidth,
   QUICK_GROW,
@@ -76,7 +79,16 @@ import {
   SHIELD_RGB,
   type PickupKind,
 } from "./props";
-import { loadSave, nextLevelIndex, recordRun, storeSave, type RunOutcome, type Save } from "./save";
+import {
+  emptySave,
+  loadSave,
+  nextLevelIndex,
+  recordRun,
+  skiesLit,
+  storeSave,
+  type RunOutcome,
+  type Save,
+} from "./save";
 import { Sfx } from "./sfx";
 import { rgbCss, THEMES, type Theme } from "./themes";
 
@@ -99,12 +111,13 @@ const BONE: RGB = [246, 241, 232];
 const TIP_SHOWS = 3;
 
 const TIPS = {
-  shield: "Shield: drop with the groove under its line. It saves one miss.",
-  lull: "Lull: drop with the groove under its line. The next slab moves slowly.",
-  bomb: "Bomb: wait for the fuse to burn out. Tap early and it takes a bite.",
+  shield: "Shield: good. Land the slab on the outline under it to take it. It saves one miss.",
+  lull: "Lull: good. Land the slab on the outline under it. The next slab moves slowly.",
+  bomb: "Bomb: bad. Don't tap. Wait for the fuse to burn out; tap early and it takes a bite.",
   fall: "The slab hangs above the stack now. Tap and it falls.",
   shrink: "A held slab wastes away. Drop it before it does.",
-  ember: "Ember: drop with the groove under its line to claim an upgrade. Miss it and it's gone.",
+  ember:
+    "Ember: good. Land the slab on the outline under it to claim an upgrade. Miss it and it's gone.",
   wind: "Wind carries the slab as it falls. Drop when the streamer's tip is over the groove.",
 } as const;
 
@@ -156,10 +169,14 @@ export type Hud = {
   charged: boolean;
   /** Slabs still slowed by the Slipstream. */
   slip: number;
+  /** Workshop ranks owned, by class. */
+  ranks: Record<Family, number>;
   /** Upgrades taken this run, by family. */
   families: Record<Family, number>;
   /** Upgrades on offer while the run is paused for a pick. */
   offers: UpgradeId[];
+  /** How the run was climbed, once it has ended. */
+  style: Family | null;
   /** The current sky's accent, as a CSS colour. */
   accent: string;
   result: LevelResult | null;
@@ -192,6 +209,8 @@ type Slab = {
   flash: number;
   /** Seconds until a queued flash fires; negative when none is queued. */
   ripple: number;
+  /** A widening in progress: the width it grew from and how far along it is. */
+  grow: { from: number; t: number } | null;
   vx: number;
   vy: number;
   rot: number;
@@ -254,6 +273,9 @@ type Mover = {
   w0: number;
   /** Seconds it has been held. */
   age: number;
+  /** Width lost since the last chunk broke off, and which end breaks next. */
+  crumb: number;
+  crumbSide: number;
 };
 
 type Mote = { x: number; y: number; kind: PickupKind };
@@ -334,10 +356,12 @@ export class SpireEngine {
     fallFrom: 0,
     w0: 160,
     age: 0,
+    crumb: 0,
+    crumbSide: 1,
   };
   private mote: Mote | null = null;
   private bomb: Bomb | null = null;
-  private kit: Kit = kitFor({});
+  private kit: Kit = kitFor({}, {}, "buttress");
   private tune: Tuning = BASE_TUNING;
   private picks: Picks = {};
   private offers: UpgradeId[] = [];
@@ -346,9 +370,14 @@ export class SpireEngine {
   /** Run clock at the last landing; -1 before the first. */
   private lastLand = -1;
   private charged = false;
+  /** Chisel strikes left on the current charge. */
+  private charges = 0;
   private slip = 0;
   private shields = 0;
   private shieldAge = 0;
+  private secondWindUsed = false;
+  private fastDrops = 0;
+  private calledCutter = false;
   /** The title's self-building spire. */
   private demoAge = 0;
   private demoNext = 0;
@@ -602,15 +631,42 @@ export class SpireEngine {
   }
 
   /** Buys the next tier of a workshop device. Returns false if it can't be afforded. */
-  buy(id: GearId): boolean {
+  /** Wipes progress and starts again. Sound settings survive. */
+  resetProgress(): void {
     this.wake();
-    const deal = purchase(this.save.coins, this.save.gear, id);
+    const { music, sfx } = this.save;
+    this.save = { ...emptySave(), music, sfx };
+    this.commit();
+    this.sfx.slice();
+    this.showMenu(0);
+  }
+
+  /** Buys the next rank on a class track. Returns false if it can't be afforded. */
+  buyRank(family: Family): boolean {
+    this.wake();
+    const deal = buyRank(this.save.coins, this.save.tracks, family, skiesLit(this.save));
     if (!deal) {
       this.sfx.sputter();
       return false;
     }
     this.save.coins = deal.coins;
-    this.save.gear = deal.owned;
+    this.save.tracks = deal.tracks;
+    this.sfx.buy();
+    haptics.medium();
+    this.commit();
+    return true;
+  }
+
+  /** Buys the next level of a weapon. Returns false if it can't be afforded. */
+  buyLevel(weapon: WeaponId): boolean {
+    this.wake();
+    const deal = buyLevel(this.save.coins, this.save.levels2, weapon, skiesLit(this.save));
+    if (!deal) {
+      this.sfx.sputter();
+      return false;
+    }
+    this.save.coins = deal.coins;
+    this.save.levels2 = deal.levels;
     this.sfx.buy();
     haptics.medium();
     this.commit();
@@ -673,6 +729,12 @@ export class SpireEngine {
     this.music.setTrack(this.theme.track);
     this.music.setMood("play");
     this.music.setTension(0);
+    // Ranks announce themselves where they act, starting with the ones that act at once.
+    const base = this.stack[0]!;
+    if (this.kit.shields > 0) {
+      this.float(this.kit.shields > 1 ? "BULWARK" : "BRACE", 0, base.y + 70, true, 18);
+    }
+    if (this.kit.footing > 1) this.float("WIDE FOOTING", 0, base.y + 96, false, 16);
   }
 
   private resetRun(phase: "menu" | "ready", cut: boolean): void {
@@ -707,16 +769,20 @@ export class SpireEngine {
     this.wasInZone = false;
     this.dir = 1;
     this.wind = 1;
-    this.kit = kitFor(this.save.gear);
+    this.weapon = this.save.weapon;
+    this.kit = kitFor(this.save.tracks, this.save.levels2, this.weapon);
     this.tune = BASE_TUNING;
     this.picks = {};
     this.offers = [];
-    this.weapon = this.save.weapon;
     this.heat = 0;
     this.lastLand = -1;
     this.charged = false;
+    this.charges = 0;
     this.slip = 0;
     this.shields = phase === "ready" ? this.kit.shields : 0;
+    this.secondWindUsed = false;
+    this.calledCutter = false;
+    this.fastDrops = 0;
     this.shieldAge = 0;
     this.runCoins = 0;
     this.lull = false;
@@ -825,6 +891,7 @@ export class SpireEngine {
       anim,
       flash,
       ripple: -1,
+      grow: null,
       vx: 0,
       vy: 0,
       rot: 0,
@@ -854,10 +921,11 @@ export class SpireEngine {
     // Wind that carries a falling slab holds for three floors, so it can be read.
     const turned = !fall || fall.drift <= 0 || this.floors % 3 === 0;
     if (turned) this.wind = -this.wind;
-    const slowed = this.lull || this.slip > 0;
+    const slipping = this.slip > 0;
+    const slowed = this.lull || slipping;
     const period = this.plan.periodAt(this.floors) * (slowed ? 1.8 : 1);
     this.lull = false;
-    if (this.slip > 0) this.slip -= 1;
+    if (slipping) this.slip -= 1;
     const keystone = isKeystone(this.plan, this.floors);
     this.mover = {
       u: dir > 0 ? -0.56 : 0.56,
@@ -874,13 +942,18 @@ export class SpireEngine {
       keystone,
       slowed,
       hover: fall?.hover ?? 0,
-      drift: (fall?.drift ?? 0) * this.kit.drift * this.tune.drift * (slowed ? 0.5 : 1),
+      drift:
+        (fall?.drift ?? 0) *
+        this.tune.drift *
+        (slipping && this.kit.slipCalm ? 0 : slowed ? 0.5 : 1),
       guide: fall?.guide ?? false,
       fallT: -1,
       fallTime: fallDuration(fall?.hover ?? 0),
       fallFrom: 0,
       w0: w,
       age: 0,
+      crumb: 0,
+      crumbSide: 1,
     };
     if (this.floors === 1) this.explain("shrink");
     this.syncMoverX();
@@ -920,6 +993,11 @@ export class SpireEngine {
         flash: 0,
       };
       this.explain("bomb");
+      if (this.kit.fuse < 1 && !this.calledCutter) {
+        this.calledCutter = true;
+        const name = this.kit.fuse <= 0.5 ? "SNUFFER" : "FUSE CUTTER";
+        this.float(name, center, prev.y + SLAB_H + 110, false, 16);
+      }
     }
     if (course !== this.courseSeen) {
       this.courseSeen = course;
@@ -1070,17 +1148,36 @@ export class SpireEngine {
 
   private advanceMover(dt: number): void {
     const m = this.mover;
-    // Waiting has a price: once the run is live the held slab wastes away,
-    // crumbling at both ends so the loss is seen as it happens.
-    if (this.phase === "play") {
+    // Waiting has a price: once the run is live the held slab wastes away.
+    // Every few pixels lost, a chunk breaks off one end and tumbles away, so
+    // the loss is something you watch. A lit bomb forces the wait, so that
+    // time is not held against the slab.
+    if (this.phase === "play" && !(this.bomb && this.bomb.fuse > 0)) {
       m.age += dt;
-      const w = heldWidth(m.w0, m.age, m.period);
+      const w = heldWidth(m.w0, m.age, m.period, this.kit.shrink, this.kit.grace, m.course);
       if (w < m.w - 0.01) {
-        if (!this.reduceMotion && Math.random() < dt * 14) {
-          const side = Math.random() < 0.5 ? m.x : m.x + m.w;
-          this.fx.burst(side, m.y + VISUAL_H / 2, this.slabColor(this.floors + 1), 2, 70);
-        }
+        m.crumb += m.w - w;
         m.w = w;
+        if (m.crumb >= 4) {
+          const side = m.crumbSide;
+          m.crumbSide = -side;
+          const rgb = this.slabColor(this.floors + 1);
+          this.scraps.push({
+            x: side < 0 ? m.x - m.crumb : m.x + m.w,
+            y: m.y,
+            w: m.crumb,
+            vx: side * (30 + Math.random() * 50),
+            vy: 30 + Math.random() * 40,
+            rot: 0,
+            vr: side * (3 + Math.random() * 4),
+            rgb,
+            life: 0.9,
+          });
+          if (!this.reduceMotion) {
+            this.fx.burst(side < 0 ? m.x : m.x + m.w, m.y + VISUAL_H / 2, rgb, 3, 60);
+          }
+          m.crumb = 0;
+        }
       }
     }
     const rate = travelRate(m.course, m.dir, m.wind, m.u, m.period, this.clock);
@@ -1120,8 +1217,11 @@ export class SpireEngine {
 
     this.drops += 1;
     if (!result.ok) {
-      if (this.shields > 0) this.spare(prev);
-      else this.die();
+      if (this.shields > 0) this.spare(prev, "SAVED");
+      else if (this.kit.secondWind && !this.secondWindUsed) {
+        this.secondWindUsed = true;
+        this.spare(prev, "SECOND WIND");
+      } else this.die();
       return;
     }
     const landed = dropAccuracy(dx, this.mover.w, this.tol);
@@ -1162,17 +1262,25 @@ export class SpireEngine {
     // Heat: what the landing was worth, by the rules of your build.
     const clean = result.perfect || landed >= 0.9;
     const fast =
-      clean && this.lastLand >= 0 && this.runTime - this.lastLand <= this.tune.fastWindow;
+      clean &&
+      this.lastLand >= 0 &&
+      this.runTime - this.lastLand <= this.tune.fastWindow + this.kit.fastBonus;
     this.lastLand = this.runTime;
     let gain = 0;
     if (result.perfect) gain += HEAT.perfect * this.tune.heatPerfect;
     else if (clean) gain += HEAT.clean * this.tune.heatClean;
     else gain += HEAT.miss * this.tune.heatMiss;
-    if (fast) gain += HEAT.fast * this.tune.heatFast;
+    if (fast) {
+      gain += HEAT.fast * this.tune.heatFast;
+      this.fastDrops += 1;
+    }
     const heatBefore = this.heat;
-    this.heat = clamp01(this.heat + gain);
+    this.heat = clamp01(this.heat + (gain > 0 ? gain * this.kit.charge : gain));
     const struck = this.charged && result.perfect;
-    if (struck) this.charged = false;
+    if (struck) {
+      this.charges -= 1;
+      this.charged = this.charges > 0;
+    }
 
     if (result.perfect) {
       this.rewardPerfect(slab, cx, seam, result.streak, result.forged);
@@ -1213,12 +1321,12 @@ export class SpireEngine {
       accuracy: landed,
     });
     pay *= 1 + heatBefore;
-    if (result.perfect) pay *= this.tune.perfectPay;
+    if (result.perfect) pay *= this.tune.perfectPay * this.kit.perfectPay;
     if (fast) pay += this.tune.fastPay;
-    if (struck) pay *= 3;
+    if (struck) pay *= this.kit.chiselPay;
     this.pay(pay, result.x + result.w, slab.y);
     if (struck) {
-      this.float("CHISEL ×3", cx, slab.y + 74, true, 26);
+      this.float(`CHISEL ×${this.kit.chiselPay}`, cx, slab.y + 74, true, 26);
       this.fx.rayBurst(cx, seam + VISUAL_H / 2, BONE, 160, 12);
       this.flash = 0.4;
     } else if (fast) {
@@ -1229,7 +1337,11 @@ export class SpireEngine {
       this.float("CLOSE", cx, slab.y + 34, false);
     }
     // The other side of wasting away: a clean drop inside the grace grows a little.
-    if (clean && this.mover.age <= graceFor(this.mover.period) && slab.w < this.startW) {
+    if (
+      clean &&
+      this.mover.age <= graceFor(this.mover.period, this.mover.course) + this.kit.grace &&
+      slab.w < this.startW
+    ) {
       this.widen(slab, Math.min(this.startW, slab.w * QUICK_GROW));
     }
     if (this.heat >= 1) this.fire(slab);
@@ -1264,14 +1376,21 @@ export class SpireEngine {
     this.heat = 0;
     const cx = slab.x + slab.w / 2;
     const seam = slab.y;
-    const grow = this.kit.forgeGrow + this.tune.forgeBonus;
+    const grow = FORGE_GROW + this.tune.forgeBonus;
     const w = this.weapon === "buttress" ? this.startW : Math.min(this.startW, slab.w * grow);
     this.widen(slab, w);
-    if (this.weapon === "chisel") this.charged = true;
-    if (this.weapon === "slipstream") this.slip = 3;
+    if (this.weapon === "chisel") {
+      this.charged = true;
+      this.charges = this.kit.chiselCharges;
+    }
+    if (this.weapon === "slipstream") this.slip = this.kit.slipSlabs;
+    if (this.kit.fireShield && this.shields < MAX_SHIELDS) {
+      this.shields += 1;
+      this.shieldAge = 0;
+    }
+    if (this.kit.fireCoins > 0) this.pay(this.kit.fireCoins, cx + slab.w / 2, seam + 10);
     this.float(WEAPONS[this.weapon].name.toUpperCase(), cx, seam + 74, true, 28);
     this.fx.rayBurst(cx, seam + VISUAL_H / 2, this.theme.accent, 190, 16);
-    this.fx.ring(cx, seam, BONE, slab.w * 1.5, 5);
     this.pulse = 1;
     this.flash = Math.max(this.flash, 0.45);
     this.trauma = Math.min(1, this.trauma + 0.45);
@@ -1288,10 +1407,16 @@ export class SpireEngine {
   /** Rebuilds the top slab to a new width about its centre. */
   private widen(slab: Slab, w: number): void {
     if (w <= slab.w + 0.4) return;
+    // Reinforced: the slab is drawn growing out from its centre, with
+    // white-hot ends and sparks where the new stone is welded on.
+    slab.grow = { from: slab.w, t: 0 };
     slab.x = slab.x + slab.w / 2 - w / 2;
     slab.w = w;
-    slab.flash = 1;
-    this.fx.sparkle(slab.x + w / 2, slab.y + 2, w, mix(this.theme.accent, BONE, 0.5), 18);
+    slab.flash = 0.6;
+    const hot = mix(this.theme.accent, BONE, 0.6);
+    this.fx.sparkle(slab.x + 4, slab.y + VISUAL_H / 2, 8, hot, 8);
+    this.fx.sparkle(slab.x + w - 4, slab.y + VISUAL_H / 2, 8, hot, 8);
+    this.sfx.slice();
     this.music.setTension(tensionFor(w, this.startW));
     const m = this.mover;
     if (m.fallT < 0 && this.phase !== "pick") {
@@ -1326,7 +1451,7 @@ export class SpireEngine {
     const heat = Math.min(1, streak / 8);
     const keystone = this.mover.keystone;
     this.fx.burst(cx, slab.y + VISUAL_H / 2, slab.rgb, forged ? 28 : 16, 160);
-    this.fx.ring(cx, seam, mix(accent, BONE, 0.4), slab.w * (0.7 + heat * 0.5), 3 + heat * 2);
+    this.fx.ring(cx, seam, mix(accent, BONE, 0.4), slab.w * (0.4 + heat * 0.2), 2 + heat);
     this.fx.sparkle(cx, seam + 2, slab.w, mix(accent, BONE, 0.55), 8 + Math.round(heat * 14));
     this.pulse = Math.min(1, 0.35 + heat * 0.4);
     this.flash = forged ? 0.45 : 0.22;
@@ -1337,7 +1462,6 @@ export class SpireEngine {
       this.sfx.forge();
       this.float("FORGE", cx, slab.y + 40, true, 28);
       this.fx.rayBurst(cx, seam + VISUAL_H / 2, accent, 190, 16);
-      this.fx.ring(cx, seam, BONE, slab.w * 1.5, 5);
       this.pulse = 1;
       // The widening runs down the tower as a wave of light.
       for (let i = this.stack.length - 1, n = 0; i >= 0 && n < 14; i--, n++) {
@@ -1377,10 +1501,10 @@ export class SpireEngine {
     this.mote = null;
     this.score += 15;
     this.pay(3, x + this.mover.w / 2, y + 26);
+    if (Math.abs(center - mote.x) > BASE_REACH)
+      this.float("MAGNET", mote.x, mote.y + 22, false, 15);
     const rgb = pickupRgb(mote.kind);
     this.fx.burst(mote.x, mote.y, rgb, 22, 220);
-    this.fx.ring(mote.x, mote.y, rgb, 90, 4);
-    this.fx.ring(x, y, rgb, this.mover.w * 0.9, 3);
     this.fx.rayBurst(mote.x, mote.y, rgb, 120, 10);
     this.fx.sparkle(x, y + 2, this.mover.w, mix(rgb, BONE, 0.4), 16);
     this.flash = Math.max(this.flash, 0.3);
@@ -1404,8 +1528,8 @@ export class SpireEngine {
   }
 
   /** A shield turns a miss into a narrow slab instead of a fall. */
-  private spare(prev: Slab): void {
-    this.shields -= 1;
+  private spare(prev: Slab, label: string): void {
+    if (this.shields > 0) this.shields -= 1;
     this.shieldAge = 0;
     this.heat = clamp01(this.heat + HEAT.saved * this.tune.heatMiss);
     const w = Math.max(MIN_W + 8, prev.w * 0.46);
@@ -1424,7 +1548,7 @@ export class SpireEngine {
     this.freeze = 0.08;
     this.sfx.slice();
     this.sfx.shieldBreak();
-    this.float("SAVED", x + w / 2, slab.y + 44, true, 28);
+    this.float(label, x + w / 2, slab.y + 44, true, 28);
     this.camDrop = 64;
     this.fx.burst(x + w / 2, slab.y + 10, slab.rgb, 16, 150);
     // The bubble bursts: shards outward, and a ring where it stood.
@@ -1620,12 +1744,21 @@ export class SpireEngine {
       weapon: this.weapon,
       charged: this.charged,
       slip: this.slip,
+      ranks: {
+        mason: this.save.tracks.mason ?? 0,
+        striker: this.save.tracks.striker ?? 0,
+        runner: this.save.tracks.runner ?? 0,
+      },
       families: {
         mason: familyCount(this.picks, "mason"),
         striker: familyCount(this.picks, "striker"),
         runner: familyCount(this.picks, "runner"),
       },
       offers: this.offers,
+      style:
+        this.phase === "fall" || this.phase === "won"
+          ? styleOf(this.floors, this.perfects, this.fastDrops)
+          : null,
       accent: rgbCss(this.theme.accent),
       result: this.result,
     });
@@ -1739,6 +1872,10 @@ export class SpireEngine {
       for (const slab of this.stack) {
         if (slab.anim < 1) slab.anim = Math.min(1, slab.anim + dt / 0.22);
         if (slab.flash > 0) slab.flash = Math.max(0, slab.flash - dt / 0.16);
+        if (slab.grow) {
+          slab.grow.t += dt / 0.32;
+          if (slab.grow.t >= 1) slab.grow = null;
+        }
         if (slab.ripple >= 0) {
           slab.ripple -= dt;
           if (slab.ripple < 0) slab.flash = 0.9;
@@ -1884,6 +2021,7 @@ export class SpireEngine {
     this.drawGround(ctx);
     this.drawGhost(ctx);
     this.drawSummitLine(ctx);
+    if (this.kit.sight) this.drawSight(ctx);
     this.drawPlinth(ctx);
     if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
     this.drawAura(ctx);
@@ -1994,6 +2132,22 @@ export class SpireEngine {
   }
 
   /** The line the last slab has to sit on. */
+  /** Sight: the perfect window, drawn on the top of the stack. */
+  private drawSight(ctx: CanvasRenderingContext2D): void {
+    if (this.phase !== "ready" && this.phase !== "play") return;
+    const top = this.stack[this.stack.length - 1];
+    if (!top) return;
+    const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H);
+    const half = Math.min(top.w / 2, this.tol);
+    const lit = this.lined(top);
+    ctx.save();
+    ctx.fillStyle = rgbCss(this.theme.accent, lit ? 1 : 0.55);
+    ctx.fillRect(s.x - half, s.y - 2, half * 2, 3);
+    ctx.fillRect(s.x - half - 1, s.y - 7, 2, 8);
+    ctx.fillRect(s.x + half - 1, s.y - 7, 2, 8);
+    ctx.restore();
+  }
+
   private drawSummitLine(ctx: CanvasRenderingContext2D): void {
     if (this.plan.goal <= 0 || (this.phase !== "ready" && this.phase !== "play")) return;
     const near = this.plan.goal - this.floors <= 3;
@@ -2113,6 +2267,25 @@ export class SpireEngine {
     const settled = slab.anim >= 1 || this.reduceMotion;
     const scaleY = settled ? 1 : 0.74 + 0.26 * easeOutBack(Math.min(1, slab.anim));
     const body = slab.flash > 0 ? mix(slab.rgb, [255, 255, 255], slab.flash * 0.82) : slab.rgb;
+    if (slab.grow && !this.reduceMotion) {
+      // Mid-reinforcement: narrower than its final width, ends glowing.
+      const t = 1 - (1 - slab.grow.t) ** 3;
+      const w = slab.grow.from + (slab.w - slab.grow.from) * t;
+      const x = s.x + (slab.w - w) / 2;
+      this.paintSlab(ctx, x, s.y, w, VISUAL_H, body, scaleY, slab.rot, hotGroove);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const glow = ctx.createLinearGradient(x, 0, x + w, 0);
+      const a = 0.9 * (1 - slab.grow.t);
+      glow.addColorStop(0, `rgba(255,236,200,${a})`);
+      glow.addColorStop(0.08, "rgba(255,236,200,0)");
+      glow.addColorStop(0.92, "rgba(255,236,200,0)");
+      glow.addColorStop(1, `rgba(255,236,200,${a})`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(x, s.y - VISUAL_H, w, VISUAL_H);
+      ctx.restore();
+      return;
+    }
     this.paintSlab(ctx, s.x, s.y, slab.w, VISUAL_H, body, scaleY, slab.rot, hotGroove);
     if (slab.key && !slab.falling) {
       ctx.fillStyle = "rgba(246,241,232,0.9)";
@@ -2162,7 +2335,7 @@ export class SpireEngine {
     const s = this.worldToScreen(m.x, m.y);
     if (m.hover > 0 && !falling) {
       const seat = this.worldToScreen(this.landingX(), m.y - m.hover);
-      if (m.guide && m.drift > 0) {
+      if ((m.guide || this.kit.mark) && m.drift > 0) {
         drawLandingGhost(
           ctx,
           seat.x,
@@ -2278,6 +2451,7 @@ export class SpireEngine {
       floorY: this.worldToScreen(0, top.y + VISUAL_H).y,
       w: top.w,
       fuse: bomb.fuse / bomb.max,
+      seconds: bomb.fuse,
       flash: bomb.flash,
       clock: this.clock,
       calm: this.reduceMotion,
@@ -2294,6 +2468,7 @@ export class SpireEngine {
       x: s.x,
       y: s.y,
       floorY: this.worldToScreen(0, top.y + VISUAL_H).y,
+      w: this.mover.w,
       armed: this.moteArmed,
       clock: this.clock,
       calm: this.reduceMotion,

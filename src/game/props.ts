@@ -61,6 +61,8 @@ export type PickupView = {
   y: number;
   /** Screen y of the top of the stack, where the plumb line ends. */
   floorY: number;
+  /** Width of the slab that will land, for the outline of where it must go. */
+  w: number;
   /** True while the slab's groove is close enough to take it. */
   armed: boolean;
   clock: number;
@@ -85,18 +87,32 @@ export function drawPickup(ctx: CanvasRenderingContext2D, v: PickupView): void {
     ctx.setLineDash([4, 5]);
     ctx.lineDashOffset = v.calm ? 0 : -v.clock * 18;
   }
+  const padTop = v.floorY - 28;
   ctx.beginPath();
   ctx.moveTo(v.x, y + r + 2);
-  ctx.lineTo(v.x, v.floorY - 2);
+  ctx.lineTo(v.x, padTop - 4);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = rgbCss(rgb, v.armed ? 1 : 0.7);
-  ctx.beginPath();
-  ctx.moveTo(v.x, v.floorY - 1);
-  ctx.lineTo(v.x - 5, v.floorY - 8);
-  ctx.lineTo(v.x + 5, v.floorY - 8);
-  ctx.closePath();
-  ctx.fill();
+
+  // Where the slab has to land to take it: an outline the slab's own size,
+  // which fills the moment the slab is over it.
+  const pulse = v.calm ? 1 : 0.85 + 0.15 * Math.sin(v.clock * 6);
+  ctx.fillStyle = rgbCss(rgb, v.armed ? 0.3 : 0.1 * pulse);
+  ctx.fillRect(v.x - v.w / 2, padTop, v.w, 24);
+  ctx.strokeStyle = rgbCss(rgb, v.armed ? 1 : 0.75);
+  ctx.lineWidth = v.armed ? 2.5 : 1.5;
+  if (!v.armed) ctx.setLineDash([6, 5]);
+  ctx.strokeRect(v.x - v.w / 2 + 1, padTop + 1, v.w - 2, 22);
+  ctx.setLineDash([]);
+  ctx.font = `800 ${v.armed ? 13 : 11}px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(10,8,6,0.7)";
+  const call = v.armed ? "DROP NOW" : "LAND HERE";
+  ctx.strokeText(call, v.x, padTop + 12);
+  ctx.fillStyle = v.armed ? "#ffffff" : rgbCss(rgb);
+  ctx.fillText(call, v.x, padTop + 12);
 
   ctx.translate(v.x, y);
   const scale = v.armed ? 1.22 : 1;
@@ -170,12 +186,11 @@ export function drawShieldDome(
   ctx.strokeStyle = rgbCss(SHIELD_RGB, 0.75);
   ctx.lineWidth = 2;
   ctx.stroke();
-  // A bright arc that travels round the rim.
-  const a = clock * 2.2;
-  ctx.strokeStyle = "rgba(255,255,255,0.85)";
-  ctx.lineWidth = 2.5;
+  // A slow breath of light across the rim rather than anything that spins.
+  ctx.strokeStyle = `rgba(255,255,255,${0.25 + 0.2 * Math.sin(clock * 2.2)})`;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.ellipse(x, y, rx, ry, 0, a, a + 0.7);
+  ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
   ctx.stroke();
   ctx.restore();
 }
@@ -189,6 +204,8 @@ export type BombView = {
   w: number;
   /** 1 when lit, falling to 0 as the fuse burns down. */
   fuse: number;
+  /** Seconds left on the fuse. */
+  seconds: number;
   flash: number;
   clock: number;
   calm: boolean;
@@ -269,9 +286,14 @@ export function drawBomb(ctx: CanvasRenderingContext2D, v: BombView): void {
   ctx.textBaseline = "alphabetic";
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(10,8,6,0.65)";
-  ctx.strokeText("WAIT", 0, -30);
+  const wait = `WAIT ${Math.max(0, v.seconds).toFixed(1)}s`;
+  ctx.strokeText(wait, 0, -30);
   ctx.fillStyle = rgbCss(BOMB_RGB);
-  ctx.fillText("WAIT", 0, -30);
+  ctx.fillText(wait, 0, -30);
+  ctx.font = `700 10px ${FONT}`;
+  ctx.strokeText("DON'T TAP", 0, 36);
+  ctx.fillStyle = "#f6f1e8";
+  ctx.fillText("DON'T TAP", 0, 36);
   ctx.restore();
 }
 

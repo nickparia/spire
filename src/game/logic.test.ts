@@ -69,6 +69,13 @@ describe("a held slab", () => {
     expect(heldWidth(100, graceFor(1), 1)).toBe(100);
   });
 
+  it("gives the waiting courses the time their rhythm costs", () => {
+    expect(graceFor(1, "breath")).toBeGreaterThan(graceFor(1, "beat"));
+    expect(graceFor(1, "beat")).toBeGreaterThan(graceFor(1, "slide"));
+    expect(heldWidth(100, 2, 1, 1, 0, "breath")).toBe(100);
+    expect(heldWidth(100, 2, 1, 1, 0, "slide")).toBeLessThan(100);
+  });
+
   it("gets a shorter grace when the slab moves faster", () => {
     expect(heldWidth(100, 1, 0.5)).toBeLessThan(heldWidth(100, 1, 1.1));
   });

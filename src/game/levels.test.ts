@@ -56,7 +56,8 @@ describe("levels", () => {
 });
 
 describe("falling slabs", () => {
-  const ridge = LEVELS[1]!;
+  const ridgeIndex = LEVELS.findIndex((l) => l.id === "ridge");
+  const ridge = LEVELS[ridgeIndex]!;
 
   it("only appear on levels that set wind", () => {
     const foundry = levelPlan(LEVELS[0]!, 0);
@@ -64,21 +65,21 @@ describe("falling slabs", () => {
   });
 
   it("teach the fall in still air before the wind starts", () => {
-    const plan = levelPlan(ridge, 1);
+    const plan = levelPlan(ridge, ridgeIndex);
     for (let f = 0; f < WARMUP_FLOORS; f++) {
       expect(plan.fallAt(f)).toMatchObject({ drift: 0, guide: true });
     }
   });
 
   it("show the landing outline for the first windy floors, then take it away", () => {
-    const plan = levelPlan(ridge, 1);
+    const plan = levelPlan(ridge, ridgeIndex);
     expect(plan.fallAt(WARMUP_FLOORS)?.guide).toBe(true);
     expect(plan.fallAt(WARMUP_FLOORS + 2)?.guide).toBe(true);
     expect(plan.fallAt(WARMUP_FLOORS + 3)?.guide).toBe(false);
   });
 
   it("blow harder as the level goes on, within the level's range", () => {
-    const plan = levelPlan(ridge, 1);
+    const plan = levelPlan(ridge, ridgeIndex);
     const [from, to] = ridge.wind!;
     let last = 0;
     for (let f = WARMUP_FLOORS; f < ridge.floors; f++) {

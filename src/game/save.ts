@@ -1,4 +1,5 @@
 import { isWeaponId, type WeaponId } from "./build";
+import { refundDevices, type Levels, type Tracks } from "./gear";
 import { LEVELS } from "./levels";
 import { starCount, type Goals } from "./logic";
 
@@ -21,8 +22,10 @@ export type Save = {
   tips: Record<string, number>;
   /** Coins in the wallet. */
   coins: number;
-  /** Workshop tiers owned, by device id. */
-  gear: Record<string, number>;
+  /** Stat track ranks owned, by class. */
+  tracks: Tracks;
+  /** Weapon levels, by weapon. Missing means level 1. */
+  levels2: Levels;
   /** The class weapon carried into runs. */
   weapon: WeaponId;
 };
@@ -36,7 +39,8 @@ export function emptySave(): Save {
     endless: { best: 0, bestFloors: 0 },
     tips: {},
     coins: 0,
-    gear: {},
+    tracks: {},
+    levels2: {},
     weapon: "buttress",
   };
 }
@@ -64,9 +68,17 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
       save.endless.bestFloors = num(data.endless?.bestFloors, 0);
       save.coins = Math.max(0, Math.floor(num(data.coins, 0)));
       if (isWeaponId(data.weapon)) save.weapon = data.weapon;
-      for (const [id, owned] of Object.entries(data.gear ?? {})) {
-        save.gear[id] = Math.max(0, Math.floor(num(owned, 0)));
+      for (const family of ["mason", "striker", "runner"] as const) {
+        const n = num(data.tracks?.[family], 0);
+        if (n > 0) save.tracks[family] = Math.floor(n);
       }
+      for (const weapon of ["buttress", "chisel", "slipstream"] as const) {
+        const n = num(data.levels2?.[weapon], 1);
+        if (n > 1) save.levels2[weapon] = Math.floor(n);
+      }
+      // Saves from the first workshop: hand the device money back.
+      const gear = (data as { gear?: Record<string, unknown> }).gear;
+      if (gear && typeof gear === "object") save.coins += refundDevices(gear);
       for (const [kind, shown] of Object.entries(data.tips ?? {})) {
         save.tips[kind] = num(shown, 0);
       }
@@ -174,6 +186,11 @@ export function levelStars(save: Save, levelId: string): number {
 
 export function totalStars(save: Save): number {
   return LEVELS.reduce((sum, level) => sum + levelStars(save, level.id), 0);
+}
+
+/** Skies relit so far: what the workshop's locks count. */
+export function skiesLit(save: Save): number {
+  return LEVELS.filter((level) => save.levels[level.id]?.clear).length;
 }
 
 /** A level opens once the one before it has been cleared. */

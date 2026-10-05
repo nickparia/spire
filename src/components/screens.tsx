@@ -9,13 +9,13 @@ import {
   LayoutGrid,
   Wrench,
 } from "lucide-react";
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { LEVELS, type LevelDef } from "@/game/levels";
 import { formatPercent, formatTime } from "@/game/logic";
 import { isUnlocked, levelStars, nextLevelIndex, totalStars, type Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
 import { Coin, Goal, IconButton, StarIcon, Stars } from "./bits";
-import { WEAPONS, type WeaponId } from "@/game/build";
+import { WEAPONS } from "@/game/build";
 
 export function SoundToggles({
   save,
@@ -54,7 +54,7 @@ export function TitleScreen({
   onLevels,
   onEndless,
   onWorkshop,
-  onWeapon,
+  onReset,
   onMusic,
   onSfx,
 }: {
@@ -63,10 +63,11 @@ export function TitleScreen({
   onLevels: () => void;
   onEndless: () => void;
   onWorkshop: () => void;
-  onWeapon: (id: WeaponId) => void;
+  onReset: () => void;
   onMusic: (on: boolean) => void;
   onSfx: (on: boolean) => void;
 }) {
+  const [confirmReset, setConfirmReset] = useState(false);
   const next = nextLevelIndex(save);
   const level = LEVELS[next]!;
   const stars = totalStars(save);
@@ -109,26 +110,6 @@ export function TitleScreen({
             <Coin size={15} /> {save.coins}
           </p>
         </div>
-        <div className="weapons" role="radiogroup" aria-label="Weapon">
-          {(Object.keys(WEAPONS) as WeaponId[]).map((id) => {
-            const w = WEAPONS[id];
-            const on = save.weapon === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                className={"weapon weapon-" + w.family + (on ? " weapon-on" : "")}
-                onClick={() => onWeapon(id)}
-              >
-                <span className="weapon-name">{w.name}</span>
-                <small>{FAMILIES_SHORT[w.family]}</small>
-              </button>
-            );
-          })}
-        </div>
-        <p className="weapon-blurb">{WEAPONS[save.weapon].blurb}</p>
         <button type="button" className="btn btn-primary" onClick={() => onPlay(next)}>
           <Play size={18} strokeWidth={2.4} fill="currentColor" />
           <span>
@@ -138,6 +119,10 @@ export function TitleScreen({
             </small>
           </span>
         </button>
+        <p className="weapon-blurb">
+          Carrying the {WEAPONS[save.weapon].name}, the{" "}
+          {FAMILIES_SHORT[WEAPONS[save.weapon].family]}'s weapon. Change it in the Workshop.
+        </p>
         <div className="grid grid-cols-3 gap-2">
           <button type="button" className="btn btn-stack" onClick={onLevels}>
             <LayoutGrid size={18} strokeWidth={2.2} />
@@ -152,6 +137,23 @@ export function TitleScreen({
             Endless
           </button>
         </div>
+        {started ? (
+          <button
+            type="button"
+            className={"link-btn" + (confirmReset ? " link-btn-warn" : "")}
+            onClick={() => {
+              if (!confirmReset) {
+                setConfirmReset(true);
+                return;
+              }
+              setConfirmReset(false);
+              onReset();
+            }}
+            onBlur={() => setConfirmReset(false)}
+          >
+            {confirmReset ? "Tap again to erase all progress" : "Start a new game"}
+          </button>
+        ) : null}
       </div>
     </div>
   );

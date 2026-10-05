@@ -229,14 +229,26 @@ export function dropOffset(prevX: number, prevW: number, moverX: number, moverW:
  * Width of a held slab after `age` seconds. It keeps its full width through a
  * grace long enough for the first pass, then wastes away, never below half.
  */
-export function heldWidth(w: number, age: number, period: number): number {
-  const keep = Math.max(SHRINK_FLOOR, 1 - SHRINK_RATE * Math.max(0, age - graceFor(period)));
+export function heldWidth(
+  w: number,
+  age: number,
+  period: number,
+  scale = 1,
+  extraGrace = 0,
+  course: CourseId = "slide",
+): number {
+  const over = Math.max(0, age - graceFor(period, course) - extraGrace);
+  const keep = Math.max(SHRINK_FLOOR, 1 - SHRINK_RATE * scale * over);
   return w * keep;
 }
 
 /** Seconds a held slab keeps its full width: enough for the first pass. */
-export function graceFor(period: number): number {
-  return 0.35 + 0.5 * period;
+export function graceFor(period: number, course: CourseId = "slide"): number {
+  const base = 0.35 + 0.5 * period;
+  // Courses that make the slab wait by design get the time their rhythm costs.
+  if (course === "breath") return base + 1.6;
+  if (course === "beat") return base + 0.5;
+  return base;
 }
 
 export const SHRINK_RATE = 0.07;

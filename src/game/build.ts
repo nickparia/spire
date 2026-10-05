@@ -17,22 +17,50 @@ export const FAMILIES: Record<Family, { name: string; blurb: string }> = {
 
 export type WeaponId = "buttress" | "chisel" | "slipstream";
 
-export const WEAPONS: Record<WeaponId, { family: Family; name: string; blurb: string }> = {
+export type WeaponDef = {
+  family: Family;
+  name: string;
+  blurb: string;
+  /** Who carries it, and how they climb. */
+  creed: string;
+};
+
+export const WEAPONS: Record<WeaponId, WeaponDef> = {
   buttress: {
     family: "mason",
     name: "Buttress",
     blurb: "At full Heat the slab is rebuilt to full width.",
+    creed:
+      "The Mason's. Stone answers to patience: hold the line, take the knocks, and when the forge runs hot the wall is made whole again.",
   },
   chisel: {
     family: "striker",
     name: "Chisel",
     blurb: "At full Heat it charges. Your next perfect pays triple and no bomb can land.",
+    creed:
+      "The Striker's. One true strike is worth ten near ones. Build the Heat, then land it dead centre and let it pay.",
   },
   slipstream: {
     family: "runner",
     name: "Slipstream",
     blurb: "At full Heat time slows and the wind drops for your next three slabs.",
+    creed:
+      "The Runner's. The wind is a road if you're quick enough. Never wait for the second pass; the sky slows for those who don't.",
   },
+};
+
+/** How a run was climbed, read from what the player actually did. */
+export function styleOf(floors: number, perfects: number, fastDrops: number): Family {
+  if (floors <= 0) return "mason";
+  if (fastDrops / floors >= 0.5) return "runner";
+  if (perfects / floors >= 0.6) return "striker";
+  return "mason";
+}
+
+export const STYLE_LINES: Record<Family, string> = {
+  mason: "You held on.",
+  striker: "You landed it.",
+  runner: "You didn't wait.",
 };
 
 export type UpgradeId =

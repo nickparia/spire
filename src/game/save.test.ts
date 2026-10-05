@@ -52,15 +52,23 @@ describe("tips", () => {
 });
 
 describe("wallet", () => {
-  it("keeps coins and workshop tiers", () => {
-    const save = parseSave(JSON.stringify({ ...emptySave(), coins: 340, gear: { brace: 1 } }));
+  it("keeps coins, track ranks and weapon levels", () => {
+    const save = parseSave(
+      JSON.stringify({ ...emptySave(), coins: 340, tracks: { mason: 2 }, levels2: { chisel: 3 } }),
+    );
     expect(save.coins).toBe(340);
-    expect(save.gear).toEqual({ brace: 1 });
+    expect(save.tracks).toEqual({ mason: 2 });
+    expect(save.levels2).toEqual({ chisel: 3 });
   });
 
   it("starts empty for a save written before coins existed", () => {
     const old = JSON.stringify({ v: 2, music: true, sfx: true, levels: {}, endless: {} });
-    expect(parseSave(old)).toMatchObject({ coins: 0, gear: {} });
+    expect(parseSave(old)).toMatchObject({ coins: 0, tracks: {}, levels2: {} });
+  });
+
+  it("refunds devices from the first workshop", () => {
+    const old = JSON.stringify({ ...emptySave(), coins: 10, gear: { brace: 1 } });
+    expect(parseSave(old).coins).toBe(160);
   });
 
   it("never loads a negative or fractional balance", () => {

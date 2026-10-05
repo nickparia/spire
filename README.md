@@ -26,29 +26,24 @@ You carry one weapon, chosen on the title screen; it is your class:
 | Chisel | Striker | Charges: the next perfect pays triple, and no bomb can land until then |
 | Slipstream | Runner | Time slows and the wind drops for the next three slabs |
 
-On levels with picks (Gale Ridge, every six floors) an ember hangs over the stack. Land with the groove under its line to claim it and the run pauses with three upgrades, one from each class. Miss it and it's gone. Three picks from one class unlock its capstone for the run. Upgrades reset every run; they are the build, not the progression. All of it is data in `src/game/build.ts`.
+From the second sky on, every eight floors or so an ember hangs over the stack. Land with the groove under its line to claim it and the run pauses with three upgrades, one from each class. Miss it and it's gone. Three picks from one class unlock its capstone for the run. Upgrades reset every run; they are the build, not the progression. All of it is data in `src/game/build.ts`.
 
 ## Coins and the workshop
 
-Every slab that lands pays coins on the spot: more for a perfect, more again for a streak, a forge or a keystone. Reaching a summit pays a purse on top, for the clear, for accuracy, for beating par, and for each star earned for the first time. A fall keeps whatever the run had already paid.
+Every slab that lands pays coins on the spot: more for a perfect, more again for a streak, a forge or a keystone, and all of it multiplied by Heat. Reaching a summit pays a purse on top. A fall keeps whatever the run had already paid.
 
-Coins buy devices in the workshop. Devices stay bought and are always on:
+Coins go two places:
 
-| Device | What it does |
-| --- | --- |
-| Brace | Start every run with one or two shields |
-| Windbreak | Wind carries a falling slab less far |
-| Fuse Cutter | Bombs burn out sooner |
-| Wide Footing | The first slab, and so every slab, starts wider |
-| Magnet | Pickups can be taken from further off their line |
-| Tempered Forge | A forge wins back more width |
-| Mint | Everything pays more coins |
+- **Class tracks.** Mason, Striker and Runner each have five ranks, bought in order and always on. Ranks are quality of life, never power: a starting shield, a forgiven fall, the perfect window drawn on the stack, shorter fuses, more coin. How the slab moves and how Heat builds belong to the run's picks alone. Ranks open up as skies are lit (rank one from the start, then after one, two, four and six skies).
+- **Weapon levels.** Each weapon climbs five levels, gated the same way. Levels two and four make Heat build faster; three and five add a perk. The weapon you carry is chosen in the workshop; it is your class, and each has a creed.
 
-Prices, tiers and effects are data in `src/game/gear.ts`.
+At the end of a run the game reads how you climbed and names it: a Runner didn't wait, a Striker landed it, a Mason held on.
+
+Prices, ranks and perks are data in `src/game/gear.ts`.
 
 ## Falling slabs and wind
 
-On Gale Ridge, in Apex's wind stretch and in every gust of endless, the slab hangs three floors above the stack and falls when you tap. Wind carries it sideways on the way down, so you release upwind. A streamer under the slab is blown the same way and its tip shows where the slab will land. The first three windy floors of Gale Ridge also outline the landing spot; after that you read the streamer. Wind holds its direction for three floors, and gets stronger as the level goes on.
+On Gale Ridge (the fifth sky), in Apex's wind stretch and in every gust of endless, the slab hangs three floors above the stack and falls when you tap. Wind carries it sideways on the way down, so you release upwind. A streamer under the slab is blown the same way and its tip shows where the slab will land. The first three windy floors of Gale Ridge also outline the landing spot; after that you read the streamer. Wind holds its direction for three floors, and gets stronger as the level goes on.
 
 ## Pickups and hazards
 

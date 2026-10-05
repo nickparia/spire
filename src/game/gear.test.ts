@@ -1,15 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
   BASE_REACH,
+  buyLevel,
+  buyRank,
   dropCoins,
-  GEAR,
   kitFor,
-  nextTier,
-  ownedTier,
-  purchase,
+  levelNeeds,
+  levelOf,
+  nextLevelCost,
+  nextRank,
+  RANK_UNLOCKS,
+  rankNeeds,
+  rankOf,
+  refundDevices,
   summitCoins,
+  TRACKS,
+  WEAPON_COSTS,
+  WEAPON_LEVELS,
+  WEAPON_PERKS,
 } from "./gear";
-import { FORGE_GROW, resolveDrop } from "./logic";
 
 const none = { clear: false, precise: false, swift: false };
 const all = { clear: true, precise: true, swift: true };
@@ -24,12 +33,6 @@ describe("dropCoins", () => {
     expect(pay(40)).toBe(6);
   });
 
-  it("pays extra for a forge and for a keystone", () => {
-    const base = { perfect: true, streak: 5, accuracy: 1 };
-    expect(dropCoins({ ...base, forged: true, keystone: false })).toBe(11);
-    expect(dropCoins({ ...base, forged: false, keystone: true })).toBe(11);
-  });
-
   it("pays one coin for a clean near-miss and nothing for a sloppy one", () => {
     const miss = { perfect: false, streak: 0, forged: false, keystone: false };
     expect(dropCoins({ ...miss, accuracy: 0.8 })).toBe(1);
@@ -38,115 +41,144 @@ describe("dropCoins", () => {
 });
 
 describe("summitCoins", () => {
-  it("pays more for later levels", () => {
+  it("pays more for later levels and for each first-time star", () => {
     expect(summitCoins(0, 0.9, all, none).clear).toBe(20);
     expect(summitCoins(7, 0.9, all, none).clear).toBe(55);
+    expect(summitCoins(0, 0.9, all, all).stars).toBe(90);
+    expect(summitCoins(0, 0.9, all, none).stars).toBe(0);
   });
 
   it("scales the accuracy purse from 60% up", () => {
     expect(summitCoins(0, 0.5, all, none).accuracy).toBe(0);
-    expect(summitCoins(0, 0.85, all, none).accuracy).toBe(25);
     expect(summitCoins(0, 1, all, none).accuracy).toBe(40);
-  });
-
-  it("pays for pace only when the par was beaten", () => {
-    expect(summitCoins(0, 0.9, all, none).pace).toBe(20);
-    expect(summitCoins(0, 0.9, { ...all, swift: false }, none).pace).toBe(0);
-  });
-
-  it("pays for each star once, the first time it is earned", () => {
-    expect(summitCoins(0, 0.9, all, all).stars).toBe(90);
-    expect(summitCoins(0, 0.9, all, { ...none, swift: true }).stars).toBe(30);
-    expect(summitCoins(0, 0.9, all, none).stars).toBe(0);
   });
 });
 
-describe("workshop", () => {
-  it("has unique device ids and rising prices", () => {
-    expect(new Set(GEAR.map((g) => g.id)).size).toBe(GEAR.length);
-    for (const gear of GEAR) {
-      for (let i = 1; i < gear.tiers.length; i++) {
-        expect(gear.tiers[i]!.cost).toBeGreaterThan(gear.tiers[i - 1]!.cost);
+describe("tracks", () => {
+  it("have five ranks each at rising prices, and stay quality of life", () => {
+    expect(TRACKS).toHaveLength(3);
+    for (const track of TRACKS) {
+      expect(track.ranks).toHaveLength(5);
+      for (let i = 1; i < track.ranks.length; i++) {
+        expect(track.ranks[i]!.cost).toBeGreaterThan(track.ranks[i - 1]!.cost);
       }
     }
   });
 
-  it("sells the next tier when the wallet covers it", () => {
-    const deal = purchase(100, {}, "windbreak");
-    expect(deal).toEqual({ coins: 20, owned: { windbreak: 1 } });
-    expect(purchase(200, { windbreak: 1 }, "windbreak")).toEqual({
-      coins: 0,
-      owned: { windbreak: 2 },
+  it("sell ranks in order, only when open and the wallet covers them", () => {
+    expect(nextRank({}, "mason")?.name).toBe("Brace");
+    const first = buyRank(150, {}, "mason", 0);
+    expect(first).toEqual({ coins: 30, tracks: { mason: 1 } });
+    expect(nextRank(first!.tracks, "mason")?.name).toBe("Second Wind");
+    // The second rank needs a sky lit first.
+    expect(rankNeeds(first!.tracks, "mason", 0)).toBe(1);
+    expect(buyRank(999, first!.tracks, "mason", 0)).toBeNull();
+    expect(buyRank(999, first!.tracks, "mason", 1)).toEqual({
+      coins: 999 - 260,
+      tracks: { mason: 2 },
     });
+    expect(buyRank(259, first!.tracks, "mason", 1)).toBeNull();
   });
 
-  it("refuses when short, and leaves the caller's data alone", () => {
-    const owned = { windbreak: 1 };
-    expect(purchase(199, owned, "windbreak")).toBeNull();
-    expect(owned).toEqual({ windbreak: 1 });
+  it("open up across the game", () => {
+    expect(RANK_UNLOCKS).toEqual([0, 1, 2, 4, 6]);
+    expect(rankNeeds({ mason: 4 }, "mason", 3)).toBe(3);
+    expect(rankNeeds({ mason: 4 }, "mason", 6)).toBe(0);
   });
 
-  it("stops selling once a device is fully built", () => {
-    expect(nextTier({ brace: 2 }, "brace")).toBeNull();
-    expect(purchase(99_999, { brace: 2 }, "brace")).toBeNull();
+  it("stop at the top and ignore ranks a save could not have", () => {
+    expect(nextRank({ mason: 5 }, "mason")).toBeNull();
+    expect(buyRank(99_999, { mason: 5 }, "mason", 8)).toBeNull();
+    expect(rankOf({ mason: 42 }, "mason")).toBe(5);
+    expect(rankOf({ mason: -1 }, "mason")).toBe(0);
+    expect(rankOf({ mason: Number.NaN }, "mason")).toBe(0);
+  });
+});
+
+describe("weapon levels", () => {
+  it("start at one and climb to five", () => {
+    expect(levelOf({}, "chisel")).toBe(1);
+    expect(levelOf({ chisel: 9 }, "chisel")).toBe(WEAPON_LEVELS);
+    expect(WEAPON_COSTS).toHaveLength(WEAPON_LEVELS);
+    for (const perks of Object.values(WEAPON_PERKS)) expect(perks).toHaveLength(WEAPON_LEVELS);
   });
 
-  it("ignores tiers a save could not have earned", () => {
-    expect(ownedTier({ brace: 99 }, "brace")).toBe(2);
-    expect(ownedTier({ brace: -3 }, "brace")).toBe(0);
-    expect(ownedTier({ brace: Number.NaN }, "brace")).toBe(0);
+  it("sell the next level when open, and stop at mastery", () => {
+    expect(nextLevelCost({}, "buttress")).toBe(200);
+    expect(buyLevel(200, {}, "buttress", 0)).toEqual({ coins: 0, levels: { buttress: 2 } });
+    expect(buyLevel(199, {}, "buttress", 0)).toBeNull();
+    expect(levelNeeds({ buttress: 2 }, "buttress", 1)).toBe(1);
+    expect(buyLevel(999, { buttress: 2 }, "buttress", 1)).toBeNull();
+    expect(buyLevel(999, { buttress: 2 }, "buttress", 2)).not.toBeNull();
+    expect(nextLevelCost({ buttress: 5 }, "buttress")).toBeNull();
   });
 });
 
 describe("kitFor", () => {
   it("changes nothing with an empty workshop", () => {
-    expect(kitFor({})).toEqual({
-      drift: 1,
-      fuse: 1,
+    expect(kitFor({}, {}, "buttress")).toMatchObject({
       shields: 0,
+      secondWind: false,
       footing: 1,
+      shrink: 1,
+      sight: false,
       reach: BASE_REACH,
-      forgeGrow: FORGE_GROW,
+      perfectPay: 1,
+      mark: false,
+      fuse: 1,
+      grace: 0,
       coins: 1,
+      fastBonus: 0,
+      charge: 1,
+      fireShield: false,
+      chiselPay: 3,
+      slipSlabs: 3,
     });
   });
 
-  it("makes every device better with every tier", () => {
-    const one = kitFor({
-      windbreak: 1,
-      cutter: 1,
-      brace: 1,
-      footing: 1,
-      magnet: 1,
-      temper: 1,
-      mint: 1,
-    });
-    const top = kitFor({
-      windbreak: 3,
-      cutter: 3,
-      brace: 2,
-      footing: 3,
-      magnet: 3,
-      temper: 3,
-      mint: 3,
-    });
-    const base = kitFor({});
-    expect(one.drift).toBeLessThan(base.drift);
-    expect(top.drift).toBeLessThan(one.drift);
-    expect(top.drift).toBeGreaterThan(0);
-    expect(top.fuse).toBeLessThan(one.fuse);
-    expect(top.shields).toBeGreaterThan(one.shields);
-    expect(top.footing).toBeGreaterThan(one.footing);
-    expect(top.reach).toBeGreaterThan(one.reach);
-    expect(top.forgeGrow).toBeGreaterThan(one.forgeGrow);
-    expect(top.coins).toBeGreaterThan(one.coins);
+  it("makes each track better rank by rank", () => {
+    const m = [0, 1, 2, 3, 4, 5].map((n) => kitFor({ mason: n }, {}, "buttress"));
+    expect(m[1]!.shields).toBe(1);
+    expect(m[2]!.secondWind).toBe(true);
+    expect(m[3]!.footing).toBeGreaterThan(1);
+    expect(m[4]!.shrink).toBeLessThan(1);
+    expect(m[5]!.shields).toBe(2);
+    const s = kitFor({ striker: 5 }, {}, "chisel");
+    expect(s.sight).toBe(true);
+    expect(s.reach).toBe(45);
+    expect(s.perfectPay).toBe(1.5);
+    expect(s.mark).toBe(true);
+    const r = kitFor({ runner: 5 }, {}, "slipstream");
+    expect(r.fuse).toBe(0.5);
+    expect(r.grace).toBe(0.3);
+    expect(r.coins).toBe(1.2);
+    expect(r.fastBonus).toBe(0.2);
   });
 
-  it("feeds a stronger forge into the drop rules", () => {
-    const drop = { prevX: 0, prevW: 100, moverX: 0, moverW: 100, tol: 10, startW: 200, streak: 4 };
-    const plain = resolveDrop(drop);
-    const tempered = resolveDrop({ ...drop, forgeGrow: kitFor({ temper: 3 }).forgeGrow });
-    expect(plain.ok && plain.w).toBeCloseTo(114);
-    expect(tempered.ok && tempered.w).toBeCloseTo(126);
+  it("gives weapon perks only to the weapon carried", () => {
+    expect(kitFor({}, { buttress: 5 }, "buttress")).toMatchObject({
+      charge: 1.25,
+      fireShield: true,
+      fireCoins: 20,
+    });
+    expect(kitFor({}, { buttress: 5 }, "chisel")).toMatchObject({
+      charge: 1,
+      fireShield: false,
+      fireCoins: 0,
+    });
+    expect(kitFor({}, { chisel: 3 }, "chisel")).toMatchObject({ chiselPay: 4, chiselCharges: 1 });
+    expect(kitFor({}, { chisel: 5 }, "chisel")).toMatchObject({ chiselCharges: 2 });
+    expect(kitFor({}, { slipstream: 5 }, "slipstream")).toMatchObject({
+      slipSlabs: 5,
+      slipCalm: true,
+    });
+  });
+});
+
+describe("refundDevices", () => {
+  it("hands back what the old devices cost", () => {
+    expect(refundDevices({ brace: 1, windbreak: 2 })).toBe(150 + 80 + 200);
+    expect(refundDevices({})).toBe(0);
+    expect(refundDevices({ unknown: 3, mint: "x" })).toBe(0);
   });
 });

@@ -14,6 +14,7 @@ import {
   CAPSTONE_AT,
   CAPSTONES,
   FAMILIES,
+  STYLE_LINES,
   upgrade,
   type Family,
   type WeaponId,
@@ -52,12 +53,24 @@ function Heat({ hud }: { hud: Hud }) {
 
 const FAMILY_KEYS: Family[] = ["mason", "striker", "runner"];
 
-/** The build so far, as a row of family counts. */
-function Build({ families }: { families: Record<Family, number> }) {
-  const any = FAMILY_KEYS.some((f) => families[f] > 0);
+/** The build: workshop ranks (quiet) and this run's picks (bright), by class. */
+function Build({
+  ranks,
+  families,
+}: {
+  ranks: Record<Family, number>;
+  families: Record<Family, number>;
+}) {
+  const any = FAMILY_KEYS.some((f) => families[f] > 0 || ranks[f] > 0);
   if (!any) return null;
   return (
     <p className="build">
+      {FAMILY_KEYS.filter((f) => ranks[f] > 0).map((f) => (
+        <span key={"r" + f} className="build-chip build-rank" title="Workshop rank">
+          {FAMILIES[f].name} {"I".repeat(Math.min(3, ranks[f]))}
+          {ranks[f] > 3 ? "+" : ""}
+        </span>
+      ))}
       {FAMILY_KEYS.filter((f) => families[f] > 0).map((f) => (
         <span key={f} className={"build-chip build-" + f}>
           {FAMILIES[f].name} {families[f]}
@@ -155,7 +168,7 @@ export function RunHud({
         {hud.relic ? <p className="relic">{hud.relic}</p> : null}
         {hud.hold ? <p className="relic">Wait</p> : null}
         {started || hud.heat > 0 ? <Heat hud={hud} /> : null}
-        <Build families={hud.families} />
+        <Build ranks={hud.ranks} families={hud.families} />
       </div>
 
       <div className="text-right">
@@ -261,6 +274,11 @@ export function OverPanel({
       ) : !level && hud.best > 0 ? (
         <p className="panel-meta">Best {hud.best}</p>
       ) : null}
+      {hud.style ? (
+        <p className={"style-line build-" + hud.style}>
+          {STYLE_LINES[hud.style]} <span>Climbed like a {FAMILIES[hud.style].name}.</span>
+        </p>
+      ) : null}
       {hud.runCoins > 0 ? (
         <p className="purse">
           <Coin size={16} /> +{hud.runCoins} kept
@@ -332,11 +350,13 @@ function Purse({ result }: { result: LevelResult }) {
 /** Summit reached: stars, the two numbers that matter, and what to chase next. */
 export function ResultsPanel({
   result,
+  style,
   onNext,
   onRetry,
   onQuit,
 }: {
   result: LevelResult;
+  style: Family | null;
   onNext: (() => void) | null;
   onRetry: () => void;
   onQuit: () => void;
@@ -348,7 +368,7 @@ export function ResultsPanel({
   return (
     <section className="panel panel-won" aria-live="polite" data-ui>
       <p className="kicker">
-        Level {result.levelIndex + 1} · {level.name}
+        Sky {result.levelIndex + 1} · {level.name}
       </p>
       <h2 className="sheet-title">Summit reached</h2>
       <div className="mt-2">
@@ -386,6 +406,12 @@ export function ResultsPanel({
       <Purse result={result} />
       <p className="panel-meta">
         {result.perfects} of {result.floors} perfect · best streak {result.bestStreak}
+        {style ? (
+          <span className={"style-line build-" + style}>
+            {" "}
+            {STYLE_LINES[style]} Climbed like a {FAMILIES[style].name}.
+          </span>
+        ) : null}
       </p>
 
       <div className="mt-3 flex flex-col gap-2">
