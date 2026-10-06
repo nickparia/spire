@@ -1253,6 +1253,11 @@
   -webkit-backdrop-filter: blur(16px);
 }
 
+/* A panel that has just appeared ignores touches until it is armed. */
+.panel:not([data-armed]) {
+  pointer-events: none;
+}
+
 .panel-won {
   padding: 1rem 1.1rem 0.9rem;
   animation: panel-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 0.7s both;

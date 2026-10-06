@@ -9,7 +9,20 @@ import {
   Wind,
   type LucideIcon,
 } from "lucide-react";
-import type { RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
+
+/**
+ * A panel that appears under a busy thumb ignores touches for a moment, so
+ * the tap that was already on its way down cannot dismiss it unseen.
+ */
+function useArmed(ms = 600): boolean {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setArmed(true), ms);
+    return () => window.clearTimeout(id);
+  }, [ms]);
+  return armed;
+}
 import {
   CAPSTONE_AT,
   CAPSTONES,
@@ -269,8 +282,9 @@ export function OverPanel({
   const level = hud.mode === "level";
   const rescue = hud.rescue;
   const weapon = WEAPONS[hud.weapon];
+  const armed = useArmed();
   return (
-    <section className="panel panel-in" aria-live="polite">
+    <section className="panel panel-in" aria-live="polite" data-armed={armed || undefined}>
       {rescue ? (
         <div className="rescue" data-ui>
           <button type="button" className="btn btn-primary" onClick={onRebuild} autoFocus>
@@ -463,8 +477,9 @@ export function ResultsPanel({
   const { goals, outcome } = result;
   const time = useCountUp(result.time, 900);
   const accuracy = useCountUp(result.accuracy, 1100);
+  const armed = useArmed();
   return (
-    <section className="panel panel-won" aria-live="polite" data-ui>
+    <section className="panel panel-won" aria-live="polite" data-ui data-armed={armed || undefined}>
       <p className="kicker">
         Sky {result.levelIndex + 1} · {level.name}
       </p>

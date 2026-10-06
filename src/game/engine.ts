@@ -102,6 +102,8 @@ import { rgbCss, THEMES, type Theme } from "./themes";
 
 const STEP = 1 / 60;
 const SLAB_H = 28;
+/** Seconds the top must stand at goal height before the summit counts. */
+const SUMMIT_HOLD = 0.45;
 const VISUAL_H = 24;
 const GROUND = 156;
 /** How far below the top of the view the stack's top sits, as a share of view height. */
@@ -473,6 +475,8 @@ export class SpireEngine {
   private seat = { x: 0, y: SLAB_H };
   /** Seconds of slow motion left while a topple plays out. */
   private slowmo = 0;
+  /** Seconds the settled top has stood at or above the goal. */
+  private summitHold = 0;
   private camY = 0;
   private camDrop = 0;
   private look = 0;
@@ -890,6 +894,7 @@ export class SpireEngine {
     }
     this.seat = { x: 0, y: SLAB_H };
     this.slowmo = 0;
+    this.summitHold = 0;
     this.taken = false;
     this.demoAge = 0;
     this.demoNext = 0.8;
@@ -1287,12 +1292,11 @@ export class SpireEngine {
         this.floors = reached;
         this.emit();
       }
-      // The summit counts once the top slab has come to rest, not in passing.
-      if (this.plan.goal > 0 && reached >= this.plan.goal) {
-        const top = this.peak();
-        const view = top.body !== null ? stage.read(top.body) : null;
-        if (view?.resting) this.win();
-      }
+      // The summit counts once the top has stood at goal height for a
+      // moment: not in passing, and not while a crooked slab beneath it is
+      // about to crumble.
+      this.summitHold = this.plan.goal > 0 && reached >= this.plan.goal ? this.summitHold + dt : 0;
+      if (this.summitHold >= SUMMIT_HOLD) this.win();
     }
   }
 
