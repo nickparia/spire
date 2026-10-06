@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Shield,
   Square,
+  X,
   Wind,
   type LucideIcon,
 } from "lucide-react";
@@ -144,18 +145,23 @@ export function RunHud({
   hud,
   engineRef,
   onPause,
+  onEnd,
 }: {
   hud: Hud;
   engineRef: RefObject<SpireEngine | null>;
   onPause: () => void;
+  onEnd: () => void;
 }) {
   const level = hud.mode === "level";
   const started = hud.phase === "play";
   return (
     <header className="run-hud">
-      <div>
+      <div className="flex gap-2">
         <IconButton label="Pause" onPress={onPause}>
           <Pause size={18} strokeWidth={2.2} />
+        </IconButton>
+        <IconButton label="End run" onPress={onEnd}>
+          <X size={18} strokeWidth={2.4} />
         </IconButton>
       </div>
 
@@ -242,6 +248,7 @@ export function RunHud({
 export function PauseSheet({
   hud,
   save,
+  ending = false,
   onResume,
   onRestart,
   onQuit,
@@ -250,6 +257,8 @@ export function PauseSheet({
 }: {
   hud: Hud;
   save: Save;
+  /** Opened to end the run: End run leads, Resume follows. */
+  ending?: boolean;
   onResume: () => void;
   onRestart: () => void;
   onQuit: () => void;
@@ -260,23 +269,38 @@ export function PauseSheet({
   return (
     <div className="scrim" data-ui>
       <section className="sheet panel-in" role="dialog" aria-modal="true" aria-label="Paused">
-        <p className="kicker">Paused</p>
+        <p className="kicker">{ending ? "End the run?" : "Paused"}</p>
         <h2 className="sheet-title">{hud.mode === "level" ? level.name : "Endless"}</h2>
         <div className="mt-4 flex flex-col gap-2">
-          <button type="button" className="btn btn-primary" onClick={onResume} autoFocus>
-            <Play size={18} strokeWidth={2.4} fill="currentColor" />
-            Resume
-          </button>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className="btn" onClick={onRestart}>
-              <RotateCcw size={17} strokeWidth={2.2} />
-              Restart
-            </button>
-            <button type="button" className="btn" onClick={onQuit}>
-              <Square size={15} strokeWidth={2.4} fill="currentColor" />
-              End run
-            </button>
-          </div>
+          {ending ? (
+            <>
+              <button type="button" className="btn btn-primary" onClick={onQuit} autoFocus>
+                <Square size={15} strokeWidth={2.4} fill="currentColor" />
+                End run
+              </button>
+              <button type="button" className="btn" onClick={onResume}>
+                <Play size={18} strokeWidth={2.4} fill="currentColor" />
+                Keep climbing
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn btn-primary" onClick={onResume} autoFocus>
+                <Play size={18} strokeWidth={2.4} fill="currentColor" />
+                Resume
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" className="btn" onClick={onRestart}>
+                  <RotateCcw size={17} strokeWidth={2.2} />
+                  Restart
+                </button>
+                <button type="button" className="btn" onClick={onQuit}>
+                  <Square size={15} strokeWidth={2.4} fill="currentColor" />
+                  End run
+                </button>
+              </div>
+            </>
+          )}
           <p className="panel-meta">
             Your skies, stars and coins are saved as you go. Ending the run only loses this climb.
           </p>

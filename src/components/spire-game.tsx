@@ -78,6 +78,16 @@ export function SpireGame() {
   const { challenge, me, refresh } = useChallenge(save);
   const [options, setOptions] = useState(false);
   const [boardFrom, setBoardFrom] = useState<"title" | "levels">("levels");
+  /** The ready card has been read: the next tap is the first drop. */
+  const [briefed, setBriefed] = useState(false);
+  useEffect(() => {
+    if (hud.phase === "ready") {
+      setBriefed(false);
+      briefedRef.current = false;
+    }
+  }, [hud.phase]);
+  /** The pause sheet, opened to end the run rather than to rest. */
+  const [ending, setEnding] = useState(false);
   const setRival = useCallback((rival: Rival | null, ghosts: Record<string, Ghost>) => {
     engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
   }, []);
@@ -94,6 +104,7 @@ export function SpireGame() {
   // so the engine is created once and never torn down by a re-render.
   const state = useRef({ hud, save, menu, selected });
   state.current = { hud, save, menu, selected };
+  const briefedRef = useRef(false);
 
   const play = useCallback((index: number) => {
     const engine = engineRef.current;
@@ -257,6 +268,17 @@ export function SpireGame() {
           return;
         }
         event.preventDefault();
+        // The first tap on a sky only puts the card away.
+        if (
+          state.current.hud.phase === "ready" &&
+          state.current.hud.mode === "level" &&
+          !briefedRef.current
+        ) {
+          briefedRef.current = true;
+          setBriefed(true);
+          engineRef.current?.wake();
+          return;
+        }
         engineRef.current?.tap();
       }}
       onContextMenu={(event) => event.preventDefault()}
@@ -352,8 +374,20 @@ export function SpireGame() {
         ) : null}
 
         {running ? (
-          <RunHud hud={hud} engineRef={engineRef} onPause={() => engineRef.current?.pause()} />
+          <RunHud
+            hud={hud}
+            engineRef={engineRef}
+            onPause={() => {
+              setEnding(false);
+              engineRef.current?.pause();
+            }}
+            onEnd={() => {
+              setEnding(true);
+              engineRef.current?.pause();
+            }}
+          />
         ) : null}
+        {running && !hud.paused && !briefed ? <ReadyCard hud={hud} /> : null}
 
         {hud.phase !== "menu" ? <div className="flex-1" /> : null}
 
@@ -363,10 +397,9 @@ export function SpireGame() {
           </p>
         ) : null}
 
-        {running && hud.hint && !hud.paused && hud.phase !== "ready" ? (
+        {running && hud.hint && !hud.paused && (hud.phase !== "ready" || briefed) ? (
           <p className="tap-hint">Tap to drop</p>
         ) : null}
-        {!hud.paused ? <ReadyCard hud={hud} /> : null}
 
         {hud.phase === "pick" ? (
           <PickPanel hud={hud} onChoose={(i) => engineRef.current?.choose(i)} />
@@ -434,6 +467,7 @@ export function SpireGame() {
         <PauseSheet
           hud={hud}
           save={save}
+          ending={ending}
           onResume={() => engineRef.current?.resume()}
           onRestart={retry}
           onQuit={quit}

@@ -1,10 +1,9 @@
 {
-  "build": 27,
-  "title": "The Hollow",
+  "build": 28,
+  "title": "Clearer starts and exits",
   "notes": [
-    "Apex has a boss. Reach its summit and the Dark wakes with eyes. Drive it down three times with perfect drops; rubble feeds it, and it takes loose slabs.",
-    "Worlds and a star map. The eight skies are world one, Hearth. Tap the beacons on the title to see the sky: every relit sky a star, the constellation completing when the Hollow falls.",
-    "A line of the story before each sky, with what the slab will do there.",
-    "A Board button on the title."
+    "The line before each sky sits up under the HUD, and your first tap only puts it away; the next is your first drop.",
+    "An X next to pause ends the run, with a check first. Your skies, stars and coins are always saved.",
+    "The wind holds for six floors and only shows its lane just after it shifts."
   ]
 }

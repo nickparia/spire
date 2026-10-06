@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 28 — Clearer starts and exits
+
+- The line before each sky now sits up under the HUD, clear of the stack, and your **first tap only puts it away**; the next tap is your first drop.
+- An **✕ next to pause** ends the run. It asks first ("End the run?"), and says what's kept: your skies, stars and coins are always saved.
+- **Wind** holds for six floors instead of flipping every three, and the wind lane is drawn only for two floors after a shift; the streamer carries the reading the rest of the time.
+
 ## Build 27 — The Hollow
 
 **What's new**

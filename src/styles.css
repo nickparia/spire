@@ -1749,7 +1749,7 @@
 .ready {
   align-self: center;
   max-width: 21rem;
-  margin: 0 auto 6rem;
+  margin: 0.6rem auto 0;
   padding: 0.9rem 1.1rem;
   border-radius: 16px;
   background: color-mix(in srgb, var(--color-bg) 78%, transparent);

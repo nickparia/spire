@@ -476,6 +476,8 @@ export class SpireEngine {
   private slow = 0;
   private tip = "";
   private wind = 1;
+  /** The floor the wind last turned on; the lane is shown for two floors after. */
+  private windTurnedAt = -9;
   private courseSeen: CourseId = "slide";
   private beatOn = false;
   private scraps: Scrap[] = [];
@@ -1110,9 +1112,13 @@ export class SpireEngine {
     this.dir = -this.dir;
     const dir = this.dir;
     const fall = this.plan.fallAt(this.floors);
-    // Wind that carries a falling slab holds for three floors, so it can be read.
-    const turned = !fall || fall.drift <= 0 || this.floors % 3 === 0;
-    if (turned) this.wind = -this.wind;
+    // Wind that carries a falling slab holds for six floors, so it can be
+    // read and relied on; a shift is called out and shown for two floors.
+    const turned = !fall || fall.drift <= 0 || this.floors % 6 === 0;
+    if (turned) {
+      this.wind = -this.wind;
+      this.windTurnedAt = this.floors;
+    }
     const slipping = this.slip > 0;
     const slowed = this.lull || slipping;
     const period = this.plan.periodAt(this.floors) * (slowed ? 1.8 : 1);
@@ -3556,8 +3562,8 @@ export class SpireEngine {
     const left = Math.max(30, lane.x - m.halfSpan - m.w / 2);
     const right = Math.min(this.vw - 30, lane.x + m.halfSpan + m.w / 2);
     const clock = this.reduceMotion ? 0.3 : this.clock;
-    if (m.course === "gust") {
-      // Gusts cover the whole drop, from where the slab hangs to where it lands.
+    if (m.course === "gust" && this.floors - this.windTurnedAt < 2) {
+      // Shown just after a shift: the streamer carries the reading after that.
       drawWindLane(ctx, left, right, lane.y + m.hover * 0.6, m.wind, clock, accent);
     } else if (m.course === "breath") {
       const held = Math.abs(m.u) > 0.78 ? Math.sign(m.u) : 0;
