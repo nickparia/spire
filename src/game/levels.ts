@@ -6,6 +6,8 @@ export type LevelDef = {
   id: string;
   name: string;
   blurb: string;
+  /** One line of the story, said before the climb. */
+  line: string;
   theme: ThemeId;
   /** Floors to place to reach the summit. */
   floors: number;
@@ -41,6 +43,7 @@ export const LEVELS: LevelDef[] = [
     id: "foundry",
     name: "The Foundry",
     blurb: "Even pace. Learn the groove.",
+    line: "This is where the stone was cut. It still knows the shape.",
     theme: "foundry",
     floors: 20,
     courses: ["slide"],
@@ -55,6 +58,7 @@ export const LEVELS: LevelDef[] = [
     id: "tide",
     name: "Tidewater",
     blurb: "The groove walks. Follow it.",
+    line: "The sea remembers the Spire's shadow. It walks when you walk.",
     theme: "tide",
     floors: 28,
     courses: ["sway"],
@@ -70,6 +74,7 @@ export const LEVELS: LevelDef[] = [
     id: "city",
     name: "Pulse City",
     blurb: "It rests, then it jumps. Count it in.",
+    line: "They built clocks here, to keep time with the tower. The clocks are all that is left.",
     theme: "city",
     floors: 26,
     courses: ["beat"],
@@ -85,6 +90,7 @@ export const LEVELS: LevelDef[] = [
     id: "canyon",
     name: "Red Canyon",
     blurb: "It bursts through the centre. A bomb means wait.",
+    line: "Something burst through here on its way down. Mind the fuses.",
     theme: "canyon",
     floors: 30,
     courses: ["rush"],
@@ -100,6 +106,7 @@ export const LEVELS: LevelDef[] = [
     id: "ridge",
     name: "Gale Ridge",
     blurb: "The slab falls now, and the wind carries it.",
+    line: "Up here the wind has nothing to hold on to but you.",
     theme: "ridge",
     floors: 34,
     courses: ["gust"],
@@ -116,6 +123,7 @@ export const LEVELS: LevelDef[] = [
     id: "glacier",
     name: "The Glacier",
     blurb: "It holds at the walls. Breathe with it.",
+    line: "Slow. The cold is honest; it only takes what you give it time to take.",
     theme: "glacier",
     floors: 30,
     courses: ["breath"],
@@ -131,6 +139,7 @@ export const LEVELS: LevelDef[] = [
     id: "eclipse",
     name: "Eclipse",
     blurb: "The slab goes dark. Tap the flare.",
+    line: "The last sky they lit was the first to go dark. Watch for the flare.",
     theme: "eclipse",
     floors: 34,
     courses: ["eclipse"],
@@ -146,6 +155,7 @@ export const LEVELS: LevelDef[] = [
     id: "apex",
     name: "Apex",
     blurb: "Every sky, one after another.",
+    line: "The top. It has been waiting, and so has what lives beneath it.",
     theme: "apex",
     floors: 44,
     courses: ["gust", "beat", "sway", "rush", "breath", "eclipse", "split"],

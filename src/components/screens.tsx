@@ -280,6 +280,7 @@ export function LevelSelect({
       <p className="kicker world-head">
         World 1 · {WORLDS[0]!.name} <small>— {WORLDS[0]!.blurb}</small>
       </p>
+      <p className="world-concept">{WORLDS[0]!.concept}</p>
       <Houses save={save} />
 
       <ol className="levels" ref={listRef}>

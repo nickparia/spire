@@ -12,6 +12,8 @@ export type WorldDef = {
   id: string;
   name: string;
   blurb: string;
+  /** What the Spire was here, said on the Skies screen. */
+  concept: string;
   /** The skies, in order; the last is the boss. */
   levelIds: string[];
   /** One line that lands when the boss falls: why this sky went out. */
@@ -25,6 +27,7 @@ export const WORLDS: WorldDef[] = [
     id: "hearth",
     name: "Hearth",
     blurb: "The column. Honest gravity, the Dark below.",
+    concept: "This is where the Spire was cut and raised. The stone still knows the shape.",
     levelIds: ["foundry", "tide", "city", "canyon", "ridge", "glacier", "eclipse", "apex"],
     revelation: "The Hollow did not put the sky out. It only ate what fell.",
     stars: [

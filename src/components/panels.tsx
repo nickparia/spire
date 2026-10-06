@@ -39,6 +39,7 @@ import { Post } from "./post";
 import { FeatToasts, Journey } from "./journey";
 import { ThrowShade } from "./shade";
 import type { FeatId } from "@/game/feats";
+import { worldOf } from "@/game/worlds";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { formatPercent, formatTime, starCount } from "@/game/logic";
@@ -198,6 +199,11 @@ export function RunHud({
         </p>
         <p className="kicker mt-2">Accuracy</p>
         <p className="stat-num">{started ? formatPercent(hud.accuracy) : "—"}</p>
+        {hud.boss ? (
+          <p className="boss-hud">
+            The Hollow · surge {hud.boss.surge} of {hud.boss.of}
+          </p>
+        ) : null}
         {hud.darkGap !== null && started ? (
           <>
             <p className="kicker mt-2">The Dark</p>
@@ -520,7 +526,8 @@ export function ResultsPanel({
         <p className="kicker">
           Sky {result.levelIndex + 1} · {level.name}
         </p>
-        <h2 className="sheet-title">Relit</h2>
+        <h2 className="sheet-title">{result.boss ? "The Hollow falls" : "Relit"}</h2>
+        {result.boss ? <p className="revelation">{worldOf(level.id).revelation}</p> : null}
       </div>
       <Journey save={save} ignite={result.levelIndex} size="large" />
 

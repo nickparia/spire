@@ -3,6 +3,21 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 27 — The Hollow
+
+**What's new**
+
+- **Apex has a boss.** Reach its summit and the Dark wakes with eyes. The goal changes: drive it down three times. Perfect drops burn it back, clean drops barely scratch it, rubble feeds it, and every few seconds it takes a loose slab from your tower. Three surges, each faster. Beat it and the whole sky relights.
+- **Worlds and the star map.** The eight skies are world one, _Hearth_. Tap the beacons on the title to open the sky: every relit sky is a star, and the constellation completes with the world's name when the Hollow falls. Two dark patches show the worlds to come.
+- **The story.** A line before each sky says where you are and what the slab will do there (this is also the answer to "what is going on on the Eclipse").
+- A **Board** button on the title, with arrows to browse every sky's leaderboard.
+
+**Please try**
+
+1. Climb Apex to the top and fight the Hollow. Tell us how long it took and whether the three surges felt fair (we expect roughly 2, 4 and 5 perfects each).
+2. After it falls, press **The sky** and watch the constellation draw.
+3. Read the line before each sky — does the voice feel right?
+
 ## Build 26 — Saved as you go
 
 - Progress is now kept in the phone's own storage as well as the game's, so it survives the app being closed hard. If a save ever went missing, this is the fix.

@@ -76,6 +76,7 @@ import {
 import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
+import { isBoss } from "./worlds";
 import {
   BOMB_RGB,
   drawBomb,
@@ -110,6 +111,11 @@ const STEP = 1 / 60;
 const SLAB_H = 28;
 /** The dust rubble is drawn in. */
 const RUBBLE_RGB: RGB = [112, 100, 94];
+/** The fight: surges to beat, floors below the top the Dark must be driven, seconds between takings. */
+const BOSS_SURGES = 3;
+const BOSS_DEPTH = 12;
+const BOSS_START = 6;
+const BOSS_TENDRIL = 4;
 /** Coins for beating your own ghost to the summit. */
 const GHOST_PURSE = 25;
 /** Seconds the top must stand at goal height before the summit counts. */
@@ -170,6 +176,8 @@ export type LevelResult = {
   feats: FeatId[];
   /** Skies relit after this one, and the total. */
   lit: number;
+  /** This summit beat a world's boss. */
+  boss: boolean;
 };
 
 export type Hud = {
@@ -230,6 +238,8 @@ export type Hud = {
   ghostGap: number | null;
   /** Whose ghost: "BEST" for your own, else the rival's name. */
   ghostName: string;
+  /** The fight at the top of a boss sky: which surge, of how many. */
+  boss: { surge: number; of: number } | null;
 };
 
 export type EngineEvents = {
@@ -507,6 +517,12 @@ export class SpireEngine {
   private summitHold = 0;
   /** Seconds the Dark holds still after a topple, for the Runner's Breather. */
   private breather = 0;
+  /**
+   * The boss at the top of a world's last sky: the Dark awake. It rises in
+   * surges; each is driven back by light until it falls below the line, and
+   * the third sends it under for good. It climbs on your mistakes.
+   */
+  private boss: { surge: number; tendril: number; eye: number; crown: number } | null = null;
   /** This run's trace: the second each floor was first reached. */
   private trace: number[] = [0];
   /** The run to race on this level, your own best or a rival's; null the first time. */
@@ -965,6 +981,7 @@ export class SpireEngine {
     this.slowmo = 0;
     this.summitHold = 0;
     this.breather = 0;
+    this.boss = null;
     this.trace = [0];
     this.ghost = null;
     this.ghostName = "BEST";
@@ -1087,7 +1104,7 @@ export class SpireEngine {
   private spawnMover(): void {
     const prev = this.peak()!;
     const w = prev.w;
-    const course = this.plan.courseAt(this.floors);
+    const course: CourseId = this.boss ? "slide" : this.plan.courseAt(this.floors);
     const halfSpan = Math.max(w * 0.98, 80);
     const center = prev.x + prev.w / 2;
     this.dir = -this.dir;
@@ -1407,7 +1424,10 @@ export class SpireEngine {
       // moment: not in passing, and not while a crooked slab beneath it is
       // about to crumble.
       this.summitHold = this.plan.goal > 0 && reached >= this.plan.goal ? this.summitHold + dt : 0;
-      if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD) this.win();
+      if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD && !this.boss) {
+        if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.wakeBoss();
+        else this.win();
+      }
     }
   }
 
@@ -1431,6 +1451,87 @@ export class SpireEngine {
     }
   }
 
+  /** The summit of a boss sky: the Dark wakes, and the goal changes. */
+  private wakeBoss(): void {
+    const crown = this.crownY();
+    this.boss = { surge: 0, tendril: BOSS_TENDRIL, eye: 0, crown };
+    this.dark = crown - SLAB_H * BOSS_START;
+    this.darkShown = this.dark;
+    // It holds its breath for a beat: time to see it, and to set the first slab.
+    this.breather = Math.max(this.breather, 2);
+    // The summit's light sets the spire: the fight is about what you build
+    // from here, not a hinge left twenty floors down.
+    this.setSpire();
+    // The fight is with the Dark, not the course: the slab runs plain.
+    this.spawnMover();
+    this.trauma = 1;
+    this.flash = 0.6;
+    this.freeze = this.reduceMotion ? 0.05 : 0.25;
+    this.float("THE HOLLOW WAKES", this.seat.x, this.seat.y + 90, false, 26);
+    this.sfx.fail();
+    this.music.setTension(1);
+    haptics.heavy();
+    this.emit();
+  }
+
+  /** One frame of the fight: a surge driven back, a slab taken, the win. */
+  private bossTurn(dt: number, top: Slab): void {
+    const b = this.boss!;
+    b.eye += dt;
+    // Driven below the line: the surge is beaten. The line is fixed where
+    // it woke, and each surge wants it driven deeper.
+    const line = b.crown - SLAB_H * (BOSS_DEPTH + b.surge * 2);
+    if (this.dark <= line) {
+      b.surge += 1;
+      if (b.surge >= BOSS_SURGES) {
+        this.boss = null;
+        this.dark = DARK_START - 600;
+        this.float("THE HOLLOW FALLS", top.x + top.w / 2, this.seat.y + 80, true, 28);
+        this.win();
+        return;
+      }
+      this.dark = b.crown - SLAB_H * (BOSS_START - b.surge);
+      this.darkShown = this.dark;
+      this.breather = Math.max(this.breather, 1.2);
+      b.tendril = BOSS_TENDRIL;
+      this.float(`SURGE ${b.surge + 1}`, top.x + top.w / 2, this.seat.y + 80, false, 26);
+      this.trauma = Math.min(1, this.trauma + 0.7);
+      this.flash = 0.5;
+      this.sfx.fail();
+      haptics.heavy();
+      this.emit();
+      return;
+    }
+    // Tendrils: every few seconds it takes the lowest loose slab.
+    b.tendril -= dt;
+    if (b.tendril <= 0) {
+      b.tendril = BOSS_TENDRIL - b.surge * 0.6;
+      const prey = [...this.stack].reverse().find((s) => s.floor > 0 && s.loose && s.body !== null);
+      if (prey && this.stage && prey.body !== null) {
+        const view = this.stage.read(prey.body);
+        if (view) {
+          this.scraps.push({
+            x: view.cx - view.w / 2,
+            y: view.cy - view.h / 2,
+            w: view.w,
+            vx: 0,
+            vy: -260,
+            rot: view.angle,
+            vr: 0,
+            rgb: [120, 60, 170],
+            life: 0.8,
+          });
+          this.fx.burst(view.cx, view.cy, [150, 80, 220], 18, 160);
+          this.stage.remove(prey.body);
+          this.stack.splice(this.stack.indexOf(prey), 1);
+          this.float("TAKEN", view.cx, view.cy + 40, false, 20);
+          this.trauma = Math.min(1, this.trauma + 0.4);
+          this.sfx.hiss();
+        }
+      }
+    }
+  }
+
   /** Light pushes the Dark down, never below where it started. */
   private pushDark(px: number): void {
     if (this.plan.darkRate <= 0 || px <= 0) return;
@@ -1449,8 +1550,13 @@ export class SpireEngine {
   private riseDark(dt: number): void {
     this.breather = Math.max(0, this.breather - dt);
     if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0 && this.breather <= 0) {
-      this.dark += this.plan.darkRate * dt;
+      const rate = this.boss
+        ? this.plan.darkRate * (1 + this.boss.surge * 0.25)
+        : this.plan.darkRate;
+      this.dark += rate * dt;
       const top = this.peak()!;
+      if (this.boss) this.bossTurn(dt, top);
+      if (this.phase !== "play") return;
       // The Dark must climb to the highest slab still standing, settled or
       // not, crooked or not.
       const seat = this.crownY();
@@ -1896,6 +2002,17 @@ export class SpireEngine {
     // A split landed home is two perfects, and pushes like it.
     if (result.perfect && this.mover.split) push += DARK_PUSH.perfect;
     if (fast) push += DARK_PUSH.fast;
+    if (this.boss) {
+      // In the fight only true light tells: a perfect burns it back twice
+      // as far, a clean drop barely scratches it, and rubble feeds it.
+      push = result.perfect ? push * 3 : clean ? DARK_PUSH.clean * 0.5 : 0;
+      if (!slab.counts) {
+        this.dark += SLAB_H;
+        this.float("IT FEEDS", cx, slab.y + 60, false, 20);
+      } else if (result.perfect) {
+        this.fx.rayBurst(cx, this.dark, [150, 80, 220], 160, 10);
+      }
+    }
     this.pushDark(push);
     const heatBefore = this.heat;
     this.heat = clamp01(this.heat + (gain > 0 ? gain * this.kit.charge : gain));
@@ -2007,16 +2124,7 @@ export class SpireEngine {
     const grow = FORGE_GROW + this.tune.forgeBonus;
     if (this.weapon === "buttress" && this.stage) {
       // The wall is made whole: every loose slab in the spire is set.
-      let n = 0;
-      for (let i = 1; i < this.stack.length; i++) {
-        const s = this.stack[i]!;
-        const under = this.stack[i - 1]!;
-        if (!s.loose || s.body === null || under.body === null) continue;
-        this.stage.weld(s.body, under.body);
-        s.loose = false;
-        s.flash = 1;
-        n++;
-      }
+      const n = this.setSpire();
       if (n > 0) this.float(`${n} SET`, cx, seam + 110, false, 18);
     } else {
       const w = this.weapon === "buttress" ? this.startW : Math.min(this.startW, slab.w * grow);
@@ -2045,6 +2153,22 @@ export class SpireEngine {
     this.sfx.forge();
     this.sfx.fire();
     haptics.heavy();
+  }
+
+  /** Welds every loose slab to the one beneath it; returns how many were set. */
+  private setSpire(): number {
+    if (!this.stage) return 0;
+    let n = 0;
+    for (let i = 1; i < this.stack.length; i++) {
+      const s = this.stack[i]!;
+      const under = this.stack[i - 1]!;
+      if (!s.loose || s.body === null || under.body === null) continue;
+      this.stage.weld(s.body, under.body);
+      s.loose = false;
+      s.flash = 1;
+      n++;
+    }
+    return n;
   }
 
   /** Rebuilds the top slab to a new width about its centre. */
@@ -2345,6 +2469,7 @@ export class SpireEngine {
       trace: [],
       feats: [],
       lit: 0,
+      boss: this.mode === "level" && isBoss(level.id),
     };
     this.result.lit = skiesLit(this.save);
     this.result.feats = earn(
@@ -2535,6 +2660,7 @@ export class SpireEngine {
           ? Math.round(this.floors - this.ghostNow()!)
           : null,
       ghostName: this.ghostName,
+      boss: this.boss ? { surge: this.boss.surge + 1, of: BOSS_SURGES } : null,
     });
   }
 
@@ -2890,6 +3016,33 @@ export class SpireEngine {
     ctx.restore();
   }
 
+  /** Two eyes in the murk, following the top of the tower, blinking slow. */
+  private drawEyes(ctx: CanvasRenderingContext2D, surface: number): void {
+    const b = this.boss!;
+    const top = this.worldToScreen(this.seat.x, 0);
+    const y = surface + 46 + Math.sin(b.eye * 0.8) * 4;
+    const blink = Math.max(0, Math.min(1, Math.abs(Math.sin(b.eye * 0.45)) * 8 - 6.5));
+    const open = 1 - blink;
+    ctx.save();
+    for (const side of [-1, 1]) {
+      const x = top.x + side * (26 + b.surge * 4);
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, 26);
+      glow.addColorStop(0, `rgba(190,120,255,${0.55 * open})`);
+      glow.addColorStop(1, "rgba(190,120,255,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 26, y - 26, 52, 52);
+      ctx.fillStyle = `rgba(240,220,255,${0.95 * open})`;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 7, 4 * open + 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(14,6,26,0.9)";
+      ctx.beginPath();
+      ctx.ellipse(x + side * 2, y, 2.4, 3 * open + 0.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   /** The Dark: a bank of it, with a lit, restless edge, eating the tower from below. */
   private drawDark(ctx: CanvasRenderingContext2D): void {
     const surface = this.worldToScreen(0, this.darkShown).y;
@@ -2923,6 +3076,7 @@ export class SpireEngine {
       ctx.stroke();
     }
     ctx.restore();
+    if (this.boss) this.drawEyes(ctx, surface);
     // Motes drifting up off it when it is close to the top.
     if (!this.reduceMotion && this.darkGap() < 4 && Math.random() < 0.3) {
       this.fx.sparkle(

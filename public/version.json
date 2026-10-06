@@ -1,9 +1,10 @@
 {
-  "build": 26,
-  "title": "Saved as you go",
+  "build": 27,
+  "title": "The Hollow",
   "notes": [
-    "Your progress is now also kept in the phone's own storage, so it survives the app being closed hard. If a save ever went missing, this is the fix.",
-    "The pause sheet says End run, and says what that keeps: your skies, stars and coins.",
-    "A Board button on the title, with arrows to browse every sky's leaderboard."
+    "Apex has a boss. Reach its summit and the Dark wakes with eyes. Drive it down three times with perfect drops; rubble feeds it, and it takes loose slabs.",
+    "Worlds and a star map. The eight skies are world one, Hearth. Tap the beacons on the title to see the sky: every relit sky a star, the constellation completing when the Hollow falls.",
+    "A line of the story before each sky, with what the slab will do there.",
+    "A Board button on the title."
   ]
 }

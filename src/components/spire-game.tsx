@@ -4,6 +4,7 @@ import { LEVELS } from "@/game/levels";
 import { BUILD } from "@/game/version";
 import { isBoss, worldDone, worldOf } from "@/game/worlds";
 import { StarMap } from "./star-map";
+import { ReadyCard } from "./ready";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
@@ -49,6 +50,7 @@ const INITIAL: Hud = {
   taken: false,
   ghostGap: null,
   ghostName: "BEST",
+  boss: null,
   accent: "rgb(255,77,26)",
   result: null,
 };
@@ -355,13 +357,16 @@ export function SpireGame() {
 
         {hud.phase !== "menu" ? <div className="flex-1" /> : null}
 
-        {running && hud.tip && !hud.paused ? (
+        {running && hud.tip && !hud.paused && hud.phase !== "ready" ? (
           <p key={hud.tip} className="tip panel-in" role="status">
             {hud.tip}
           </p>
         ) : null}
 
-        {running && hud.hint && !hud.paused ? <p className="tap-hint">Tap to drop</p> : null}
+        {running && hud.hint && !hud.paused && hud.phase !== "ready" ? (
+          <p className="tap-hint">Tap to drop</p>
+        ) : null}
+        {!hud.paused ? <ReadyCard hud={hud} /> : null}
 
         {hud.phase === "pick" ? (
           <PickPanel hud={hud} onChoose={(i) => engineRef.current?.choose(i)} />
