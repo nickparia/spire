@@ -35,44 +35,46 @@ import {
 import { haptics } from "./haptics";
 import { ENDLESS_PLAN, endlessTheme, LEVELS, levelPlan } from "./levels";
 import {
+  type CourseId,
+  DARK_PUSH,
+  DARK_START,
+  type DropResult,
+  FORGE_GROW,
+  type Ghost,
+  type Goals,
+  MIN_W,
+  type Plan,
+  QUICK_GROW,
+  type RGB,
+  SPLIT_TEMPO,
   beatPhase,
   clamp01,
   courseHint,
   courseLabel,
   dropAccuracy,
-  DARK_PUSH,
-  DARK_START,
   dropOffset,
   fallDuration,
-  FORGE_GROW,
+  fallShare,
+  ghostBetter,
+  ghostHeight,
+  goalsFor,
   graceFor,
   heldWidth,
-  QUICK_GROW,
-  fallShare,
-  goalsFor,
   isKeystone,
-  MIN_W,
   mix,
   ramp,
   resolveDrop,
   shade,
   shouldSpawnBomb,
   shouldSpawnMote,
-  SPLIT_TEMPO,
+  starCount,
   swayOffset,
   tensionFor,
   tolerance,
   travelRate,
-  type CourseId,
-  type DropResult,
-  type Goals,
-  type Plan,
-  type RGB,
-  ghostBetter,
-  ghostHeight,
-  type Ghost,
 } from "./logic";
 import { Music } from "./music";
+import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import {
   BOMB_RGB,
@@ -91,14 +93,15 @@ import {
   type PickupKind,
 } from "./props";
 import {
+  type RunOutcome,
+  type Save,
   emptySave,
   loadSave,
   nextLevelIndex,
   recordRun,
   skiesLit,
   storeSave,
-  type RunOutcome,
-  type Save,
+  totalStars,
 } from "./save";
 import { Sfx } from "./sfx";
 import { rgbCss, THEMES, type Theme } from "./themes";
@@ -163,6 +166,10 @@ export type LevelResult = {
   ghost: { time: number; beaten: boolean; name: string } | null;
   /** This run's trace, for the leaderboard. */
   trace: Ghost;
+  /** Feats earned on this summit, newest last. */
+  feats: FeatId[];
+  /** Skies relit after this one, and the total. */
+  lit: number;
 };
 
 export type Hud = {
@@ -705,6 +712,13 @@ export class SpireEngine {
     this.phase = "play";
     this.spawnMover();
     this.emit();
+  }
+
+  /** Awards a feat earned outside a summit; true when it is new. */
+  award(id: FeatId): boolean {
+    const fresh = earn(this.save.feats, [id], Date.now()).length > 0;
+    if (fresh) this.commit();
+    return fresh;
   }
 
   /** The shell's way to change what the leaderboard needs: name and rival. */
@@ -2309,7 +2323,25 @@ export class SpireEngine {
       offers: [],
       ghost: this.ghostResult(),
       trace: [],
+      feats: [],
+      lit: 0,
     };
+    this.result.lit = skiesLit(this.save);
+    this.result.feats = earn(
+      this.save.feats,
+      featsFor({
+        skiesLit: this.result.lit,
+        skies: LEVELS.length,
+        starsOnThisSky: starCount(this.save.levels[level.id]!),
+        totalStars: totalStars(this.save),
+        perfects: this.perfects,
+        floors: this.floors,
+        ghost: this.result.ghost
+          ? { beaten: this.result.ghost.beaten, rival: this.result.ghost.name !== "BEST" }
+          : null,
+      }),
+      Date.now(),
+    );
     // The ghost summits when the run did, by the official clock.
     this.mark(this.plan.goal);
     this.trace.length = this.plan.goal + 1;

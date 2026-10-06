@@ -35,11 +35,13 @@ import {
 } from "@/game/build";
 import { nextWeapon } from "./use-count-up";
 import { Post } from "./post";
+import { FeatToasts, Journey } from "./journey";
+import type { FeatId } from "@/game/feats";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { formatPercent, formatTime, starCount } from "@/game/logic";
 import type { Save } from "@/game/save";
-import { Clock, Coin, Goal, IconButton, Stars } from "./bits";
+import { Clock, Coin, IconButton, StarIcon } from "./bits";
 import { SoundToggles } from "./screens";
 import { useCountUp } from "./use-count-up";
 
@@ -429,7 +431,7 @@ function Forge({
   return (
     <div className="forge" data-ui>
       <p className="kicker">
-        The forge · <span className={"build-" + house}>House {FAMILIES[house].name}</span> pays less
+        <span className={"build-" + house}>House {FAMILIES[house].name}</span> pays less
       </p>
       {offers.map((offer, i) => {
         const open = offer.needs === 0;
@@ -470,7 +472,6 @@ function Forge({
 
 export function ResultsPanel({
   result,
-  style,
   house,
   onForge,
   onNext,
@@ -478,6 +479,7 @@ export function ResultsPanel({
   onQuit,
   save,
   onName,
+  onFeat,
 }: {
   result: LevelResult;
   style: Family | null;
@@ -488,31 +490,55 @@ export function ResultsPanel({
   onQuit: () => void;
   save: Save;
   onName: (name: string) => void;
+  onFeat: (id: FeatId) => boolean;
 }) {
   const level = LEVELS[result.levelIndex]!;
   const { goals, outcome } = result;
-  const time = useCountUp(result.time, 900);
-  const accuracy = useCountUp(result.accuracy, 1100);
+  const stars = starCount(goals);
+  // The card is paced: the sky ignites, the stars land, then the numbers.
+  const time = useCountUp(result.time, 800, 1900);
+  const accuracy = useCountUp(result.accuracy, 900, 2000);
   const armed = useArmed();
+  const [forgeOpen, setForgeOpen] = useState(false);
+  const captions = [
+    "Summit",
+    `${formatPercent(level.parAccuracy)} accuracy`,
+    `Under ${formatTime(level.parTime)}`,
+  ];
+  const earned = [goals.clear, goals.precise, goals.swift];
+  const fresh = [outcome.fresh.clear, outcome.fresh.precise, outcome.fresh.swift];
   return (
     <section className="panel panel-won" aria-live="polite" data-ui data-armed={armed || undefined}>
-      <p className="kicker">
-        Sky {result.levelIndex + 1} · {level.name}
-      </p>
-      <h2 className="sheet-title">Summit reached</h2>
-      {result.ghost ? (
-        <p className={"ghost-line" + (result.ghost.beaten ? " ghost-won" : "")}>
-          {result.ghost.beaten
-            ? `Beat ${result.ghost.name === "BEST" ? "your ghost" : result.ghost.name} by ${formatTime(result.ghost.time - result.time)}`
-            : `${result.ghost.name === "BEST" ? "Your ghost" : result.ghost.name} summited in ${formatTime(result.ghost.time)}`}
+      <div className="won-head">
+        <p className="kicker">
+          Sky {result.levelIndex + 1} · {level.name}
         </p>
-      ) : null}
-      <Post save={save} result={result} onName={onName} />
-      <div className="mt-2">
-        <Stars count={starCount(goals)} size={34} popFrom={1.05} />
+        <h2 className="sheet-title">Relit</h2>
+      </div>
+      <Journey save={save} ignite={result.levelIndex} size="large" />
+
+      <div className="won-stars reveal" style={{ "--at": "0.9s" } as React.CSSProperties}>
+        {[0, 1, 2].map((i) => {
+          const on = i < stars;
+          const slot = earned[i] ? i : -1;
+          return (
+            <div key={i} className={"won-star" + (on ? " won-star-on" : "")}>
+              <StarIcon
+                on={on}
+                size={36}
+                className={on ? "star-pop" : ""}
+                style={on ? { animationDelay: `${1.05 + i * 0.35}s` } : undefined}
+              />
+              <small className={fresh[i] ? "star-fresh" : ""}>
+                {captions[i]}
+                {slot >= 0 && fresh[i] ? " · new" : ""}
+              </small>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="records">
+      <div className="records reveal" style={{ "--at": "1.9s" } as React.CSSProperties}>
         <Record
           label="Time"
           value={formatTime(time)}
@@ -529,35 +555,52 @@ export function ResultsPanel({
         />
       </div>
 
-      <ul className="goals">
-        <Goal done={goals.clear} fresh={outcome.fresh.clear}>
-          Reach the summit
-        </Goal>
-        <Goal done={goals.precise} fresh={outcome.fresh.precise}>
-          {formatPercent(level.parAccuracy)} accuracy or better
-        </Goal>
-        <Goal done={goals.swift} fresh={outcome.fresh.swift}>
-          Finish in {formatTime(level.parTime)}
-          {result.rebuilt ? " · forfeited by the rebuild" : ""}
-        </Goal>
-      </ul>
-      <Purse result={result} />
-      <p className="panel-meta">
-        {result.perfects} of {result.floors} perfect · best streak {result.bestStreak}
-        {style ? (
-          <span className={"style-line build-" + style}>
-            {" "}
-            {STYLE_LINES[style]} Climbed like a {FAMILIES[style].name}.
-          </span>
-        ) : null}
-      </p>
+      <div className="reveal" style={{ "--at": "2.3s" } as React.CSSProperties}>
+        <Purse result={result} />
+      </div>
 
-      <Forge result={result} house={house} onForge={onForge} />
+      <div className="won-quiet reveal" style={{ "--at": "2.7s" } as React.CSSProperties}>
+        {result.ghost ? (
+          <p className={"ghost-line" + (result.ghost.beaten ? " ghost-won" : "")}>
+            {result.ghost.beaten
+              ? `Beat ${result.ghost.name === "BEST" ? "your ghost" : result.ghost.name} by ${formatTime(result.ghost.time - result.time)}`
+              : `${result.ghost.name === "BEST" ? "Your ghost" : result.ghost.name} summited in ${formatTime(result.ghost.time)}`}
+          </p>
+        ) : null}
+        <Post save={save} result={result} onName={onName} onFeat={onFeat} />
+      </div>
+
+      <FeatToasts ids={result.feats} />
+
+      {result.offers.length > 0 ? (
+        <div className="forge-fold reveal" style={{ "--at": "3s" } as React.CSSProperties}>
+          <button
+            type="button"
+            className="forge-toggle"
+            aria-expanded={forgeOpen}
+            onClick={() => setForgeOpen((v) => !v)}
+          >
+            <span>
+              The forge · {result.offers.slice(0, 3).length} offers
+              <small>
+                {" "}
+                · <Coin size={12} /> {save.coins}
+              </small>
+            </span>
+            <ChevronRight
+              size={16}
+              strokeWidth={2.4}
+              style={{ transform: forgeOpen ? "rotate(90deg)" : undefined }}
+            />
+          </button>
+          {forgeOpen ? <Forge result={result} house={house} onForge={onForge} /> : null}
+        </div>
+      ) : null}
 
       <div className="mt-3 flex flex-col gap-2">
         {onNext ? (
           <button type="button" className="btn btn-primary" onClick={onNext}>
-            Next level
+            Next sky
             <ChevronRight size={18} strokeWidth={2.4} />
           </button>
         ) : null}
@@ -572,7 +615,7 @@ export function ResultsPanel({
           </button>
           <button type="button" className="btn" onClick={onQuit}>
             <LayoutGrid size={17} strokeWidth={2.2} />
-            Levels
+            Skies
           </button>
         </div>
       </div>

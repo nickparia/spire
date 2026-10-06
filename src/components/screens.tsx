@@ -20,6 +20,7 @@ import { Coin, Goal, IconButton, StarIcon, Stars } from "./bits";
 import { FAMILIES, WEAPONS, type WeaponId } from "@/game/build";
 import { houseOf, rankOf, TRACKS } from "@/game/gear";
 import { nextWeapon } from "./use-count-up";
+import { Journey, Medals } from "./journey";
 
 /** What you've built, as three quiet rows of pips: one per house. */
 export function Houses({ save }: { save: Save }) {
@@ -98,7 +99,6 @@ export function TitleScreen({
   const next = nextLevelIndex(save);
   const level = LEVELS[next]!;
   const stars = totalStars(save);
-  const lit = LEVELS.filter((l) => save.levels[l.id]?.clear).length;
   const started = Object.keys(save.levels).length > 0;
   return (
     <div className="screen screen-in" data-ui>
@@ -112,15 +112,9 @@ export function TitleScreen({
             Something put the skies out. Stack the Spire high enough to light them again, one sky at
             a time.
           </p>
-          <div className="beacons" aria-label={`${lit} of ${LEVELS.length} skies lit`}>
-            <span className="beacons-row" aria-hidden="true">
-              {LEVELS.map((l, i) => (
-                <span key={l.id} className={"beacon" + (i < lit ? " beacon-lit" : "")} />
-              ))}
-            </span>
-            <span className="kicker">
-              {lit === 0 ? "No skies lit yet" : `${lit} of ${LEVELS.length} skies lit`}
-            </span>
+          <div className="beacons">
+            <Journey save={save} />
+            <Medals save={save} />
           </div>
         </div>
         <SoundToggles save={save} onMusic={onMusic} onSfx={onSfx} />
@@ -236,6 +230,7 @@ export function LevelSelect({
         </p>
       </div>
 
+      <Journey save={save} size="large" caption={false} />
       <Houses save={save} />
 
       <ol className="levels" ref={listRef}>

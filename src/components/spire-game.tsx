@@ -300,6 +300,7 @@ export function SpireGame() {
             onQuit={quit}
             save={save}
             onName={(name) => engineRef.current?.updateSave({ name })}
+            onFeat={(id) => engineRef.current?.award(id) ?? false}
           />
         ) : null}
       </div>

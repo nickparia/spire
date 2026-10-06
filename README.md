@@ -46,6 +46,10 @@ At the end of a run the game reads how you climbed and names it: a Runner didn't
 
 On the last stretch of Apex, and late in endless, the slab splits into two halves on two clocks: the left half slides at one speed, the right at another, each over its own side of the stack. One tap drops both halves as two bodies. Both home is a perfect and they seat side by side; anything else lands where it was and leans the spire.
 
+## The journey, feats, and the summit card
+
+Eight beacons, one per sky in that sky's colour, stand on the title screen, the Skies screen and the summit card; lit ones burn, and the sky just lit ignites on the summit card. Feats (`src/game/feats.ts`) are earned once and announced there as medals that slide in: first light, half the sky, every sky, three stars on a sky, every star, a true column of perfects, beating your own ghost or a rival's, and a top-ten board placing. Earned medals line up under the title's beacons. The summit card is paced rather than piled: the ignition, then the stars with their captions, then the numbers and the purse, then ghost and board lines, then any medals; the forge folds into one row that expands on tap.
+
 ## Ghosts and the leaderboard
 
 Each sky keeps the trace of your best run: the second every floor was first reached. On a replay that ghost climbs beside you as a dashed line, the HUD says how many floors ahead or behind you are, and beating it pays 25 coins. Summits are posted to a leaderboard (Supabase, `src/game/board.ts`) under a name chosen once on the summit card; each device keeps only its best per sky, written through a server function that only ever improves that device's own row. The board shows the fastest 25 on each sky, and **Compete** on any entry makes that person's ghosts the ones you race on every sky they hold, until you go back to your own best. Devices are identified by a random id; the board shows a one-way hash of it.

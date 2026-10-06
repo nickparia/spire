@@ -39,6 +39,8 @@ export type Save = {
   rival: { id: string; name: string } | null;
   /** The rival's traces by level, fetched when they were picked. */
   rivalGhosts: Record<string, Ghost>;
+  /** Feats earned, by id, with when. */
+  feats: Record<string, number>;
 };
 
 export function emptySave(): Save {
@@ -58,6 +60,7 @@ export function emptySave(): Save {
     name: "",
     rival: null,
     rivalGhosts: {},
+    feats: {},
   };
 }
 
@@ -109,6 +112,9 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
             save.rivalGhosts[id] = trace as number[];
           }
         }
+      }
+      for (const [id, at] of Object.entries(data.feats ?? {})) {
+        if (typeof at === "number" && at > 0) save.feats[id] = at;
       }
       for (const [id, trace] of Object.entries(data.ghosts ?? {})) {
         if (!Array.isArray(trace) || trace.length < 2) continue;
