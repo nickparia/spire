@@ -14,9 +14,7 @@
   --color-ember: #ff4d1a;
   --color-line: #3a342c;
   --color-gold: #ffd24a;
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue",
-    Helvetica, Arial, sans-serif;
+  --font-sans: "Nunito Variable", -apple-system, system-ui, "Helvetica Neue", sans-serif;
   --radius-control: 14px;
   --radius-sheet: 22px;
 }
@@ -1763,7 +1761,7 @@
   top: 27%;
   padding: 0 2.2rem;
   text-align: center;
-  font-family: "Nunito Variable", system-ui, sans-serif;
+  font-family: var(--font-sans);
   pointer-events: none;
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
   transition:
@@ -1830,7 +1828,7 @@
   justify-content: center;
   padding: 2rem 2rem 7rem;
   text-align: center;
-  font-family: "Nunito Variable", system-ui, sans-serif;
+  font-family: var(--font-sans);
   color: #f3e9dc;
   background: radial-gradient(120% 70% at 50% 110%, #3a1a10 0%, #140b10 45%, #07060b 100%);
   overflow: hidden;
@@ -1924,7 +1922,7 @@
   align-items: center;
   justify-content: center;
   gap: 1.6rem;
-  font-family: "Nunito Variable", system-ui, sans-serif;
+  font-family: var(--font-sans);
   color: #f3e9dc;
   background: radial-gradient(
     90% 60% at 50% 55%,

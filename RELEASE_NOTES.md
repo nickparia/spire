@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 33 — One typeface
+
+- The whole game uses one typeface, Nunito: the title and wordmark, the HUD, the callouts on the tower (PERFECT, LANDING…), the cards, the summit card and the menus.
+
 ## Build 32 — Cards and a quieter start
 
 - **Landing gifts are cards.** Two cards deal up with a flip and a flare and sit bobbing in the light, each with an emblem from the world: the weld seam of Set Stone, the clamps of Two Braces, the plumb line of Keel, the lamp of Lantern, a Pulse City clock for Slow Stone. Amber cards (Stone) help the tower stand; violet cards (Light) hold the Dark back. Take one and it lifts, ignites and breaks into light that pours down the tower.

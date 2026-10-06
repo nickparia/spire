@@ -25,6 +25,7 @@ Read this first, then BACKLOG.md (what is next), STORY.md (the voice), README.md
 ## Backend
 
 - Supabase project **Spire** (`eufnyvqsniakpdckkuga`, eu-west-1). Tables `ghosts`, `shade`, `challenges`, `players`. All writes go through security-definer RPCs (`post_ghost`, `throw_shade`, `send_challenge`, `answer_challenge`, `end_challenge`, `set_challenges`, `rename_player`); the public handle is `handle_of(player_id)` (half of SHA-256) and the secret `player_id` column is not readable. Client: `src/game/board.ts` with the publishable key.
+- Bots that reach a summit post to the live board when the save has a `name`: leave `name` empty in bot saves, or delete the row after.
 - Test rows: use ids like `aaaaaaaa-2222-4333-8444-555555555555` and delete them from all four tables afterwards. A bot once threw shade at Nick's real row by clicking the first button on the board.
 
 ## Where things are

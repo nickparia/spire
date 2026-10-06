@@ -30,7 +30,7 @@ function flamePath(ctx: CanvasRenderingContext2D, s: number): void {
 }
 
 const TAU = Math.PI * 2;
-const FONT = 'system-ui, -apple-system, "Helvetica Neue", sans-serif';
+const FONT = '"Nunito Variable", system-ui, -apple-system, sans-serif';
 
 function shieldPath(ctx: CanvasRenderingContext2D, s: number): void {
   ctx.beginPath();

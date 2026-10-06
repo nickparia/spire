@@ -3299,7 +3299,7 @@ export class SpireEngine {
     ctx.lineTo(this.vw - 28, y);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.font = '600 11px system-ui, -apple-system, "Helvetica Neue", sans-serif';
+    ctx.font = '600 11px "Nunito Variable", system-ui, -apple-system, sans-serif';
     ctx.fillStyle = text;
     ctx.textAlign = "left";
     ctx.fillText(label, 28, y - 6);
@@ -3402,7 +3402,7 @@ export class SpireEngine {
     ctx.lineTo(q.x, q.y);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.font = '700 11px system-ui, -apple-system, "Helvetica Neue", sans-serif';
+    ctx.font = '700 11px "Nunito Variable", system-ui, -apple-system, sans-serif';
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
     ctx.fillStyle = ahead ? "rgba(140,220,255,0.8)" : "rgba(255,180,120,0.95)";
@@ -3449,7 +3449,7 @@ export class SpireEngine {
     ctx.stroke();
     if (deg >= 1.5) {
       ctx.setLineDash([]);
-      ctx.font = '700 13px system-ui, -apple-system, "Helvetica Neue", sans-serif';
+      ctx.font = '700 13px "Nunito Variable", system-ui, -apple-system, sans-serif';
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillStyle = `rgba(255,${Math.round(200 - tilt * 120)},${Math.round(170 - tilt * 110)},0.95)`;
@@ -3824,7 +3824,7 @@ export class SpireEngine {
       const age = f.max - f.life;
       const pop = this.reduceMotion ? 1 : 1 + 0.45 * Math.max(0, 1 - age / 0.14);
       ctx.globalAlpha = Math.max(0, Math.min(1, f.life / (f.max * 0.6)));
-      ctx.font = `800 ${Math.round(f.size * pop)}px system-ui, -apple-system, "Helvetica Neue", sans-serif`;
+      ctx.font = `800 ${Math.round(f.size * pop)}px "Nunito Variable", system-ui, -apple-system, sans-serif`;
       ctx.lineWidth = 4;
       ctx.strokeStyle = "rgba(10,8,6,0.55)";
       ctx.strokeText(f.text, s.x, s.y);

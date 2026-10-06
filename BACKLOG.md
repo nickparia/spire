@@ -8,7 +8,6 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Next, in order
 
-0. **Typeface everywhere?** Nunito is now used for the story, the begin text and the cards; the rest of the UI is still the system font. Decide whether to move the HUD, menus and summit card to Nunito too.
 1. **Tester read on builds 27–29**: the Hollow's three surges (target ~2, 4, 5 perfects), landing spacing (8) and whether any gift is a dud, the Foundry's fairness for a newcomer, Apex's fairness at the top, whether the "Update in TestFlight" button works on a real phone.
 2. **The Descent** (above), then its boss (what was buried).
 3. **The Wheel** (world three): a turning hub, gravity to the centre, slabs seated on the rim. Boss: **the Siege** — a ring of slabs with a notch around the light; the ring turns, things fly in; tap when the notch faces one and it feeds the light; misses crack plates; repair gaps between waves by dropping slabs.
@@ -28,6 +27,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 33 Nunito everywhere: CSS `--font-sans` and the canvas fonts in `engine.ts`/`props.ts`.
 - 32 Landing gifts as animated cards with lore emblems (`src/components/gifts.tsx`); begin text alone, first tap drops; the story as a full-screen reveal; Nunito for these surfaces. Design canvas: https://claude.ai/artifact/KRFrf2VYJx2qi3vXDP9hYr
 - 31 The world-end scene: a family on a hill watches the world's stars return, then the revelation, then the map (`src/components/world-end.tsx`).
 - 29 Landings: checkpoints every eight floors with two gifts; embers grant a gift on the move.

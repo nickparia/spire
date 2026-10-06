@@ -1,9 +1,7 @@
 {
-  "build": 32,
-  "title": "Cards and a quieter start",
+  "build": 33,
+  "title": "One typeface",
   "notes": [
-    "Landing gifts are cards now: dealt with a flip, each with its own emblem from the world. Take one and it lifts, ignites and pours its light into the tower.",
-    "Before each sky its line sits over the sky, alone. Your first tap drops the slab and the words fade.",
-    "The story rises out of the dark, line by line."
+    "The whole game now speaks in one typeface, Nunito: the title, the HUD, the callouts on the tower, the cards and the summit."
   ]
 }
