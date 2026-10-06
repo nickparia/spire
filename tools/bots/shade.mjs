@@ -68,10 +68,6 @@ await page.reload({ waitUntil: "networkidle0" });
 await wait(300);
 await play(0, 1500);
 // Nick (B) competes with Lois, beats her, throws shade.
-const loisPublic = await page.evaluate(async () => {
-  const r = await fetch("http://localhost:8080/");
-  return null;
-});
 await page.evaluate((s) => localStorage.setItem("spire-v2", JSON.stringify(s)), saveFor(B, "Nick"));
 await page.reload({ waitUntil: "networkidle0" });
 await wait(300);

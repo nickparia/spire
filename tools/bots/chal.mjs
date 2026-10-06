@@ -69,24 +69,6 @@ const play = async (lvl, pace) => {
   }
   await wait(4000);
 };
-const toBoard = async () => {
-  await page.evaluate(() => {
-    for (const b of document.querySelectorAll("button"))
-      if (b.textContent?.trim() === "Skies") {
-        b.click();
-        break;
-      }
-  });
-  await wait(500);
-  await page.evaluate(() => {
-    document.querySelector(".level-head")?.click();
-  });
-  await wait(300);
-  await page.evaluate(() => {
-    document.querySelector(".btn-board")?.click();
-  });
-  await wait(2500);
-};
 await page.goto("http://localhost:8080/", { waitUntil: "networkidle0" });
 // Lois posts a slow time.
 await as(A, "Lois");

@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 31 — A world relit
+
+- When the Hollow falls and you press **The sky**, a scene plays before the map: far away, on a hill, a family looks up at a dark sky as Hearth's eight stars come back one by one, each in its sky's colour, and join into the constellation. Then the world's line. Tap to go on.
+
+**Please try**: beat the Hollow and watch the scene. Does it land, and is it the right length (about seven seconds before the line)?
+
 ## Build 30 — The story and the worlds
 
 - **The story**, told once on first launch in four lines, and kept behind "The story" on the Worlds screen.

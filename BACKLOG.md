@@ -9,14 +9,13 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 ## Next, in order
 
 1. **Tester read on builds 27–29**: the Hollow's three surges (target ~2, 4, 5 perfects), landing spacing (8) and whether any gift is a dud, the Foundry's fairness for a newcomer, Apex's fairness at the top, whether the "Update in TestFlight" button works on a real phone.
-2. **The world's end scene** (user, Oct 6): when a world's boss falls, before the map — a wistful shot from behind a family on a hill on earth, looking up at a dark sky, as the planets/stars of that world spark into life above them; then the revelation line. Procedural canvas scene, no video. World one gets it first.
-3. **The Descent** (above), then its boss (what was buried).
-4. **The Wheel** (world three): a turning hub, gravity to the centre, slabs seated on the rim. Boss: **the Siege** — a ring of slabs with a notch around the light; the ring turns, things fly in; tap when the notch faces one and it feeds the light; misses crack plates; repair gaps between waves by dropping slabs.
-5. **The title screen**: procedural, the Spire building itself out of the Dark as the title settles, lit skies burning on the horizon, the premise in three lines. (Instead of generated video.)
-6. **Pixel-art side test**: a render mode behind an Options toggle — quarter-resolution canvas, nearest-neighbour upscale, palette crush and a touch of dither — so testers can compare; redraw properly only if it wins.
-7. **Cosmetic forge**: coins buy stone finishes and beacon styles instead of the quality-of-life ranks, which read as nothing; the few ranks that matter (Brace, Second Wind, Breather) move into landings or run picks.
-8. **Catch and dodge**: embers that fall to be caught under the slab, rocks to dodge, all through the drop tap.
-9. **App Store groundwork**: screenshots, a preview video (one month of a video tool then), the privacy form (display name and scores, not linked to identity), listing copy.
+2. **The Descent** (above), then its boss (what was buried).
+3. **The Wheel** (world three): a turning hub, gravity to the centre, slabs seated on the rim. Boss: **the Siege** — a ring of slabs with a notch around the light; the ring turns, things fly in; tap when the notch faces one and it feeds the light; misses crack plates; repair gaps between waves by dropping slabs.
+4. **The title screen**: procedural, the Spire building itself out of the Dark as the title settles, lit skies burning on the horizon, the premise in three lines. (Instead of generated video.)
+5. **Pixel-art side test**: a render mode behind an Options toggle — quarter-resolution canvas, nearest-neighbour upscale, palette crush and a touch of dither — so testers can compare; redraw properly only if it wins.
+6. **Cosmetic forge**: coins buy stone finishes and beacon styles instead of the quality-of-life ranks, which read as nothing; the few ranks that matter (Brace, Second Wind, Breather) move into landings or run picks.
+7. **Catch and dodge**: embers that fall to be caught under the slab, rocks to dodge, all through the drop tap.
+8. **App Store groundwork**: screenshots, a preview video (one month of a video tool then), the privacy form (display name and scores, not linked to identity), listing copy.
 
 ## Pinned ideas (not scheduled)
 
@@ -28,6 +27,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 31 The world-end scene: a family on a hill watches the world's stars return, then the revelation, then the map (`src/components/world-end.tsx`).
 - 29 Landings: checkpoints every eight floors with two gifts; embers grant a gift on the move.
 - 28 Ready card under the HUD, first tap dismisses; End button beside pause; wind holds six floors.
 - 27 The Hollow (Apex's boss), worlds and the star map, the story and a line before each sky.

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { BUILD } from "@/game/version";
-import { isBoss, worldDone, worldOf } from "@/game/worlds";
+import { isBoss, worldDone, worldOf, WORLDS } from "@/game/worlds";
 import { StarMap } from "./star-map";
+import { WorldEnd } from "./world-end";
 import { ReadyCard } from "./ready";
 import { StoryCard } from "./story";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
@@ -57,7 +58,7 @@ const INITIAL: Hud = {
   result: null,
 };
 
-type Menu = "title" | "levels" | "board" | "map";
+type Menu = "title" | "levels" | "board" | "map" | "end";
 
 /** Text colour that reads on the sky's accent: dark on a pale accent, white on a deep one. */
 function onAccent(css: string): string {
@@ -176,13 +177,17 @@ export function SpireGame() {
     const world = worldOf(LEVELS[done]!.id);
     // The last sky of a world leads to the map, where its constellation completes.
     if (isBoss(LEVELS[done]!.id) && worldDone(state.current.save, world)) {
-      openMap(world.id);
+      // First the scene on Earth, then the map with the constellation drawing.
+      engineRef.current?.click();
+      setMapLit(world.id);
+      setMenu("end");
+      engineRef.current?.showMenu(done);
       return;
     }
     const index = done + 1;
     if (index < LEVELS.length) play(index);
     else openLevels(done);
-  }, [play, openLevels, openMap]);
+  }, [play, openLevels]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -323,6 +328,16 @@ export function SpireGame() {
             onWeapon={(id) => engineRef.current?.setWeapon(id)}
             onMusic={setMusic}
             onSfx={setSfx}
+          />
+        ) : null}
+
+        {hud.phase === "menu" && menu === "end" && mapLit ? (
+          <WorldEnd
+            world={WORLDS.find((w) => w.id === mapLit) ?? WORLDS[0]!}
+            onDone={() => {
+              engineRef.current?.click();
+              setMenu("map");
+            }}
           />
         ) : null}
 
