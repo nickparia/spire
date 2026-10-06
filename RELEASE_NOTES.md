@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 34 — Sound that comes back
+
+- Fixed: after switching to another app and coming back, the sound could stay off. Your next tap now brings it back; if iOS has shut the audio down entirely, the game rebuilds it and the music picks up again.
+- Includes everything in builds 32 and 33.
+
 ## Build 33 — One typeface
 
 - The whole game uses one typeface, Nunito: the title and wordmark, the HUD, the callouts on the tower (PERFECT, LANDING…), the cards, the summit card and the menus.

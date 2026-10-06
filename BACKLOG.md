@@ -27,6 +27,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 34 Audio heals after backgrounding: a stuck or interrupted context is rebuilt on the next gesture and the music graph follows it (`audio.ts`, `music.ts`; `tools/bots/audio.mjs`).
 - 33 Nunito everywhere: CSS `--font-sans` and the canvas fonts in `engine.ts`/`props.ts`.
 - 32 Landing gifts as animated cards with lore emblems (`src/components/gifts.tsx`); begin text alone, first tap drops; the story as a full-screen reveal; Nunito for these surfaces. Design canvas: https://claude.ai/artifact/KRFrf2VYJx2qi3vXDP9hYr
 - 31 The world-end scene: a family on a hill watches the world's stars return, then the revelation, then the map (`src/components/world-end.tsx`).

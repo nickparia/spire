@@ -163,6 +163,11 @@ export class Music {
   start(): void {
     const { ctx, musicBus } = this.rig;
     if (!ctx || !musicBus) return;
+    // A rebuilt context needs a new graph, on the new clock.
+    if (this.graph && this.graph.ctx !== ctx) {
+      this.graph = null;
+      this.stop();
+    }
     if (!this.graph) this.graph = buildGraph(ctx, musicBus);
     if (this.timer !== null) return;
     this.nextTime = ctx.currentTime + 0.06;

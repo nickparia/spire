@@ -10,12 +10,29 @@ export class AudioRig {
   private sfxOn = true;
   private musicOn = true;
   private held = false;
+  /** When a resume was last asked for; a context still not running well after is dead. */
+  private askedAt = 0;
 
   /** Returns true once the context exists. Safe to call on every tap. */
   unlock(): boolean {
     const w = window as Window & { webkitAudioContext?: typeof AudioContext };
     const AC = window.AudioContext ?? w.webkitAudioContext;
     if (!AC) return false;
+    // iOS can leave a backgrounded context "interrupted", or suspended for
+    // good: if a resume asked for earlier never took, start again.
+    const stuck =
+      this.ctx !== null &&
+      !this.held &&
+      this.ctx.state !== "running" &&
+      this.askedAt > 0 &&
+      performance.now() - this.askedAt > 400;
+    if (stuck || (this.ctx && (this.ctx.state as string) === "interrupted")) {
+      void this.ctx!.close().catch(() => undefined);
+      this.ctx = null;
+      this.sfxBus = null;
+      this.musicBus = null;
+      this.askedAt = 0;
+    }
     if (!this.ctx) {
       const ctx = new AC({ latencyHint: "interactive" });
       // A limiter on the way out: stacked effects over the score never clip.
@@ -34,7 +51,12 @@ export class AudioRig {
       this.musicBus.connect(limiter);
       this.ctx = ctx;
     }
-    if (!this.held && this.ctx.state !== "running") void this.ctx.resume();
+    if (!this.held && this.ctx.state !== "running") {
+      if (this.askedAt === 0) this.askedAt = performance.now();
+      void this.ctx.resume().then(() => {
+        if (this.ctx?.state === "running") this.askedAt = 0;
+      });
+    } else this.askedAt = 0;
     return true;
   }
 
@@ -68,6 +90,11 @@ export class AudioRig {
 
   release(): void {
     this.held = false;
-    if (this.ctx && this.ctx.state !== "running") void this.ctx.resume();
+    if (this.ctx && this.ctx.state !== "running") {
+      this.askedAt = performance.now();
+      void this.ctx.resume().then(() => {
+        if (this.ctx?.state === "running") this.askedAt = 0;
+      });
+    }
   }
 }

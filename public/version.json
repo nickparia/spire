@@ -1,7 +1,7 @@
 {
-  "build": 33,
-  "title": "One typeface",
+  "build": 34,
+  "title": "Sound that comes back",
   "notes": [
-    "The whole game now speaks in one typeface, Nunito: the title, the HUD, the callouts on the tower, the cards and the summit."
+    "Leave the app and come back: your next tap brings the sound back, even when iOS has switched it off."
   ]
 }
