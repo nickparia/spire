@@ -485,6 +485,7 @@ export function ResultsPanel({
   save,
   onName,
   onFeat,
+  nextLabel = "Next sky",
 }: {
   result: LevelResult;
   style: Family | null;
@@ -496,6 +497,7 @@ export function ResultsPanel({
   save: Save;
   onName: (name: string) => void;
   onFeat: (id: FeatId) => boolean;
+  nextLabel?: string;
 }) {
   const level = LEVELS[result.levelIndex]!;
   const { goals, outcome } = result;
@@ -608,7 +610,7 @@ export function ResultsPanel({
       <div className="mt-3 flex flex-col gap-2">
         {onNext ? (
           <button type="button" className="btn btn-primary" onClick={onNext}>
-            Next sky
+            {nextLabel}
             <ChevronRight size={18} strokeWidth={2.4} />
           </button>
         ) : null}

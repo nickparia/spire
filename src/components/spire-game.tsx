@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { BUILD } from "@/game/version";
+import { isBoss, worldDone, worldOf } from "@/game/worlds";
+import { StarMap } from "./star-map";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
@@ -51,7 +53,7 @@ const INITIAL: Hud = {
   result: null,
 };
 
-type Menu = "title" | "levels" | "board";
+type Menu = "title" | "levels" | "board" | "map";
 
 /** Text colour that reads on the sky's accent: dark on a pale accent, white on a deep one. */
 function onAccent(css: string): string {
@@ -142,11 +144,28 @@ export function SpireGame() {
     engineRef.current?.retry();
   }, []);
 
+  const [mapLit, setMapLit] = useState<string | undefined>(undefined);
+  const openMap = useCallback((lit?: string) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.click();
+    setMapLit(lit);
+    setMenu("map");
+    engine.showMenu(state.current.hud.levelIndex);
+  }, []);
+
   const next = useCallback(() => {
-    const index = state.current.hud.levelIndex + 1;
+    const done = state.current.hud.levelIndex;
+    const world = worldOf(LEVELS[done]!.id);
+    // The last sky of a world leads to the map, where its constellation completes.
+    if (isBoss(LEVELS[done]!.id) && worldDone(state.current.save, world)) {
+      openMap(world.id);
+      return;
+    }
+    const index = done + 1;
     if (index < LEVELS.length) play(index);
-    else openLevels(state.current.hud.levelIndex);
-  }, [play, openLevels]);
+    else openLevels(done);
+  }, [play, openLevels, openMap]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -270,11 +289,21 @@ export function SpireGame() {
               setBoardFrom("title");
               setMenu("board");
             }}
+            onMap={() => openMap()}
             onEndless={endless}
             onReset={() => engineRef.current?.resetProgress()}
             onWeapon={(id) => engineRef.current?.setWeapon(id)}
             onMusic={setMusic}
             onSfx={setSfx}
+          />
+        ) : null}
+
+        {hud.phase === "menu" && menu === "map" ? (
+          <StarMap
+            save={save}
+            justLit={mapLit}
+            onBack={openTitle}
+            onWorld={(index) => openLevels(index)}
           />
         ) : null}
 
@@ -354,7 +383,12 @@ export function SpireGame() {
             style={hud.style}
             house={hud.house}
             onForge={(i) => engineRef.current?.forge(i)}
-            onNext={hud.result.levelIndex + 1 < LEVELS.length ? next : null}
+            onNext={
+              hud.result.levelIndex + 1 < LEVELS.length || isBoss(LEVELS[hud.result.levelIndex]!.id)
+                ? next
+                : null
+            }
+            nextLabel={isBoss(LEVELS[hud.result.levelIndex]!.id) ? "The sky" : "Next sky"}
             onRetry={retry}
             onQuit={quit}
             save={save}

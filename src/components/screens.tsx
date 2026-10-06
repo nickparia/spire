@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { ShadeMark, type Rival } from "./shade";
 import { SettingsButton } from "./challenge";
 import { sendChallenge, type Challenge, type SendResult } from "@/game/board";
+import { isBoss, WORLDS } from "@/game/worlds";
 import type { Shade } from "@/game/board";
 import { fetchBoard, fetchPlayer, type Entry } from "@/game/board";
 import type { Ghost } from "@/game/logic";
@@ -89,6 +90,7 @@ export function TitleScreen({
   onShadeSeen,
   invite,
   onOptions,
+  onMap,
   onPlay,
   onLevels,
   onBoard,
@@ -104,6 +106,7 @@ export function TitleScreen({
   onShadeSeen: (at: string) => void;
   invite?: ReactNode;
   onOptions: () => void;
+  onMap: () => void;
   onPlay: (index: number) => void;
   onLevels: () => void;
   onBoard: () => void;
@@ -130,10 +133,15 @@ export function TitleScreen({
             Something put the skies out. Stack the Spire high enough to light them again, one sky at
             a time.
           </p>
-          <div className="beacons">
+          <button
+            type="button"
+            className="beacons beacons-btn"
+            onClick={onMap}
+            aria-label="Open the star map"
+          >
             <Journey save={save} />
             <Medals save={save} />
-          </div>
+          </button>
         </div>
         <div className="flex gap-2">
           <SettingsButton onPress={onOptions} />
@@ -269,6 +277,9 @@ export function LevelSelect({
       </div>
 
       <Journey save={save} size="large" caption={false} />
+      <p className="kicker world-head">
+        World 1 · {WORLDS[0]!.name} <small>— {WORLDS[0]!.blurb}</small>
+      </p>
       <Houses save={save} />
 
       <ol className="levels" ref={listRef}>
@@ -294,7 +305,10 @@ export function LevelSelect({
                     {open ? index + 1 : <Lock size={16} strokeWidth={2.2} />}
                   </span>
                   <span className="level-text">
-                    <span className="level-name">{level.name}</span>
+                    <span className="level-name">
+                      {level.name}
+                      {isBoss(level.id) ? <em className="boss-tag">Boss</em> : null}
+                    </span>
                     <span className="level-blurb">
                       {open
                         ? level.blurb

@@ -1727,6 +1727,138 @@
   opacity: 0.6;
 }
 
+/* The star map. */
+.starmap {
+  display: flex;
+  flex-direction: column;
+}
+
+.starmap-svg {
+  width: 100%;
+  flex: 1;
+  min-height: 40vh;
+  margin-top: 0.5rem;
+}
+
+.starline {
+  stroke: color-mix(in srgb, var(--color-fg) 14%, transparent);
+  stroke-width: 0.35;
+  stroke-dasharray: 1.2 1;
+}
+
+.starline-on {
+  stroke: color-mix(in srgb, var(--color-fg) 70%, transparent);
+  stroke-dasharray: none;
+}
+
+.constellation-draw .starline-on {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: draw 700ms ease-out both;
+}
+
+.star circle {
+  fill: color-mix(in srgb, var(--color-fg) 22%, transparent);
+}
+
+.star .star-halo {
+  fill: transparent;
+}
+
+.star-on circle {
+  fill: var(--star);
+}
+
+.star-on .star-halo {
+  fill: var(--star);
+  opacity: 0.16;
+  animation: glow 2.4s ease-in-out infinite;
+}
+
+.constellation-draw .star-on circle {
+  animation: star-pop 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.starname {
+  font-size: 3.2px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  fill: var(--color-fg);
+}
+
+.nebula circle {
+  fill: color-mix(in srgb, var(--color-fg) 5%, transparent);
+  stroke: color-mix(in srgb, var(--color-fg) 12%, transparent);
+  stroke-width: 0.3;
+  stroke-dasharray: 1 1.2;
+}
+
+.starname-dark {
+  text-anchor: middle;
+  fill: color-mix(in srgb, var(--color-fg) 45%, transparent);
+}
+
+.starmap-legend {
+  margin-top: 0.5rem;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.starmap-legend small {
+  display: block;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.starmap-dark {
+  opacity: 0.55;
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.beacons-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.world-head {
+  margin-top: 0.6rem;
+}
+
+.world-head small {
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+.boss-tag {
+  margin-left: 8px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #14100d;
+  background: var(--color-ember);
+  vertical-align: middle;
+}
+
 /* Options. */
 .switch-row {
   display: flex;
