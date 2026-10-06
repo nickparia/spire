@@ -22,6 +22,14 @@ const TENSE: readonly Chord[] = [
   [7, 11, 14],
 ];
 
+/** VI – VII – i – v: the B section, the same key seen from further off. */
+const LIFT: readonly Chord[] = [
+  [8, 12, 15],
+  [10, 14, 17],
+  [0, 3, 7],
+  [7, 10, 14],
+];
+
 /** I – IV – V – I for the summit. */
 const BRIGHT: readonly Chord[] = [
   [0, 4, 7],
@@ -62,6 +70,23 @@ const LEAD_16: readonly (readonly [number, number])[] = [
 ];
 
 const STEPS_PER_BAR = 16;
+
+/**
+ * The arrangement, in bars: A, B, A, then a short breakdown. The last bar of
+ * each section carries a fill into the next.
+ */
+const FORM: readonly { kind: Section; bars: number }[] = [
+  { kind: "a", bars: 8 },
+  { kind: "b", bars: 8 },
+  { kind: "a", bars: 8 },
+  { kind: "break", bars: 4 },
+];
+const FORM_BARS = FORM.reduce((n, p) => n + p.bars, 0);
+
+type Section = "a" | "b" | "break";
+
+/** What the climb tells the score: how far up, how close the Dark, how clean. */
+export type Climb = { progress: number; danger: number; streak: number; landings: number };
 const LOOKAHEAD = 0.14;
 
 function hz(midi: number): number {
@@ -153,6 +178,13 @@ export class Music {
   private step = 0;
   private nextTime = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private climb: Climb = { progress: 0, danger: 0, streak: 0, landings: 0 };
+  /** The score is stripped to a pad until this bar: a topple. */
+  private stripUntil = -1;
+  /** A swell rises through this bar into the next section: a landing. */
+  private swellBar = -1;
+  /** Bars are counted from here so a fresh climb starts at the top of the form. */
+  private formStart = 0;
 
   constructor(rig: AudioRig, track: Track) {
     this.rig = rig;
@@ -190,6 +222,48 @@ export class Music {
     this.target = clamp01(value);
   }
 
+  /**
+   * The climb drives the score: height and the Dark's nearness set the
+   * tension; landings and a streak bring layers in.
+   */
+  setClimb(climb: Climb): void {
+    this.climb = climb;
+    this.target = clamp01(
+      climb.progress * 0.45 + climb.danger * 0.6 + Math.min(climb.streak, 8) * 0.012,
+    );
+  }
+
+  /** A fresh climb: back to the top of the form, nothing earned yet. */
+  restart(): void {
+    this.formStart = Math.floor(this.step / STEPS_PER_BAR);
+    this.climb = { progress: 0, danger: 0, streak: 0, landings: 0 };
+    this.stripUntil = -1;
+    this.swellBar = -1;
+  }
+
+  /** A landing: a swell through the next bar, then the B section. */
+  landing(): void {
+    const bar = Math.floor(this.step / STEPS_PER_BAR);
+    this.swellBar = bar + 1;
+    // Land the next section on B: move the form so bar + 2 starts it.
+    this.formStart = bar + 2 - FORM[0]!.bars;
+  }
+
+  /** A topple: strip back to the pad for a few bars. */
+  topple(): void {
+    this.stripUntil = Math.floor(this.step / STEPS_PER_BAR) + 4;
+  }
+
+  /** Where a bar falls in the form, and whether it is the last of its section. */
+  private section(bar: number): { kind: Section; fill: boolean } {
+    let at = (((bar - this.formStart) % FORM_BARS) + FORM_BARS) % FORM_BARS;
+    for (const part of FORM) {
+      if (at < part.bars) return { kind: part.kind, fill: at === part.bars - 1 };
+      at -= part.bars;
+    }
+    return { kind: "a", fill: false };
+  }
+
   setMood(mood: Mood): void {
     this.mood = mood;
   }
@@ -221,10 +295,20 @@ export class Music {
     const stepDur = 60 / (track.bpm * (1 + 0.38 * t)) / 4;
     const bar = Math.floor(step / STEPS_PER_BAR);
     const s = step % STEPS_PER_BAR;
-    const prog = this.mood === "summit" ? BRIGHT : t > 0.62 ? TENSE : CALM;
+    const playing = this.mood === "play";
+    const sec = this.section(bar);
+    const stripped = playing && (bar < this.stripUntil || sec.kind === "break");
+    const prog =
+      this.mood === "summit" ? BRIGHT : t > 0.62 ? TENSE : sec.kind === "b" ? LIFT : CALM;
     const chord = prog[bar % prog.length]!;
+    const climb = this.climb;
+    // Layers are earned: bass and drums after the first landing (or once it
+    // is tense), the melody with a streak of three.
+    const bassOn = !playing || climb.landings >= 1 || t > 0.45;
+    const drumsOn = !playing || climb.landings >= 2 || t > 0.5;
+    const leadOn = !playing || climb.streak >= 3 || t > 0.62;
 
-    const cutoff = this.mood === "fallen" ? 420 : 700 * Math.pow(18, t);
+    const cutoff = this.mood === "fallen" ? 420 : stripped ? 520 : 700 * Math.pow(18, t);
     graph.tone.frequency.setTargetAtTime(cutoff, time, 0.12);
     const level = this.mood === "fallen" ? 0.35 : this.mood === "menu" ? 0.7 : 0.95;
     graph.level.gain.setTargetAtTime(level, time, 0.25);
@@ -235,10 +319,16 @@ export class Music {
     graph.strainOscs[1]!.frequency.setTargetAtTime(hz(track.root + 30), time, 0.05);
 
     if (s === 0) this.pad(graph, time, chord, stepDur * STEPS_PER_BAR, t);
-    this.lead(graph, time, s, chord, stepDur, t);
+    if (bar === this.swellBar && s === 0) this.swell(graph, time, stepDur * STEPS_PER_BAR);
+    if (stripped) return stepDur;
+    if (leadOn) this.lead(graph, time, s, chord, stepDur, t);
     if (this.mood !== "fallen") {
-      this.bass(graph, time, s, chord, stepDur, t);
-      this.kit(graph, time, s, t);
+      if (bassOn) this.bass(graph, time, s, chord, stepDur, Math.max(t, playing ? 0.2 : t));
+      if (drumsOn) this.kit(graph, time, s, Math.max(t, playing ? 0.45 : t));
+      // A fill into the next section: a roll over the last beat.
+      if (playing && sec.fill && drumsOn && s >= 12) {
+        this.hit(graph, time, "bandpass", 1500 + (s - 12) * 300, 0.09, 0.08 + (s - 12) * 0.03);
+      }
     }
     return stepDur;
   }
@@ -397,6 +487,33 @@ export class Music {
     else if (t > 0.5) hat = s % 4 === 2 ? 0.07 : 0;
     else if (t > 0.28) hat = s === 4 || s === 12 ? 0.055 : 0;
     if (hat > 0) this.hit(graph, time, "highpass", 7000, 0.035, hat);
+  }
+
+  /** A rising wash of noise over one bar: the lift into a new section. */
+  private swell(graph: Graph, time: number, dur: number): void {
+    const { ctx } = graph;
+    const src = ctx.createBufferSource();
+    src.buffer = graph.noise;
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.Q.value = 1.2;
+    filter.frequency.setValueAtTime(300, time);
+    filter.frequency.exponentialRampToValueAtTime(7000, time + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.14, time + dur * 0.95);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur + 0.08);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(graph.drums);
+    src.start(time);
+    src.stop(time + dur + 0.1);
+    src.onended = () => {
+      src.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
   }
 
   private hit(

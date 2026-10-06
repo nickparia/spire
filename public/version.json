@@ -1,7 +1,8 @@
 {
-  "build": 34,
-  "title": "Sound that comes back",
+  "build": 35,
+  "title": "A score that climbs with you, and a Dark that won't wait",
   "notes": [
-    "Leave the app and come back: your next tap brings the sound back, even when iOS has switched it off."
+    "The music now follows your climb: it moves between sections, the bass comes in at your first landing and the drums at your second, the melody joins on a streak of three perfects, a landing swells into a new section, and a topple strips it back.",
+    "Stay on a sky past its par time and the Dark quickens, faster every ten seconds. Perfect drops still push it back, but never more than twelve floors below you."
   ]
 }

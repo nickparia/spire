@@ -3,6 +3,21 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 35 — A score that climbs with you, and a Dark that won't wait
+
+**Music**
+
+- The score follows your climb instead of looping: it moves through sections (A, B, A and a breakdown) with a second chord progression and drum fills between them.
+- Layers are earned: the bass comes in at your first landing, the drums at your second, and the melody joins on a streak of three perfects and drops out if you break it.
+- A landing plays a rising swell into a new section; a topple strips everything back to a bare pad for a few bars. Tension rises with your height and as the Dark closes in.
+
+**The Dark quickens**
+
+- Stay on a sky past its par time and the Dark climbs faster, stepping up every ten seconds ("THE DARK QUICKENS") — about 40% faster ten seconds over, more than twice as fast by thirty.
+- Perfect drops still push it back, but never more than twelve floors below your top, so it can no longer fall so far behind that it stops mattering.
+
+**Please try**: play a sky slowly or carelessly and tell us when the Dark started to feel dangerous — too soon, or not soon enough?
+
 ## Build 34 — Sound that comes back
 
 - Fixed: after switching to another app and coming back, the sound could stay off. Your next tap now brings it back; if iOS has shut the audio down entirely, the game rebuilds it and the music picks up again.

@@ -117,6 +117,11 @@ const BOSS_SURGES = 3;
 const BOSS_DEPTH = 12;
 const BOSS_START = 6;
 const BOSS_TENDRIL = 4;
+/** Floors below the top that light can drive the Dark, and no further. */
+const DARK_REACH = 12;
+/** Past par, the Dark climbs this much faster per second over, called out every QUICKEN_EVERY seconds. */
+const QUICKEN_RATE = 0.04;
+const QUICKEN_EVERY = 10;
 /** Coins for beating your own ghost to the summit. */
 const GHOST_PURSE = 25;
 /** Seconds the top must stand at goal height before the summit counts. */
@@ -520,6 +525,8 @@ export class SpireEngine {
   private slowmo = 0;
   /** Seconds the settled top has stood at or above the goal. */
   private summitHold = 0;
+  /** The last ten-second step past par the Dark was called out quickening on. */
+  private quickStep = -1;
   /** Seconds the Dark holds still after a topple, for the Runner's Breather. */
   private breather = 0;
   /**
@@ -906,6 +913,7 @@ export class SpireEngine {
     this.music.setTrack(this.theme.track);
     this.music.setMood("play");
     this.music.setTension(0);
+    this.music.restart();
     // Ranks announce themselves where they act, starting with the ones that act at once.
     const base = this.stack[0]!;
     if (this.kit.shields > 0) {
@@ -996,6 +1004,7 @@ export class SpireEngine {
     this.seat = { x: 0, y: SLAB_H };
     this.slowmo = 0;
     this.summitHold = 0;
+    this.quickStep = -1;
     this.breather = 0;
     this.boss = null;
     this.landing = null;
@@ -1398,6 +1407,7 @@ export class SpireEngine {
     stage.step(this.slowmo > 0 ? dt * 0.3 : dt);
     if (stage.takeTopple() && this.phase === "play") {
       this.slowmo = 0.8;
+      this.music.topple();
       if (this.kit.breather > 0) {
         this.breather = this.kit.breather;
         this.float("BREATHER", 0, this.dark + 40, false, 18);
@@ -1496,6 +1506,7 @@ export class SpireEngine {
    */
   private openLanding(floor: number): void {
     this.landed.add(floor);
+    this.music.landing();
     const set = this.setSpire();
     this.phase = "pick";
     this.landing = {
@@ -1654,10 +1665,31 @@ export class SpireEngine {
     }
   }
 
+  /**
+   * How much faster the Dark climbs for a run that has outstayed the sky's
+   * par time, called out each time it steps up.
+   */
+  private quickening(): number {
+    if (this.mode !== "level") return 1;
+    const over = this.runTime - LEVELS[this.levelIndex]!.parTime;
+    if (over <= 0) return 1;
+    const step = Math.floor(over / QUICKEN_EVERY);
+    if (step > this.quickStep) {
+      this.quickStep = step;
+      const top = this.peak();
+      this.float("THE DARK QUICKENS", top.x + top.w / 2, this.dark + 70, false, 22);
+      this.sfx.hiss();
+      this.pulse = Math.max(this.pulse, 0.5);
+    }
+    return 1 + QUICKEN_RATE * over;
+  }
+
   /** Light pushes the Dark down, never below where it started. */
   private pushDark(px: number): void {
     if (this.plan.darkRate <= 0 || px <= 0) return;
-    this.dark = Math.max(DARK_START, this.dark - px);
+    // Light buys time, never safety: the Dark is held within reach of the top.
+    const floor = this.stage ? this.crownY() - SLAB_H * DARK_REACH : -Infinity;
+    this.dark = Math.max(DARK_START, Math.min(this.dark, Math.max(floor, this.dark - px)));
   }
 
   /** Floors of tower still above the Dark. */
@@ -1672,9 +1704,12 @@ export class SpireEngine {
   private riseDark(dt: number): void {
     this.breather = Math.max(0, this.breather - dt);
     if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0 && this.breather <= 0) {
-      const rate = this.boss
+      const base = this.boss
         ? this.plan.darkRate * (1 + this.boss.surge * 0.25)
         : this.plan.darkRate;
+      // Linger past par and the Dark quickens: about 40% faster ten seconds
+      // over, more than twice as fast by thirty. Not in the boss fight.
+      const rate = base * (this.boss ? 1 : this.quickening());
       this.dark += rate * dt;
       const top = this.peak()!;
       if (this.boss) this.bossTurn(dt, top);
@@ -2862,6 +2897,16 @@ export class SpireEngine {
     if (this.phase === "play" && this.freeze <= 0) this.runTime += dt;
     if (this.phase !== "won") this.settle(dt);
     this.riseDark(dt);
+    if (this.stage && this.phase === "play") {
+      // The score follows the climb: height, the Dark's nearness, the streak.
+      const goal = this.plan.goal > 0 ? this.plan.goal : 40;
+      this.music.setClimb({
+        progress: clamp01(this.floors / goal),
+        danger: this.boss ? 1 : clamp01(1 - (this.darkGap() - 2) / 8),
+        streak: this.streak,
+        landings: this.landed.size,
+      });
+    }
 
     const flareGoal = inZone && this.mover.course === "eclipse" && this.phase !== "menu" ? 1 : 0;
     this.flare += (flareGoal - this.flare) * Math.min(1, dt * 14);

@@ -8,6 +8,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Next, in order
 
+- **Motif per world** (music idea 3): a short theme for Hearth that each sky varies, the Hollow breaks and the world-end scene resolves; world two arrives with its own.
+
 1. **Tester read on builds 27–29**: the Hollow's three surges (target ~2, 4, 5 perfects), landing spacing (8) and whether any gift is a dud, the Foundry's fairness for a newcomer, Apex's fairness at the top, whether the "Update in TestFlight" button works on a real phone.
 2. **The Descent** (above), then its boss (what was buried).
 3. **The Wheel** (world three): a turning hub, gravity to the centre, slabs seated on the rim. Boss: **the Siege** — a ring of slabs with a notch around the light; the ring turns, things fly in; tap when the notch faces one and it feeds the light; misses crack plates; repair gaps between waves by dropping slabs.
@@ -27,6 +29,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 35 Music driven by the climb (form A/B/A/break, earned layers, landing swell, topple strip; `music.ts` `setClimb`, `tools/bots/music.mjs`); the Dark quickens past par (`QUICKEN_RATE`, `QUICKEN_EVERY`) and light can push it at most `DARK_REACH` = 12 floors below the top (`tools/bots/linger.mjs`).
 - 34 Audio heals after backgrounding: a stuck or interrupted context is rebuilt on the next gesture and the music graph follows it (`audio.ts`, `music.ts`; `tools/bots/audio.mjs`).
 - 33 Nunito everywhere: CSS `--font-sans` and the canvas fonts in `engine.ts`/`props.ts`.
 - 32 Landing gifts as animated cards with lore emblems (`src/components/gifts.tsx`); begin text alone, first tap drops; the story as a full-screen reveal; Nunito for these surfaces. Design canvas: https://claude.ai/artifact/KRFrf2VYJx2qi3vXDP9hYr
@@ -45,7 +48,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 ## Tuning knobs (where the numbers live)
 
 - `src/game/levels.ts`: floors, periods, par times, `darkRate`, `sway` per sky.
-- `src/game/engine.ts`: `BOSS_SURGES/DEPTH/START/TENDRIL`, `SUMMIT_HOLD`, `GHOST_PURSE`, `DARK_PUSH` use.
+- `src/game/engine.ts`: `QUICKEN_RATE`, `QUICKEN_EVERY`, `DARK_REACH`, `BOSS_SURGES/DEPTH/START/TENDRIL`, `SUMMIT_HOLD`, `GHOST_PURSE`, `DARK_PUSH` use.
 - `src/game/landing.ts`: `LANDING_EVERY`, the gifts.
 - `src/game/physics.ts`: friction, damping, `LEVEL_TILT`, `CROOKED_TIME`, `SWAY_REACH`.
 - `src/game/logic.ts`: `DARK_START`, `DARK_PUSH`.
