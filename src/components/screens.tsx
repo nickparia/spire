@@ -1,5 +1,6 @@
 import {
   ChevronLeft,
+  ChevronRight,
   Flame,
   Infinity as InfinityIcon,
   Lock,
@@ -90,6 +91,7 @@ export function TitleScreen({
   onOptions,
   onPlay,
   onLevels,
+  onBoard,
   onEndless,
   onReset,
   onWeapon,
@@ -104,6 +106,7 @@ export function TitleScreen({
   onOptions: () => void;
   onPlay: (index: number) => void;
   onLevels: () => void;
+  onBoard: () => void;
   onEndless: () => void;
   onReset: () => void;
   onWeapon: (id: WeaponId) => void;
@@ -177,10 +180,14 @@ export function TitleScreen({
           </span>
           <span className="carrying-creed">{WEAPONS[save.weapon].creed}</span>
         </button>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button type="button" className="btn btn-stack" onClick={onLevels}>
             <LayoutGrid size={18} strokeWidth={2.2} />
             Skies
+          </button>
+          <button type="button" className="btn btn-stack" onClick={onBoard}>
+            <Trophy size={18} strokeWidth={2.2} />
+            Board
           </button>
           <button type="button" className="btn btn-stack" onClick={onEndless}>
             <InfinityIcon size={18} strokeWidth={2.2} />
@@ -358,6 +365,7 @@ export function BoardScreen({
   challenge,
   me,
   onBack,
+  onSky,
   onSent,
 }: {
   save: Save;
@@ -365,6 +373,7 @@ export function BoardScreen({
   challenge: Challenge | null;
   me: string;
   onBack: () => void;
+  onSky: (index: number) => void;
   onSent: (rival: Rival, ghosts: Record<string, Ghost>) => void;
 }) {
   const level = LEVELS[levelIndex]!;
@@ -419,12 +428,29 @@ export function BoardScreen({
         <IconButton label="Back" onPress={onBack}>
           <ChevronLeft size={20} strokeWidth={2.2} />
         </IconButton>
-        <p className="kicker">
-          Sky {levelIndex + 1} · {level.name}
-        </p>
+        <p className="kicker">Leaderboard</p>
         <span style={{ width: 44 }} />
       </div>
-      <h2 className="sheet-title mt-2">Leaderboard</h2>
+      <div className="board-sky">
+        <IconButton
+          label="Previous sky"
+          onPress={() => onSky(levelIndex - 1)}
+          disabled={levelIndex === 0}
+        >
+          <ChevronLeft size={18} strokeWidth={2.4} />
+        </IconButton>
+        <h2 className="sheet-title">
+          <small>Sky {levelIndex + 1}</small>
+          {level.name}
+        </h2>
+        <IconButton
+          label="Next sky"
+          onPress={() => onSky(levelIndex + 1)}
+          disabled={levelIndex === LEVELS.length - 1}
+        >
+          <ChevronRight size={18} strokeWidth={2.4} />
+        </IconButton>
+      </div>
       {challenge && partnerName ? (
         <p className="board-rival">
           {challenge.status === "accepted" ? "Competing with" : "Waiting for"} <b>{partnerName}</b>{" "}

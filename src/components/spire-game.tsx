@@ -73,6 +73,7 @@ export function SpireGame() {
   const shade = useShade(save);
   const { challenge, me, refresh } = useChallenge(save);
   const [options, setOptions] = useState(false);
+  const [boardFrom, setBoardFrom] = useState<"title" | "levels">("levels");
   const setRival = useCallback((rival: Rival | null, ghosts: Record<string, Ghost>) => {
     engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
   }, []);
@@ -259,6 +260,12 @@ export function SpireGame() {
             }}
             onPlay={play}
             onLevels={() => openLevels()}
+            onBoard={() => {
+              engineRef.current?.click();
+              setSelected(nextLevelIndex(state.current.save));
+              setBoardFrom("title");
+              setMenu("board");
+            }}
             onEndless={endless}
             onReset={() => engineRef.current?.resetProgress()}
             onWeapon={(id) => engineRef.current?.setWeapon(id)}
@@ -275,7 +282,12 @@ export function SpireGame() {
             me={me}
             onBack={() => {
               engineRef.current?.click();
-              setMenu("levels");
+              setMenu(boardFrom);
+            }}
+            onSky={(index) => {
+              engineRef.current?.click();
+              setSelected(index);
+              engineRef.current?.showMenu(index);
             }}
             onSent={(rival, ghosts) => {
               engineRef.current?.click();
@@ -297,6 +309,7 @@ export function SpireGame() {
             onBoard={(index) => {
               engineRef.current?.click();
               setSelected(index);
+              setBoardFrom("levels");
               setMenu("board");
             }}
             onBack={openTitle}

@@ -1705,6 +1705,28 @@
   margin-top: 0.5rem;
 }
 
+.board-sky {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.board-sky .sheet-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+}
+
+.board-sky .sheet-title small {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
 /* Options. */
 .switch-row {
   display: flex;
@@ -2249,4 +2271,8 @@
   .panel-meta {
     display: none;
   }
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
 }
