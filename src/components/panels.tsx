@@ -34,6 +34,7 @@ import {
   type WeaponId,
 } from "@/game/build";
 import { nextWeapon } from "./use-count-up";
+import { Post } from "./post";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { formatPercent, formatTime, starCount } from "@/game/logic";
@@ -203,7 +204,7 @@ export function RunHud({
         ) : null}
         {hud.ghostGap !== null ? (
           <>
-            <p className="kicker mt-2">Your best</p>
+            <p className="kicker mt-2">{hud.ghostName === "BEST" ? "Your best" : hud.ghostName}</p>
             <p className={"stat-num ghost-gap" + (hud.ghostGap < 0 ? " ghost-behind" : "")}>
               {hud.ghostGap === 0
                 ? "level"
@@ -475,6 +476,8 @@ export function ResultsPanel({
   onNext,
   onRetry,
   onQuit,
+  save,
+  onName,
 }: {
   result: LevelResult;
   style: Family | null;
@@ -483,6 +486,8 @@ export function ResultsPanel({
   onNext: (() => void) | null;
   onRetry: () => void;
   onQuit: () => void;
+  save: Save;
+  onName: (name: string) => void;
 }) {
   const level = LEVELS[result.levelIndex]!;
   const { goals, outcome } = result;
@@ -498,10 +503,11 @@ export function ResultsPanel({
       {result.ghost ? (
         <p className={"ghost-line" + (result.ghost.beaten ? " ghost-won" : "")}>
           {result.ghost.beaten
-            ? `Beat your ghost by ${formatTime(result.ghost.time - result.time)}`
-            : `Your ghost summited in ${formatTime(result.ghost.time)}`}
+            ? `Beat ${result.ghost.name === "BEST" ? "your ghost" : result.ghost.name} by ${formatTime(result.ghost.time - result.time)}`
+            : `${result.ghost.name === "BEST" ? "Your ghost" : result.ghost.name} summited in ${formatTime(result.ghost.time)}`}
         </p>
       ) : null}
+      <Post save={save} result={result} onName={onName} />
       <div className="mt-2">
         <Stars count={starCount(goals)} size={34} popFrom={1.05} />
       </div>

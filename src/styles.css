@@ -1272,6 +1272,149 @@
   font-weight: 700;
 }
 
+.btn-board {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.btn-board small {
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.board-rival,
+.board-note {
+  margin-top: 10px;
+  font-size: 14px;
+  color: rgba(255, 245, 230, 0.75);
+}
+
+.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: rgb(140, 220, 255);
+  font: inherit;
+  text-decoration: underline;
+}
+
+.board {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 64px 48px 84px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 15px;
+}
+
+.board-me {
+  background: rgba(140, 220, 255, 0.14);
+}
+
+.board-rank {
+  font-weight: 800;
+  opacity: 0.7;
+}
+
+.board-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-name small {
+  margin-left: 6px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+.board-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.board-acc {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.board-cta {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #14100d;
+  background: rgb(140, 220, 255);
+}
+
+.board-cta:disabled {
+  opacity: 0.5;
+}
+
+.board-racing {
+  background: rgb(255, 180, 120);
+}
+
+.post {
+  margin-top: 8px;
+}
+
+.post-label,
+.post-line {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(255, 245, 230, 0.75);
+}
+
+.post-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.post-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+}
+
+.post-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 700;
+  color: #14100d;
+  background: rgb(140, 220, 255);
+}
+
+.post-btn:disabled {
+  opacity: 0.5;
+}
+
 /* A panel that has just appeared ignores touches until it is armed. */
 .panel:not([data-armed]) {
   pointer-events: none;

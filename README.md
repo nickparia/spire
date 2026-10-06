@@ -16,7 +16,7 @@ Once a run is live, the Dark climbs the tower from below, faster on later skies.
 
 ## Weight
 
-Slabs are rigid bodies (Box2D via `planck`, in `src/game/physics.ts`). A slab keeps its whole width; where it lands is where it sits. **A perfect sets, a miss stays loose**: a slab seated in the groove is welded to the one beneath it, so a true column is solid however tall, while an off-centre slab is a loose hinge and everything built on it can tip as a unit. A breath of air (`sway`, stronger each sky) swings sides every few seconds, never enough to move a true column, enough to finish off a lean. A plumb line hangs from the top slab, faint while the spire is true and red with the angle once it tilts. A topple plays in slow motion. Only a slab lying level enough to build on (`LEVEL_TILT`) is a floor; a slab that settles crooked, or on the ground, crumbles. Floors are counted from the highest level slab, so a topple costs height and time rather than the run, and the summit counts once the top slab has come to rest.
+Slabs are rigid bodies (Box2D via `planck`, in `src/game/physics.ts`). A slab keeps its whole width; where it lands is where it sits. **A perfect sets, a miss stays loose**: a slab seated in the groove is welded to the one beneath it, so a true column is solid however tall, while an off-centre slab is a loose hinge and everything built on it can tip as a unit. A breath of air (`sway`, stronger each sky) swings sides every few seconds, never enough to move a true column, enough to finish off a lean. A plumb line hangs from the top slab, faint while the spire is true and red with the angle once it tilts. A topple plays in slow motion. Only a slab lying level enough to build on (`LEVEL_TILT`) is a floor; a slab that settles crooked, or on the ground, crumbles. A slab counts as a floor only if it landed close to the groove and still stands level on something anchored to the base (a chain of landed slabs down to the foundation); anything else is rubble, real and buildable but not height. The slab enters from well off-centre, so tapping the moment it appears drops it past the edge. A topple costs height and time rather than the run, and the summit counts once the floor count has held at the goal for a moment.
 
 ## Heat, weapons and upgrades
 
@@ -45,6 +45,10 @@ At the end of a run the game reads how you climbed and names it: a Runner didn't
 ## Split slabs
 
 On the last stretch of Apex, and late in endless, the slab splits into two halves on two clocks: the left half slides at one speed, the right at another, each over its own side of the stack. One tap drops both halves as two bodies. Both home is a perfect and they seat side by side; anything else lands where it was and leans the spire.
+
+## Ghosts and the leaderboard
+
+Each sky keeps the trace of your best run: the second every floor was first reached. On a replay that ghost climbs beside you as a dashed line, the HUD says how many floors ahead or behind you are, and beating it pays 25 coins. Summits are posted to a leaderboard (Supabase, `src/game/board.ts`) under a name chosen once on the summit card; each device keeps only its best per sky, written through a server function that only ever improves that device's own row. The board shows the fastest 25 on each sky, and **Compete** on any entry makes that person's ghosts the ones you race on every sky they hold, until you go back to your own best. Devices are identified by a random id; the board shows a one-way hash of it.
 
 ## Pickups and hazards
 

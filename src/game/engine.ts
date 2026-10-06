@@ -157,8 +157,10 @@ export type LevelResult = {
   rebuilt: boolean;
   /** What the forge has on the table, priced for your house. */
   offers: Offer[];
-  /** The ghost's summit time, and whether this run beat it. Null the first time. */
-  ghost: { time: number; beaten: boolean } | null;
+  /** The ghost's summit time, whose it was, and whether this run beat it. Null the first time. */
+  ghost: { time: number; beaten: boolean; name: string } | null;
+  /** This run's trace, for the leaderboard. */
+  trace: Ghost;
 };
 
 export type Hud = {
@@ -215,8 +217,10 @@ export type Hud = {
   rescue: { price: number; seconds: number } | null;
   /** True when the Dark, not a missed drop, ended the run. */
   taken: boolean;
-  /** Floors ahead of your best run's ghost, negative when behind; null without one. */
+  /** Floors ahead of the ghost, negative when behind; null without one. */
   ghostGap: number | null;
+  /** Whose ghost: "BEST" for your own, else the rival's name. */
+  ghostName: string;
 };
 
 export type EngineEvents = {
@@ -261,6 +265,8 @@ type Slab = {
   body: number | null;
   /** On the stage: landed off the groove, so it sits unset, a hinge in the tower. */
   loose: boolean;
+  /** On the stage: landed close enough to the groove to be a floor. Anything else is rubble. */
+  counts: boolean;
 };
 
 type Piece = { x: number; w: number };
@@ -494,8 +500,10 @@ export class SpireEngine {
   private breather = 0;
   /** This run's trace: the second each floor was first reached. */
   private trace: number[] = [0];
-  /** The best run on this level, to race against; null the first time. */
+  /** The run to race on this level, your own best or a rival's; null the first time. */
   private ghost: Ghost | null = null;
+  /** Who the ghost is: "BEST" for your own, else the rival's name. */
+  private ghostName = "BEST";
   private camY = 0;
   private camDrop = 0;
   private look = 0;
@@ -695,6 +703,12 @@ export class SpireEngine {
     this.phase = "play";
     this.spawnMover();
     this.emit();
+  }
+
+  /** The shell's way to change what the leaderboard needs: name and rival. */
+  updateSave(patch: Pick<Partial<Save>, "name" | "rival" | "rivalGhosts">): void {
+    Object.assign(this.save, patch);
+    this.commit();
   }
 
   setWeapon(id: WeaponId): void {
@@ -916,10 +930,16 @@ export class SpireEngine {
     this.summitHold = 0;
     this.breather = 0;
     this.trace = [0];
-    this.ghost =
-      phase === "ready" && this.mode === "level"
-        ? (this.save.ghosts[LEVELS[this.levelIndex]!.id] ?? null)
-        : null;
+    this.ghost = null;
+    this.ghostName = "BEST";
+    if (phase === "ready" && this.mode === "level") {
+      const id = LEVELS[this.levelIndex]!.id;
+      const rival = this.save.rival ? this.save.rivalGhosts[id] : undefined;
+      if (rival) {
+        this.ghost = rival;
+        this.ghostName = this.save.rival!.name;
+      } else this.ghost = this.save.ghosts[id] ?? null;
+    }
     this.taken = false;
     this.demoAge = 0;
     this.demoNext = 0.8;
@@ -1017,6 +1037,7 @@ export class SpireEngine {
       key: false,
       body: null,
       loose: false,
+      counts: true,
     };
   }
 
@@ -1046,7 +1067,7 @@ export class SpireEngine {
     if (slipping) this.slip -= 1;
     const keystone = isKeystone(this.plan, this.floors);
     this.mover = {
-      u: dir > 0 ? -0.56 : 0.56,
+      u: dir > 0 ? -0.92 : 0.92,
       x: 0,
       y: this.seatY() + (fall?.hover ?? 0) + (this.stage ? SLAB_H * 3 : 0),
       w,
@@ -1271,10 +1292,19 @@ export class SpireEngine {
     return top;
   }
 
+  /**
+   * Floors are slabs that landed close to the groove and still stand level
+   * on something anchored to the base. Rubble is real but is not height.
+   */
   private floorsNow(): number {
     if (!this.stage) return this.floors;
-    // The foundation's top sits one slab up and is floor zero.
-    return Math.max(0, Math.round(this.seat.y / SLAB_H) - 1);
+    let n = 0;
+    for (const slab of this.stack) {
+      if (slab.floor === 0 || !slab.counts || slab.body === null) continue;
+      const view = this.stage.read(slab.body);
+      if (view && view.landed && Math.abs(view.angle) <= LEVEL_TILT) n++;
+    }
+    return n;
   }
 
   /** Steps the stage and reads the bodies back into their slabs. */
@@ -1340,11 +1370,7 @@ export class SpireEngine {
       // The summit counts once the top has stood at goal height for a
       // moment: not in passing, and not while a crooked slab beneath it is
       // about to crumble.
-      // Measured with slack either side, so a top creeping across the
-      // rounding line under the sway does not keep resetting the hold.
-      const height = this.seat.y / SLAB_H - 1;
-      if (this.plan.goal > 0 && height >= this.plan.goal - 0.5) this.summitHold += dt;
-      else if (height < this.plan.goal - 0.75) this.summitHold = 0;
+      this.summitHold = this.plan.goal > 0 && reached >= this.plan.goal ? this.summitHold + dt : 0;
       if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD) this.win();
     }
   }
@@ -1762,6 +1788,7 @@ export class SpireEngine {
       const onto = result.perfect || braced ? prev.body : null;
       slab.body = this.stage.drop(result.x, this.mover.y, result.w, SLAB_H, onto);
       slab.loose = !result.perfect && !braced;
+      slab.counts = result.perfect || braced || result.close;
     }
     slab.pieces = pieces;
     slab.key = this.mover.keystone && result.perfect;
@@ -1782,6 +1809,7 @@ export class SpireEngine {
         result.perfect || braced ? prev.body : null,
       );
       other.loose = slab.loose;
+      other.counts = slab.counts;
       this.stack.push(other);
     }
     this.floors = floor;
@@ -1894,6 +1922,8 @@ export class SpireEngine {
     const grabbed = this.collectMote(cx, slab.y);
     if (!result.perfect && result.close && grabbed === null) {
       this.float("CLOSE", cx, slab.y + 34, false);
+    } else if (this.stage && !slab.counts) {
+      this.float("RUBBLE", cx, slab.y + 34, false);
     }
     // The other side of wasting away: a clean drop inside the grace grows a little.
     if (
@@ -2276,11 +2306,13 @@ export class SpireEngine {
       rebuilt: this.rebuilt,
       offers: [],
       ghost: this.ghostResult(),
+      trace: [],
     };
     // The ghost summits when the run did, by the official clock.
     this.mark(this.plan.goal);
     this.trace.length = this.plan.goal + 1;
     this.trace[this.plan.goal] = this.runTime;
+    this.result.trace = this.trace.slice();
     this.keepGhost();
     this.result.offers = this.offersNow();
     this.phase = "won";
@@ -2354,7 +2386,7 @@ export class SpireEngine {
   }
 
   /** How the summit stands against the ghost; a win pays a little. */
-  private ghostResult(): { time: number; beaten: boolean } | null {
+  private ghostResult(): { time: number; beaten: boolean; name: string } | null {
     const g = this.ghost;
     if (!g || g.length <= this.plan.goal) return null;
     const time = g[this.plan.goal]!;
@@ -2363,7 +2395,7 @@ export class SpireEngine {
       this.save.coins += GHOST_PURSE;
       this.runCoins += GHOST_PURSE;
     }
-    return { time, beaten };
+    return { time, beaten, name: this.ghostName };
   }
 
   /** The purse for a summit. Banked here; the results card itemises it. */
@@ -2448,6 +2480,7 @@ export class SpireEngine {
         live && this.ghost !== null && this.phase === "play"
           ? Math.round(this.floors - this.ghostNow()!)
           : null,
+      ghostName: this.ghostName,
     });
   }
 
@@ -3032,7 +3065,7 @@ export class SpireEngine {
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
     ctx.fillStyle = ahead ? "rgba(140,220,255,0.8)" : "rgba(255,180,120,0.95)";
-    ctx.fillText("BEST", q.x - 34, p.y - 3);
+    ctx.fillText(this.ghostName.toUpperCase(), q.x - 34, p.y - 3);
     ctx.restore();
   }
 

@@ -3,7 +3,7 @@ import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { emptySave, isUnlocked, nextLevelIndex, type Save } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
-import { LevelSelect, TitleScreen } from "./screens";
+import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
 
 const INITIAL: Hud = {
   phase: "menu",
@@ -40,11 +40,12 @@ const INITIAL: Hud = {
   rescue: null,
   taken: false,
   ghostGap: null,
+  ghostName: "BEST",
   accent: "rgb(255,77,26)",
   result: null,
 };
 
-type Menu = "title" | "levels";
+type Menu = "title" | "levels" | "board";
 
 /** Text colour that reads on the sky's accent: dark on a pale accent, white on a deep one. */
 function onAccent(css: string): string {
@@ -161,6 +162,8 @@ export function SpireGame() {
       const engine = engineRef.current;
       if (!engine) return;
       const now = state.current;
+      // Typing a name is not playing: leave the keys to the field.
+      if (event.target instanceof HTMLInputElement) return;
       const onButton = event.target instanceof HTMLElement && event.target.closest("button");
       if (event.code === "Space" || event.code === "Enter") {
         // Let a focused button handle its own activation.
@@ -228,12 +231,32 @@ export function SpireGame() {
           />
         ) : null}
 
+        {hud.phase === "menu" && menu === "board" ? (
+          <BoardScreen
+            save={save}
+            levelIndex={selected}
+            onBack={() => {
+              engineRef.current?.click();
+              setMenu("levels");
+            }}
+            onRival={(rival, ghosts) => {
+              engineRef.current?.click();
+              engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
+            }}
+          />
+        ) : null}
+
         {hud.phase === "menu" && menu === "levels" ? (
           <LevelSelect
             save={save}
             selected={selected}
             onSelect={select}
             onPlay={play}
+            onBoard={(index) => {
+              engineRef.current?.click();
+              setSelected(index);
+              setMenu("board");
+            }}
             onBack={openTitle}
           />
         ) : null}
@@ -275,6 +298,8 @@ export function SpireGame() {
             onNext={hud.result.levelIndex + 1 < LEVELS.length ? next : null}
             onRetry={retry}
             onQuit={quit}
+            save={save}
+            onName={(name) => engineRef.current?.updateSave({ name })}
           />
         ) : null}
       </div>

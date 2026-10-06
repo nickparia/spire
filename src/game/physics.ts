@@ -51,6 +51,8 @@ export class Stage {
   /** Seconds each body has been tilted past LEVEL_TILT. */
   private crooked = new Map<number, number>();
   private landed = new Set<number>();
+  /** The same, by body, so a contact's other side can be checked. */
+  private landedBodies = new Set<Body>();
   private toppled = false;
   private lost: number[] = [];
   /** Bodies waiting to set onto the body they were dropped on, once they land. */
@@ -125,6 +127,7 @@ export class Stage {
     this.crooked.delete(id);
     this.setting.delete(id);
     this.landed.delete(id);
+    if (body) this.landedBodies.delete(body);
   }
 
   step(dt: number): void {
@@ -165,11 +168,16 @@ export class Stage {
       const v = body.getLinearVelocity();
       const speed = Math.hypot(v.x, v.y) * SCALE;
       const spin = Math.abs(body.getAngularVelocity());
-      // Landed: it has touched something. Creeping afterwards does not undo it.
+      // Landed: it rests on something that is itself landed, the ground or
+      // the foundation or a slab that got there first. Two slabs meeting in
+      // the air are not landed. Creeping afterwards does not undo it.
       if (!this.landed.has(id)) {
         for (let ce = body.getContactList(); ce; ce = ce.next) {
-          if (ce.contact.isTouching()) {
+          const other = ce.other;
+          if (!other || !ce.contact.isTouching()) continue;
+          if (!other.isDynamic() || this.landedBodies.has(other)) {
             this.landed.add(id);
+            this.landedBodies.add(body);
             break;
           }
         }

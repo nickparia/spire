@@ -48,7 +48,7 @@ export const LEVELS: LevelDef[] = [
     keystones: false,
     motes: false,
     bombs: false,
-    parTime: 24,
+    parTime: 31,
     parAccuracy: 0.86,
   },
   {
@@ -63,7 +63,7 @@ export const LEVELS: LevelDef[] = [
     keystones: false,
     motes: true,
     bombs: false,
-    parTime: 32,
+    parTime: 40,
     parAccuracy: 0.88,
   },
   {
@@ -78,7 +78,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: false,
-    parTime: 43,
+    parTime: 49,
     parAccuracy: 0.88,
   },
   {
@@ -93,7 +93,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 40,
+    parTime: 50,
     parAccuracy: 0.89,
   },
   {
@@ -109,7 +109,7 @@ export const LEVELS: LevelDef[] = [
     keystones: false,
     motes: true,
     bombs: false,
-    parTime: 59,
+    parTime: 58,
     parAccuracy: 0.82,
   },
   {
@@ -124,7 +124,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 96,
+    parTime: 49,
     parAccuracy: 0.89,
   },
   {
@@ -139,7 +139,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 40,
+    parTime: 47,
     parAccuracy: 0.9,
   },
   {
@@ -155,7 +155,7 @@ export const LEVELS: LevelDef[] = [
     keystones: true,
     motes: true,
     bombs: true,
-    parTime: 105,
+    parTime: 96,
     parAccuracy: 0.9,
   },
 ];

@@ -15,7 +15,8 @@ const second = LEVELS[1]!.id;
 
 describe("parseSave", () => {
   it("starts fresh with nothing in storage", () => {
-    expect(parseSave(null, null)).toEqual(emptySave());
+    // Every fresh save mints its own player id.
+    expect(parseSave(null, null)).toEqual({ ...emptySave(), playerId: expect.any(String) });
   });
 
   it("carries a v1 best score and mute switch forward", () => {
@@ -32,7 +33,10 @@ describe("parseSave", () => {
   });
 
   it("survives garbage without throwing", () => {
-    expect(parseSave("{not json", "also not json")).toEqual(emptySave());
+    expect(parseSave("{not json", "also not json")).toEqual({
+      ...emptySave(),
+      playerId: expect.any(String),
+    });
     const odd = parseSave(JSON.stringify({ levels: { [first]: { bestTime: "fast" }, x: null } }));
     expect(odd.levels[first]).toMatchObject({ clear: false, bestTime: null, runs: 0 });
     expect(odd.levels.x).toBeUndefined();

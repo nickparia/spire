@@ -4,11 +4,14 @@ import {
   Lock,
   Music,
   Play,
+  Trophy,
   Volume2,
   VolumeX,
   LayoutGrid,
 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { fetchBoard, fetchPlayer, publicIdOf, type Entry } from "@/game/board";
+import type { Ghost } from "@/game/logic";
 import { LEVELS, type LevelDef } from "@/game/levels";
 import { formatPercent, formatTime } from "@/game/logic";
 import { isUnlocked, levelStars, nextLevelIndex, totalStars, type Save } from "@/game/save";
@@ -201,12 +204,14 @@ export function LevelSelect({
   selected,
   onSelect,
   onPlay,
+  onBoard,
   onBack,
 }: {
   save: Save;
   selected: number;
   onSelect: (index: number) => void;
   onPlay: (index: number) => void;
+  onBoard: (index: number) => void;
   onBack: () => void;
 }) {
   const listRef = useRef<HTMLOListElement>(null);
@@ -292,6 +297,11 @@ export function LevelSelect({
                       <Play size={18} strokeWidth={2.4} fill="currentColor" />
                       Play
                     </button>
+                    <button type="button" className="btn btn-board" onClick={() => onBoard(index)}>
+                      <Trophy size={16} strokeWidth={2.2} />
+                      Leaderboard
+                      {save.rival ? <small>racing {save.rival.name}</small> : null}
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -299,6 +309,112 @@ export function LevelSelect({
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+/**
+ * The fastest summits on one sky. Pick anyone and their ghosts climb beside
+ * you on every sky they hold, until you go back to racing your own best.
+ */
+export function BoardScreen({
+  save,
+  levelIndex,
+  onBack,
+  onRival,
+}: {
+  save: Save;
+  levelIndex: number;
+  onBack: () => void;
+  onRival: (rival: { id: string; name: string } | null, ghosts: Record<string, Ghost>) => void;
+}) {
+  const level = LEVELS[levelIndex]!;
+  const [entries, setEntries] = useState<Entry[] | null | undefined>(undefined);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [me, setMe] = useState("");
+  useEffect(() => {
+    publicIdOf(save.playerId).then(setMe);
+  }, [save.playerId]);
+  useEffect(() => {
+    let live = true;
+    setEntries(undefined);
+    fetchBoard(level.id).then((rows) => {
+      if (live) setEntries(rows);
+    });
+    return () => {
+      live = false;
+    };
+  }, [level.id]);
+
+  const compete = async (entry: Entry) => {
+    setBusy(entry.playerId);
+    const ghosts = (await fetchPlayer(entry.playerId)) ?? { [level.id]: entry };
+    const traces: Record<string, Ghost> = {};
+    for (const [id, e] of Object.entries(ghosts)) traces[id] = e.trace;
+    onRival({ id: entry.playerId, name: entry.name }, traces);
+    setBusy(null);
+  };
+
+  return (
+    <div className="screen screen-in" data-ui>
+      <div className="flex items-center justify-between">
+        <IconButton label="Back" onPress={onBack}>
+          <ChevronLeft size={20} strokeWidth={2.2} />
+        </IconButton>
+        <p className="kicker">
+          Sky {levelIndex + 1} · {level.name}
+        </p>
+        <span style={{ width: 44 }} />
+      </div>
+      <h2 className="sheet-title mt-2">Leaderboard</h2>
+      {save.rival ? (
+        <p className="board-rival">
+          Racing <b>{save.rival.name}</b> on every sky ·{" "}
+          <button type="button" className="link" onClick={() => onRival(null, {})}>
+            race my own best instead
+          </button>
+        </p>
+      ) : (
+        <p className="board-rival">Pick anyone to race their ghost on every sky they hold.</p>
+      )}
+      {entries === undefined ? <p className="board-note">Fetching…</p> : null}
+      {entries === null ? (
+        <p className="board-note">Couldn't reach the board. Try again later.</p>
+      ) : null}
+      {entries && entries.length === 0 ? (
+        <p className="board-note">No summits posted yet. Light this sky and post yours.</p>
+      ) : null}
+      {entries && entries.length > 0 ? (
+        <ol className="board">
+          {entries.map((e, i) => {
+            const mine = e.playerId === me;
+            const racing = save.rival?.id === e.playerId;
+            return (
+              <li key={e.playerId} className={"board-row" + (mine ? " board-me" : "")}>
+                <span className="board-rank">{i + 1}</span>
+                <span className="board-name">
+                  {e.name}
+                  {mine ? <small>you</small> : null}
+                </span>
+                <span className="board-time">{formatTime(e.time)}</span>
+                <span className="board-acc">{formatPercent(e.accuracy)}</span>
+                {mine ? (
+                  <span className="board-cta" />
+                ) : (
+                  <button
+                    type="button"
+                    className={"board-cta" + (racing ? " board-racing" : "")}
+                    disabled={busy !== null}
+                    onClick={() => (racing ? onRival(null, {}) : compete(e))}
+                  >
+                    {racing ? "Racing" : busy === e.playerId ? "…" : "Compete"}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
     </div>
   );
 }
