@@ -166,13 +166,13 @@ describe("kitFor", () => {
       shields: 0,
       secondWind: false,
       footing: 1,
-      shrink: 1,
+      sway: 1,
       sight: false,
       reach: BASE_REACH,
       perfectPay: 1,
       mark: false,
       fuse: 1,
-      grace: 0,
+      breather: 0,
       coins: 1,
       fastBonus: 0,
       charge: 1,
@@ -187,7 +187,7 @@ describe("kitFor", () => {
     expect(m[1]!.shields).toBe(1);
     expect(m[2]!.secondWind).toBe(true);
     expect(m[3]!.footing).toBeGreaterThan(1);
-    expect(m[4]!.shrink).toBeLessThan(1);
+    expect(m[4]!.sway).toBeLessThan(1);
     expect(m[5]!.shields).toBe(2);
     const s = kitFor({ striker: 5 }, {}, "chisel");
     expect(s.sight).toBe(true);
@@ -196,7 +196,7 @@ describe("kitFor", () => {
     expect(s.mark).toBe(true);
     const r = kitFor({ runner: 5 }, {}, "slipstream");
     expect(r.fuse).toBe(0.5);
-    expect(r.grace).toBe(0.3);
+    expect(r.breather).toBe(3);
     expect(r.coins).toBe(1.2);
     expect(r.fastBonus).toBe(0.2);
   });

@@ -178,6 +178,29 @@ export class Stage {
     }
   }
 
+  /** Welds a resting slab to another at once, whatever its tilt: a brace. */
+  weld(id: number, onto: number): void {
+    const body = this.bodies.get(id);
+    const base = this.bodies.get(onto);
+    if (!body || !base || !body.isDynamic()) return;
+    this.setting.delete(id);
+    this.world.createJoint(new WeldJoint({}, base, body, body.getPosition()));
+  }
+
+  /** Gives a slab a new width about its centre, keeping its weight per metre. */
+  resize(id: number, w: number): void {
+    const body = this.bodies.get(id);
+    const size = this.sizes.get(id);
+    if (!body || !size) return;
+    for (let f = body.getFixtureList(); f; f = f.getNext()) body.destroyFixture(f);
+    body.createFixture(new Box(w / 2 / SCALE, size.h / 2 / SCALE), {
+      density: 1,
+      friction: body.isDynamic() ? 0.6 : 1,
+      restitution: 0,
+    });
+    this.sizes.set(id, { w, h: size.h });
+  }
+
   /** Welds a landed slab to the one it was seated on. */
   private set(id: number): void {
     const onto = this.setting.get(id);

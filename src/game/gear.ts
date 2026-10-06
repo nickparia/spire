@@ -32,11 +32,15 @@ export const TRACKS: TrackDef[] = [
     name: "Mason",
     blurb: "Lives, and a steadier slab.",
     ranks: [
-      { name: "Brace", effect: "Start every run with a shield", cost: 120 },
-      { name: "Second Wind", effect: "The first fall of each run is forgiven", cost: 260 },
+      { name: "Brace", effect: "Start every run with a brace", cost: 120 },
+      {
+        name: "Second Wind",
+        effect: "The first time the Dark reaches the top, it is thrown back five floors",
+        cost: 260,
+      },
       { name: "Wide Footing", effect: "Start 6% wider", cost: 450 },
-      { name: "Keel", effect: "A held slab wastes away a quarter slower", cost: 750 },
-      { name: "Bulwark", effect: "Start every run with two shields", cost: 1200 },
+      { name: "Keel", effect: "The sway leans on your spire a quarter less", cost: 750 },
+      { name: "Bulwark", effect: "Start every run with two braces", cost: 1200 },
     ],
   },
   {
@@ -57,7 +61,7 @@ export const TRACKS: TrackDef[] = [
     blurb: "Less waiting, more coin.",
     ranks: [
       { name: "Fuse Cutter", effect: "Bomb fuses 25% shorter", cost: 120 },
-      { name: "Glide", effect: "A held slab keeps its width 0.3 s longer", cost: 260 },
+      { name: "Breather", effect: "After a topple the Dark holds still for 3 s", cost: 260 },
       { name: "Mint", effect: "Everything pays 20% more coins", cost: 450 },
       { name: "Quick Hands", effect: "The fast-drop window is 0.2 s wider", cost: 750 },
       { name: "Snuffer", effect: "Bomb fuses halved", cost: 1200 },
@@ -73,9 +77,9 @@ export const LEVEL_UNLOCKS = [0, 0, 2, 4, 6];
 /** What each weapon level adds. Index 0 is level 1, which every weapon starts at. */
 export const WEAPON_PERKS: Record<WeaponId, string[]> = {
   buttress: [
-    "Rebuilds the slab to full width at full Heat",
+    "Sets every loose slab in the spire at full Heat",
     "Heat builds 10% faster",
-    "Firing also raises a shield",
+    "Firing also hands you a brace",
     "Heat builds 25% faster",
     "Firing also pays 20 coins",
   ],
@@ -107,7 +111,8 @@ export type Kit = {
   secondWind: boolean;
   footing: number;
   /** Multiplier on how fast a held slab wastes away. */
-  shrink: number;
+  /** Multiplies the sky's sway. */
+  sway: number;
   /** The perfect window is drawn on the stack. */
   sight: boolean;
   reach: number;
@@ -116,7 +121,8 @@ export type Kit = {
   mark: boolean;
   fuse: number;
   /** Seconds added to a held slab's grace. */
-  grace: number;
+  /** Seconds the Dark holds still after a topple. */
+  breather: number;
   coins: number;
   /** Seconds added to the fast-drop window. */
   fastBonus: number;
@@ -154,13 +160,13 @@ export function kitFor(tracks: Tracks, levels: Levels, weapon: WeaponId): Kit {
     shields: m >= 5 ? 2 : m >= 1 ? 1 : 0,
     secondWind: m >= 2,
     footing: m >= 3 ? 1.06 : 1,
-    shrink: m >= 4 ? 0.75 : 1,
+    sway: m >= 4 ? 0.75 : 1,
     sight: s >= 1,
     reach: BASE_REACH * (s >= 2 ? 1.5 : 1),
     perfectPay: s >= 5 ? 1.5 : s >= 3 ? 1.25 : 1,
     mark: s >= 4,
     fuse: r >= 5 ? 0.5 : r >= 1 ? 0.75 : 1,
-    grace: r >= 2 ? 0.3 : 0,
+    breather: r >= 2 ? 3 : 0,
     coins: r >= 3 ? 1.2 : 1,
     fastBonus: r >= 4 ? 0.2 : 0,
     charge: lv >= 4 ? 1.25 : lv >= 2 ? 1.1 : 1,

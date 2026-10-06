@@ -190,7 +190,7 @@ export function drawPickup(ctx: CanvasRenderingContext2D, v: PickupView): void {
   ctx.textBaseline = "alphabetic";
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(10,8,6,0.6)";
-  const label = v.kind === "shield" ? "SHIELD" : v.kind === "lull" ? "LULL" : "EMBER";
+  const label = v.kind === "shield" ? "BRACE" : v.kind === "lull" ? "LULL" : "EMBER";
   ctx.strokeText(label, 0, -r - 6);
   ctx.fillStyle = "#f6f1e8";
   ctx.fillText(label, 0, -r - 6);

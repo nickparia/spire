@@ -29,7 +29,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   buttress: {
     family: "mason",
     name: "Buttress",
-    blurb: "At full Heat the slab is rebuilt to full width.",
+    blurb: "At full Heat every loose slab in the spire is set.",
     creed:
       "The Mason's. Stone answers to patience: hold the line, take the knocks, and when the forge runs hot the wall is made whole again.",
   },
@@ -87,7 +87,13 @@ export type UpgradeDef = {
 };
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: "shield", family: "mason", name: "Shield", blurb: "Raise a shield now.", max: 2 },
+  {
+    id: "shield",
+    family: "mason",
+    name: "Brace",
+    blurb: "Take a brace now: your next loose drop sets.",
+    max: 2,
+  },
   {
     id: "broad",
     family: "mason",
@@ -135,7 +141,7 @@ export const UPGRADES: UpgradeDef[] = [
 export const CAPSTONE_AT = 3;
 
 export const CAPSTONES: Record<Family, { name: string; blurb: string }> = {
-  mason: { name: "Bulwark", blurb: "A new shield every eight floors." },
+  mason: { name: "Bulwark", blurb: "A new brace every eight floors." },
   striker: { name: "Deadeye", blurb: "Perfects pay double." },
   runner: {
     name: "Flow",

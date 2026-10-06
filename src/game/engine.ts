@@ -121,11 +121,13 @@ const BONE: RGB = [246, 241, 232];
 const TIP_SHOWS = 3;
 
 const TIPS = {
-  shield: "Shield: good. Land the slab on the outline under it to take it. It saves one miss.",
+  shield:
+    "Brace: good. Land the slab on the outline under it to take it. Your next loose drop sets.",
   lull: "Lull: good. Land the slab on the outline under it. The next slab moves slowly.",
   bomb: "Bomb: bad. Don't tap. Wait for the fuse to burn out; tap early and it takes a bite.",
   fall: "The slab hangs above the stack now. Tap and it falls.",
-  shrink: "A held slab wastes away. Drop it before it does.",
+  loose:
+    "Loose: it landed off the groove, so it sits unset and tips under weight. A perfect on top sets it.",
   dark: "The Dark is rising from below. Perfects and the forge push it back. Don't let it reach the top.",
   split: "Split: the slab is two halves on two clocks. Drop when both sit over their own side.",
   ember:
@@ -248,6 +250,8 @@ type Slab = {
   key: boolean;
   /** Its rigid body on the physics stage, when the sky runs one. */
   body: number | null;
+  /** On the stage: landed off the groove, so it sits unset, a hinge in the tower. */
+  loose: boolean;
 };
 
 type Piece = { x: number; w: number };
@@ -477,6 +481,8 @@ export class SpireEngine {
   private slowmo = 0;
   /** Seconds the settled top has stood at or above the goal. */
   private summitHold = 0;
+  /** Seconds the Dark holds still after a topple, for the Runner's Breather. */
+  private breather = 0;
   private camY = 0;
   private camDrop = 0;
   private look = 0;
@@ -889,12 +895,13 @@ export class SpireEngine {
     this.stage = null;
     if (this.plan.physics && phase === "ready") {
       this.stage = new Stage();
-      this.stage.sway = this.plan.sway;
+      this.stage.sway = this.plan.sway * this.kit.sway;
       this.stack[0]!.body = this.stage.addStatic(-this.startW / 2, 0, this.startW, SLAB_H);
     }
     this.seat = { x: 0, y: SLAB_H };
     this.slowmo = 0;
     this.summitHold = 0;
+    this.breather = 0;
     this.taken = false;
     this.demoAge = 0;
     this.demoNext = 0.8;
@@ -991,6 +998,7 @@ export class SpireEngine {
       falling: false,
       key: false,
       body: null,
+      loose: false,
     };
   }
 
@@ -1051,7 +1059,7 @@ export class SpireEngine {
       dir2: -dir,
       x2: 0,
     };
-    if (this.floors === 1) this.explain("shrink");
+
     if (this.floors === 2 && this.plan.darkRate > 0) this.explain("dark");
     this.syncMoverX();
     this.tol = this.toleranceNow();
@@ -1246,6 +1254,10 @@ export class SpireEngine {
     stage.step(this.slowmo > 0 ? dt * 0.3 : dt);
     if (stage.takeTopple() && this.phase === "play") {
       this.slowmo = 0.8;
+      if (this.kit.breather > 0) {
+        this.breather = this.kit.breather;
+        this.float("BREATHER", 0, this.dark + 40, false, 18);
+      }
       const top = this.peak();
       this.float("TOPPLE", top.x + top.w / 2, top.y + 50, false, 22);
       this.sfx.fail();
@@ -1319,11 +1331,20 @@ export class SpireEngine {
    * the top slab's seat; a near miss is what the music and the edges play on.
    */
   private riseDark(dt: number): void {
-    if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0) {
+    this.breather = Math.max(0, this.breather - dt);
+    if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0 && this.breather <= 0) {
       this.dark += this.plan.darkRate * dt;
       const top = this.peak()!;
       // On the stage the Dark judges the settled top, never a slab mid-topple.
       const seat = this.stage ? this.seat.y : top.y + SLAB_H;
+      if (this.dark >= seat - SLAB_H * 0.5 && this.kit.secondWind && !this.secondWindUsed) {
+        // Second Wind: the first time the Dark reaches the top, it is thrown back.
+        this.secondWindUsed = true;
+        this.pushDark(SLAB_H * 5);
+        this.float("SECOND WIND", top.x + top.w / 2, seat + 40, true, 24);
+        this.fx.ring(top.x + top.w / 2, this.dark, SHIELD_RGB, 300, 6);
+        this.sfx.chime();
+      }
       if (this.dark >= seat - SLAB_H * 0.5) {
         this.dark = seat - SLAB_H * 0.5;
         this.float("TAKEN BY THE DARK", top.x + top.w / 2, seat + 40, false, 24);
@@ -1444,7 +1465,7 @@ export class SpireEngine {
     // time is not held against the slab.
     if (this.phase === "play" && !this.stage && !(this.bomb && this.bomb.fuse > 0)) {
       m.age += dt;
-      const w = heldWidth(m.w0, m.age, m.period, this.kit.shrink, this.kit.grace, m.course);
+      const w = heldWidth(m.w0, m.age, m.period, 1, 0, m.course);
       if (w < m.w - 0.01) {
         m.crumb += m.w - w;
         m.w = w;
@@ -1674,16 +1695,28 @@ export class SpireEngine {
       this.stage ? 1 : 0,
       1,
     );
+    let braced = false;
     if (this.stage) {
-      // A perfect sets to the slab beneath it; a miss stays loose.
-      const onto = result.perfect ? prev.body : null;
+      // A perfect sets to the slab beneath it; a miss stays loose, unless a
+      // brace is held, which sets it anyway.
+      braced = !result.perfect && this.shields > 0;
+      if (braced) {
+        this.shields -= 1;
+        this.shieldAge = 0;
+      }
+      const onto = result.perfect || braced ? prev.body : null;
       slab.body = this.stage.drop(result.x, this.mover.y, result.w, SLAB_H, onto);
+      slab.loose = !result.perfect && !braced;
     }
     slab.pieces = pieces;
     slab.key = this.mover.keystone && result.perfect;
     let points = result.points;
     if (this.mover.keystone && result.perfect) points += result.points;
     this.stack.push(slab);
+    if (braced) {
+      this.float("BRACED", result.x + result.w / 2, this.mover.y + 40, true, 22);
+      this.fx.ring(result.x + result.w / 2, this.mover.y, SHIELD_RGB, result.w + 40, 5);
+    }
     if (this.stage && half) {
       const other = this.makeSlab(half.x, this.mover.y, half.w, floor, 1, 1);
       other.body = this.stage.drop(
@@ -1691,8 +1724,9 @@ export class SpireEngine {
         this.mover.y,
         half.w,
         SLAB_H,
-        result.perfect ? prev.body : null,
+        result.perfect || braced ? prev.body : null,
       );
+      other.loose = slab.loose;
       this.stack.push(other);
     }
     this.floors = floor;
@@ -1807,7 +1841,7 @@ export class SpireEngine {
     // The other side of wasting away: a clean drop inside the grace grows a little.
     if (
       clean &&
-      this.mover.age <= graceFor(this.mover.period, this.mover.course) + this.kit.grace &&
+      this.mover.age <= graceFor(this.mover.period, this.mover.course) &&
       slab.w < this.startW
     ) {
       this.widen(slab, Math.min(this.startW, slab.w * QUICK_GROW));
@@ -1836,6 +1870,8 @@ export class SpireEngine {
       return;
     }
     this.spawnMover();
+    // After the next slab is up, so the fresh slab does not wipe the tip.
+    if (slab.loose) this.explain("loose");
     this.emit();
   }
 
@@ -1846,8 +1882,23 @@ export class SpireEngine {
     const cx = slab.x + slab.w / 2;
     const seam = slab.y;
     const grow = FORGE_GROW + this.tune.forgeBonus;
-    const w = this.weapon === "buttress" ? this.startW : Math.min(this.startW, slab.w * grow);
-    this.widen(slab, w);
+    if (this.weapon === "buttress" && this.stage) {
+      // The wall is made whole: every loose slab in the spire is set.
+      let n = 0;
+      for (let i = 1; i < this.stack.length; i++) {
+        const s = this.stack[i]!;
+        const under = this.stack[i - 1]!;
+        if (!s.loose || s.body === null || under.body === null) continue;
+        this.stage.weld(s.body, under.body);
+        s.loose = false;
+        s.flash = 1;
+        n++;
+      }
+      if (n > 0) this.float(`${n} SET`, cx, seam + 110, false, 18);
+    } else {
+      const w = this.weapon === "buttress" ? this.startW : Math.min(this.startW, slab.w * grow);
+      this.widen(slab, w);
+    }
     if (this.weapon === "chisel") {
       this.charged = true;
       this.charges = this.kit.chiselCharges;
@@ -1881,6 +1932,7 @@ export class SpireEngine {
     slab.grow = { from: slab.w, t: 0 };
     slab.x = slab.x + slab.w / 2 - w / 2;
     slab.w = w;
+    if (this.stage && slab.body !== null) this.stage.resize(slab.body, w);
     slab.flash = 0.6;
     const hot = mix(this.theme.accent, BONE, 0.6);
     this.fx.sparkle(slab.x + 4, slab.y + VISUAL_H / 2, 8, hot, 8);
@@ -1984,7 +2036,7 @@ export class SpireEngine {
       this.shields = Math.min(MAX_SHIELDS, this.shields + 1);
       this.shieldAge = 0;
       this.sfx.shieldUp();
-      this.float("SHIELD UP", x, y + 62, false, 24);
+      this.float("BRACE", x, y + 62, false, 24);
     } else if (mote.kind === "lull") {
       this.lull = true;
       this.sfx.slow();
@@ -2282,7 +2334,7 @@ export class SpireEngine {
       newBest: this.newBest,
       course: live ? courseLabel(course) : "",
       blurb: !live || course === "slide" ? "" : courseHint(course),
-      relic: this.shields > 1 ? `Shield ×${this.shields}` : this.shields === 1 ? "Shield" : "",
+      relic: this.shields > 1 ? `Brace ×${this.shields}` : this.shields === 1 ? "Brace" : "",
       hold: !!this.bomb && this.bomb.fuse > 0 && live,
       hint: this.hint && live,
       tip: live ? this.tip : "",
@@ -2872,6 +2924,25 @@ export class SpireEngine {
   }
 
   /**
+   * A loose slab shows a dark, broken seam along its underside: it is not
+   * set, and the eye should read the hinge before the weight finds it.
+   */
+  private drawCrack(ctx: CanvasRenderingContext2D, w: number): void {
+    const y = SLAB_H / 2 - 1;
+    ctx.save();
+    ctx.strokeStyle = "rgba(20,10,8,0.75)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = -w / 2; x < w / 2; x += 9) {
+      const dx = Math.min(w / 2, x + 6);
+      ctx.moveTo(x, y);
+      ctx.lineTo(dx, y - ((x * 7) % 3 === 0 ? 2 : 0));
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
    * A plumb line from the top slab shows the lean: faint while the spire is
    * true, red with the angle once it is tilting enough to matter.
    */
@@ -2911,6 +2982,7 @@ export class SpireEngine {
       ctx.translate(c.x, c.y);
       ctx.rotate(-slab.rot);
       this.paintSlab(ctx, -slab.w / 2, SLAB_H / 2, slab.w, VISUAL_H, body, 1, 0, hotGroove);
+      if (slab.loose) this.drawCrack(ctx, slab.w);
       ctx.restore();
       return;
     }

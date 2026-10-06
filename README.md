@@ -24,11 +24,11 @@ Heat is the one meter. A perfect adds a lot, a clean landing a little, a fast dr
 
 You carry one weapon, chosen on the title screen; it is your class:
 
-| Weapon | Class | At full Heat |
-| --- | --- | --- |
-| Buttress | Mason | The slab is rebuilt to full width |
-| Chisel | Striker | Charges: the next perfect pays triple, and no bomb can land until then |
-| Slipstream | Runner | Time slows and the wind drops for the next three slabs |
+| Weapon     | Class   | At full Heat                                                           |
+| ---------- | ------- | ---------------------------------------------------------------------- |
+| Buttress   | Mason   | Every loose slab in the spire is set                                   |
+| Chisel     | Striker | Charges: the next perfect pays triple, and no bomb can land until then |
+| Slipstream | Runner  | Time slows and the wind drops for the next three slabs                 |
 
 From the second sky on, every eight floors or so an ember hangs over the stack. Land with the groove under its line to claim it and the run pauses with three upgrades, one from each class. Miss it and it's gone. Three picks from one class unlock its capstone for the run. Upgrades reset every run; they are the build, not the progression. All of it is data in `src/game/build.ts`.
 
@@ -36,7 +36,7 @@ From the second sky on, every eight floors or so an ember hangs over the stack. 
 
 Every slab that lands pays coins on the spot, multiplied by Heat, and a summit pays a purse. There is no shop to visit: coins are spent where they are earned.
 
-- **The forge, on the summit card.** After lighting a sky you're offered the next rank of each class track and the next level of the weapon you carry. Ranks are quality of life (a starting shield, a forgiven fall, the perfect window drawn on the stack, shorter fuses, more coin), never power; power is what the run's picks are for. Ranks and levels open as skies are lit.
+- **The forge, on the summit card.** After lighting a sky you're offered the next rank of each class track and the next level of the weapon you carry. Ranks are quality of life (a starting brace, the Dark thrown back once, the perfect window drawn on the stack, shorter fuses, more coin), never power; power is what the run's picks are for. Ranks and levels open as skies are lit.
 - **Houses.** The class you have built most is your house, and anything bought within it costs a quarter less. Focusing pays; spreading across houses costs full price and buys cover against more skies. The weapon you carry (tap it on the title to change) breaks ties and has a creed.
 - **The rebuild, on the fall card.** See below.
 
@@ -50,11 +50,11 @@ On the last stretch of Apex, and late in endless, the slab splits into two halve
 
 Each keeps the same colour and shape in every sky.
 
-| | What to do | What it does |
-| --- | --- | --- |
-| **Shield** (blue) | Drop with the slab's groove under its line | A bubble sits over the stack. (Carried over from the precision game; its role on a weighted spire is still open) |
-| **Lull** (green) | Drop with the slab's groove under its line | The next slab moves slowly |
-| **Bomb** (red) | Wait for the fuse to burn out | Tap early and the blast shoves the top of the spire sideways and ends your streak |
+|                  | What to do                                 | What it does                                                                            |
+| ---------------- | ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| **Brace** (blue) | Drop with the slab's groove under its line | Your next loose drop sets where it lands. A bubble sits over the stack until it is used |
+| **Lull** (green) | Drop with the slab's groove under its line | The next slab moves slowly                                                              |
+| **Bomb** (red)   | Wait for the fuse to burn out              | Tap early and the blast shoves the top of the spire sideways and ends your streak       |
 
 Pickups hang just outside the perfect window, so taking one costs a sliver of slab. The first three times each appears, a one-line tip explains it.
 
@@ -69,22 +69,22 @@ npm run dev
 
 Open http://localhost:8080.
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Dev server with hot reload |
-| `npm run build` | Typecheck, then build the static site into `dist/` |
-| `npm test` | Unit tests for the rules, levels and save data |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | TypeScript only |
+| Command             | What it does                                       |
+| ------------------- | -------------------------------------------------- |
+| `npm run dev`       | Dev server with hot reload                         |
+| `npm run build`     | Typecheck, then build the static site into `dist/` |
+| `npm test`          | Unit tests for the rules, levels and save data     |
+| `npm run lint`      | ESLint                                             |
+| `npm run typecheck` | TypeScript only                                    |
 
 ## Controls
 
-| | Touch | Keyboard |
-| --- | --- | --- |
-| Drop the slab | Tap anywhere | Space or Enter |
-| Pause | Pause button | Esc or P |
-| Restart | Pause, then Restart | R |
-| Mute everything | Toggles on the title and pause screens | M |
+|                 | Touch                                  | Keyboard       |
+| --------------- | -------------------------------------- | -------------- |
+| Drop the slab   | Tap anywhere                           | Space or Enter |
+| Pause           | Pause button                           | Esc or P       |
+| Restart         | Pause, then Restart                    | R              |
+| Mute everything | Toggles on the title and pause screens | M              |
 
 ## iOS
 
@@ -101,12 +101,12 @@ Run `npm run ios:sync` after every change to the web code before building in Xco
 
 Settings that matter for the App Store, and where they live:
 
-| Setting | Value | Where |
-| --- | --- | --- |
-| Bundle ID | `com.nickprince.spire` | `capacitor.config.ts` and the App target in Xcode |
-| Team | `XUKTV95C24` | App target, Signing & Capabilities |
-| Version / build | `1.0.0` / `1` | App target, General |
-| Orientation | Portrait on iPhone, any on iPad | `ios/App/App/Info.plist` |
+| Setting         | Value                           | Where                                             |
+| --------------- | ------------------------------- | ------------------------------------------------- |
+| Bundle ID       | `com.nickprince.spire`          | `capacitor.config.ts` and the App target in Xcode |
+| Team            | `XUKTV95C24`                    | App target, Signing & Capabilities                |
+| Version / build | `1.0.0` / `1`                   | App target, General                               |
+| Orientation     | Portrait on iPhone, any on iPad | `ios/App/App/Info.plist`                          |
 
 To ship a build: open the project in Xcode, select **Any iOS Device**, choose **Product → Archive**, then **Distribute App** to send it to TestFlight. The bundle ID must be registered to the team first; Xcode's automatic signing offers to do that the first time.
 
