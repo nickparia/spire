@@ -5,6 +5,7 @@ import { BUILD } from "@/game/version";
 import { isBoss, worldDone, worldOf } from "@/game/worlds";
 import { StarMap } from "./star-map";
 import { ReadyCard } from "./ready";
+import { StoryCard } from "./story";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
@@ -89,6 +90,8 @@ export function SpireGame() {
   }, [hud.phase]);
   /** The pause sheet, opened to end the run rather than to rest. */
   const [ending, setEnding] = useState(false);
+  /** The story card, opened by hand; it also opens itself once at the start. */
+  const [story, setStory] = useState(false);
   const setRival = useCallback((rival: Rival | null, ghosts: Record<string, Ghost>) => {
     engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
   }, []);
@@ -307,7 +310,7 @@ export function SpireGame() {
               setOptions(true);
             }}
             onPlay={play}
-            onLevels={() => openLevels()}
+            onLevels={() => openMap()}
             onBoard={() => {
               engineRef.current?.click();
               setSelected(nextLevelIndex(state.current.save));
@@ -329,6 +332,10 @@ export function SpireGame() {
             justLit={mapLit}
             onBack={openTitle}
             onWorld={(index) => openLevels(index)}
+            onStory={() => {
+              engineRef.current?.click();
+              setStory(true);
+            }}
           />
         ) : null}
 
@@ -370,7 +377,7 @@ export function SpireGame() {
               setBoardFrom("levels");
               setMenu("board");
             }}
-            onBack={openTitle}
+            onBack={() => openMap()}
           />
         ) : null}
 
@@ -436,6 +443,17 @@ export function SpireGame() {
           />
         ) : null}
       </div>
+
+      {hud.phase === "menu" && (story || (!save.storySeen && save.savedAt > 0)) ? (
+        <StoryCard
+          cta={save.storySeen ? "Close" : "Begin"}
+          onDone={() => {
+            engineRef.current?.click();
+            setStory(false);
+            if (!save.storySeen) engineRef.current?.updateSave({ storySeen: true });
+          }}
+        />
+      ) : null}
 
       {options ? (
         <SettingsSheet

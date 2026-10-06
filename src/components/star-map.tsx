@@ -14,12 +14,14 @@ export function StarMap({
   justLit,
   onBack,
   onWorld,
+  onStory,
 }: {
   save: Save;
   /** A world completed just now: its constellation draws itself. */
   justLit?: string;
   onBack: () => void;
   onWorld: (levelIndex: number) => void;
+  onStory: () => void;
 }) {
   return (
     <div className="screen screen-in starmap" data-ui>
@@ -27,8 +29,10 @@ export function StarMap({
         <IconButton label="Back" onPress={onBack}>
           <ChevronLeft size={20} strokeWidth={2.2} />
         </IconButton>
-        <p className="kicker">The sky</p>
-        <span style={{ width: 44 }} />
+        <p className="kicker">Worlds</p>
+        <button type="button" className="link" onClick={onStory}>
+          The story
+        </button>
       </div>
       <svg
         className="starmap-svg"
@@ -108,17 +112,47 @@ export function StarMap({
           </g>
         ))}
       </svg>
-      <div className="starmap-legend">
-        {WORLDS.map((world) => (
-          <p key={world.id}>
-            <b>{world.name}</b> · {skiesLitIn(save, world)} of {world.levelIds.length} skies relit
-            {worldDone(save, world) ? <small> — {world.revelation}</small> : null}
-          </p>
-        ))}
+      <div className="worlds">
+        {WORLDS.map((world, i) => {
+          const lit = skiesLitIn(save, world);
+          const done = worldDone(save, world);
+          const open = i === 0 || worldDone(save, WORLDS[i - 1]!);
+          const levels = levelsOf(world);
+          const next = levels.find((l) => !save.levels[l.id]?.clear) ?? levels[levels.length - 1]!;
+          return (
+            <div key={world.id} className={"world" + (open ? "" : " world-locked")}>
+              <div className="world-text">
+                <p className="kicker">
+                  World {i + 1} · {world.name}
+                </p>
+                <p className="world-blurb">{world.concept}</p>
+                <p className="world-progress">
+                  {done ? "Every sky relit" : `${lit} of ${world.levelIds.length} skies relit`}
+                  {done ? <small> — {world.revelation}</small> : null}
+                </p>
+              </div>
+              {open ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => onWorld(LEVELS.indexOf(next))}
+                >
+                  {lit === 0 ? "Enter" : done ? "Return" : "Continue"}
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
         {WORLDS_TO_COME.map((w) => (
-          <p key={w.name} className="starmap-dark">
-            <b>{w.name}</b> · {w.blurb}
-          </p>
+          <div key={w.name} className="world world-locked">
+            <div className="world-text">
+              <p className="kicker">{w.name}</p>
+              <p className="world-blurb">{w.blurb}</p>
+              <p className="world-progress">
+                Relight every sky of {WORLDS[WORLDS.length - 1]!.name} to open
+              </p>
+            </div>
+          </div>
         ))}
       </div>
     </div>

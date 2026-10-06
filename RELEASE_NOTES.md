@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 30 — The story and the worlds
+
+- **The story**, told once on first launch in four lines, and kept behind "The story" on the Worlds screen.
+- **Worlds**: the title's Skies button is now **Worlds**. It opens the star map with a card per world — what it is, how many skies you've relit, Continue — and the worlds to come, locked, with what opens them.
+
 ## Build 29 — Landings
 
 - **Every eight floors the climb stops at a landing.** The stone below sets for good — a topple can never take you under it — and you choose one of two gifts whose effect you feel at once: _Set Stone_ (the next five slabs set and count wherever they land), _Lantern_ (the Dark holds for twelve seconds), _Broad Stone_ (three wider slabs), _Two Braces_, _Ember_ (Heat to full), _Slow Stone_ (six slow slabs), _Keel_ (half the sway for the sky), _Light_ (the Dark driven down six floors).

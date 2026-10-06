@@ -1797,6 +1797,64 @@
   opacity: 0.75;
 }
 
+/* The story, and the worlds. */
+.story .story-line {
+  margin-top: 0.7rem;
+  font-size: 15px;
+  line-height: 1.45;
+  text-align: left;
+  animation: rise 700ms ease-out both;
+}
+
+.worlds {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.world {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-fg) 7%, transparent);
+}
+
+.world-locked {
+  opacity: 0.55;
+}
+
+.world-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.world-blurb {
+  margin-top: 2px;
+  font-size: 14px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.world-progress {
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.world-progress small {
+  display: block;
+  font-style: italic;
+}
+
+.world .btn {
+  flex: none;
+  width: auto;
+  padding-inline: 1rem;
+}
+
 /* The star map. */
 .starmap {
   display: flex;

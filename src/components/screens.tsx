@@ -191,7 +191,7 @@ export function TitleScreen({
         <div className="grid grid-cols-3 gap-2">
           <button type="button" className="btn btn-stack" onClick={onLevels}>
             <LayoutGrid size={18} strokeWidth={2.2} />
-            Skies
+            Worlds
           </button>
           <button type="button" className="btn btn-stack" onClick={onBoard}>
             <Trophy size={18} strokeWidth={2.2} />
