@@ -1,21 +1,33 @@
 import { STORY } from "@/game/story";
 
-export function StoryCard({ onDone, cta = "Begin" }: { onDone: () => void; cta?: string }) {
+/** The premise: four lines that rise out of the dark, then a glowing tap to go on. */
+export function StoryCard({ onDone, cta = "Tap to begin" }: { onDone: () => void; cta?: string }) {
+  const last = 0.4 + (STORY.length - 1) * 1.8;
   return (
-    <div className="sheet-wrap" role="dialog" aria-label="The story" data-ui>
-      <section className="sheet story panel-in">
-        <p className="kicker">Relight the sky</p>
+    <div className="story" role="dialog" aria-label="The story" data-ui onClick={onDone}>
+      <span className="story-ember" style={{ left: "22%", animationDelay: "0.5s" }} />
+      <span className="story-ember" style={{ left: "74%", animationDelay: "1.7s" }} />
+      <span className="story-ember" style={{ left: "50%", animationDelay: "2.9s" }} />
+      <p className="story-kicker">Relight the sky</p>
+      <div className="story-lines">
         {STORY.map((line, i) => (
-          <p key={i} className="story-line" style={{ animationDelay: `${0.3 + i * 0.9}s` }}>
+          <p
+            key={i}
+            className={"story-line" + (i === STORY.length - 1 ? " story-dark" : "")}
+            style={{ animationDelay: `${0.4 + i * 1.8}s` }}
+          >
             {line}
           </p>
         ))}
-        <div className="mt-3">
-          <button type="button" className="btn btn-primary" onClick={onDone}>
-            {cta}
-          </button>
-        </div>
-      </section>
+      </div>
+      <button
+        type="button"
+        className="story-cta"
+        style={{ animationDelay: `${last + 1.6}s, ${last + 2.6}s` }}
+        onClick={onDone}
+      >
+        {cta}
+      </button>
     </div>
   );
 }

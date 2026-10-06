@@ -1563,7 +1563,14 @@ export class SpireEngine {
         this.fx.rayBurst(cx, this.dark, [150, 80, 220], 160, 10);
         break;
     }
-    this.float(LANDING_BY_ID[id].name.toUpperCase(), cx, y, true, 22);
+    this.float(LANDING_BY_ID[id].name.toUpperCase(), cx, y, true, 24);
+    const rgb: RGB = LANDING_BY_ID[id].family === "stone" ? [255, 190, 120] : [190, 160, 255];
+    this.fx.rayBurst(cx, this.seat.y, rgb, 220, 18);
+    this.fx.sparkle(cx, this.seat.y, 160, rgb, 30);
+    for (let i = 0; i < this.stack.length; i++)
+      this.stack[i]!.ripple = (this.stack.length - i) * 0.025;
+    this.flash = Math.max(this.flash, 0.4);
+    haptics.heavy();
   }
 
   /** The summit of a boss sky: the Dark wakes, and the goal changes. */

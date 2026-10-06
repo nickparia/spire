@@ -1755,39 +1755,506 @@
   border-color: rgba(255, 245, 230, 0.35);
 }
 
-/* Said before the climb. */
+/* Said before the climb: text alone over the sky, faded by the first drop. */
 .ready {
-  align-self: center;
-  max-width: 21rem;
-  margin: 0.6rem auto 0;
-  padding: 0.9rem 1.1rem;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-fg) 12%, transparent);
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 27%;
+  padding: 0 2.2rem;
   text-align: center;
+  font-family: "Nunito Variable", system-ui, sans-serif;
   pointer-events: none;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s ease,
+    filter 0.8s ease;
+}
+
+.ready > * {
+  animation: veil-in 1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.ready-kicker {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-ember) 70%, #fff);
 }
 
 .ready-line {
-  margin-top: 0.4rem;
-  font-size: 17px;
-  line-height: 1.35;
-  font-style: italic;
+  margin-top: 0.7rem;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  animation-delay: 0.35s !important;
 }
 
 .ready-what {
-  margin-top: 0.5rem;
-  font-size: 13px;
-  opacity: 0.75;
+  margin-top: 0.8rem;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.72;
+  animation-delay: 0.7s !important;
 }
 
-.ready-tap {
-  margin-top: 0.7rem;
+.ready-out {
+  opacity: 0;
+  transform: translateY(-14px);
+  filter: blur(6px);
+}
+
+@keyframes veil-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* The story: lines rising out of the dark. */
+.story {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 2rem 7rem;
+  text-align: center;
+  font-family: "Nunito Variable", system-ui, sans-serif;
+  color: #f3e9dc;
+  background: radial-gradient(120% 70% at 50% 110%, #3a1a10 0%, #140b10 45%, #07060b 100%);
+  overflow: hidden;
+  animation: screen-in 0.8s ease-out both;
+}
+
+.story-kicker {
   font-size: 12px;
-  letter-spacing: 0.16em;
+  font-weight: 800;
+  letter-spacing: 0.32em;
   text-transform: uppercase;
-  opacity: 0.7;
-  animation: glow 1.6s ease-in-out infinite;
+  color: #e09468;
+  animation: veil-in 1s ease-out both;
+}
+
+.story-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  margin-top: 2.2rem;
+  max-width: 21rem;
+}
+
+.story-line {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.38;
+  animation: veil-in 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.story-dark {
+  color: #d6c6ff;
+}
+
+.story-cta {
+  position: absolute;
+  left: 50%;
+  bottom: max(4rem, env(safe-area-inset-bottom));
+  translate: -50% 0;
+  min-width: 190px;
+  height: 52px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 176, 112, 0.7);
+  background: transparent;
+  color: #ffd2a8;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  box-shadow:
+    0 0 30px rgba(255, 138, 64, 0.35),
+    inset 0 0 18px rgba(255, 138, 64, 0.18);
+  animation:
+    veil-in 1s ease-out both,
+    glow 2.4s ease-in-out infinite;
+}
+
+.story-ember {
+  position: absolute;
+  bottom: 12%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffa060;
+  box-shadow: 0 0 6px #ff7a3a;
+  animation: ember-rise 4.2s ease-out infinite;
+}
+
+@keyframes ember-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-160px) translateX(10px);
+  }
+}
+
+/* A landing's gifts: cards dealt, chosen, broken into light. */
+.gifts {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6rem;
+  font-family: "Nunito Variable", system-ui, sans-serif;
+  color: #f3e9dc;
+  background: radial-gradient(
+    90% 60% at 50% 55%,
+    rgba(40, 24, 16, 0.75) 0%,
+    rgba(8, 6, 10, 0.88) 70%
+  );
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: screen-in 0.4s ease-out both;
+}
+
+.gifts-taken {
+  animation: gifts-out 0.5s ease-in 0.45s both;
+}
+
+.gifts-head {
+  text-align: center;
+  animation: veil-in 0.6s ease-out both;
+}
+
+.gifts-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #e3a37a;
+}
+
+.gifts-title {
+  margin-top: 0.4rem;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.gifts-sub {
+  margin-top: 0.3rem;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.65;
+}
+
+.gifts-row {
+  display: flex;
+  gap: 14px;
+  perspective: 900px;
+}
+
+.gift {
+  --tilt: calc((var(--i) * 2 - 1) * 5deg);
+  --c: #d9a066;
+  --c2: #ffe3c4;
+  --bg1: #3d2a1c;
+  --bg2: #1d130e;
+  position: relative;
+  width: 160px;
+  height: 248px;
+  border: 0;
+  padding: 0;
+  border-radius: 14px;
+  overflow: visible;
+  color: var(--c2);
+  font: inherit;
+  text-align: center;
+  background: linear-gradient(160deg, var(--bg1), var(--bg2));
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1.5px var(--c),
+    inset 0 0 0 5px var(--bg2),
+    inset 0 0 0 6px color-mix(in srgb, var(--c) 50%, transparent);
+  transform: rotate(var(--tilt));
+  animation:
+    deal 0.75s cubic-bezier(0.2, 1.25, 0.3, 1) calc(0.15s + var(--i) * 0.16s) both,
+    bob 3.2s ease-in-out calc(1s + var(--i) * 0.4s) infinite;
+}
+
+.gift-light {
+  --c: #a48cff;
+  --c2: #ece6ff;
+  --bg1: #2a1f44;
+  --bg2: #120d1f;
+}
+
+.gift:active {
+  scale: 0.97;
+}
+
+.gift-rays {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    color-mix(in srgb, var(--c) 30%, transparent) 0 6deg,
+    transparent 6deg 22deg
+  );
+  mask: radial-gradient(circle, #000 20%, transparent 65%);
+  -webkit-mask: radial-gradient(circle, #000 20%, transparent 65%);
+  opacity: 0.35;
+  animation: spin 14s linear infinite;
+  pointer-events: none;
+}
+
+.gift-halo {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  width: 110px;
+  height: 110px;
+  margin: -55px 0 0 -55px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--c) 70%, transparent),
+    transparent 70%
+  );
+  animation: glow 2.6s ease-in-out infinite;
+}
+
+.gift-glyph {
+  position: absolute;
+  left: 50%;
+  top: 40px;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  color: var(--c2);
+  filter: drop-shadow(0 0 8px var(--c));
+}
+
+.gift-glyph svg {
+  width: 100%;
+  height: 100%;
+}
+
+.gift-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 122px;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.gift-blurb {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 156px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(243, 233, 220, 0.82);
+}
+
+.gift-blurb b {
+  color: var(--c);
+  font-weight: 800;
+  text-transform: none;
+}
+
+.gift-family {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 13px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--c);
+}
+
+.gift-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.gift-sheen::after {
+  content: "";
+  position: absolute;
+  top: -20px;
+  bottom: -20px;
+  left: 0;
+  width: 46px;
+  background: linear-gradient(90deg, transparent, rgba(255, 245, 230, 0.24), transparent);
+  animation: sheen 3.6s ease-in-out calc(1.2s + var(--i) * 1s) infinite;
+}
+
+.gift-burst {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  pointer-events: none;
+}
+
+.gift-burst i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+  border-radius: 50%;
+  background: var(--c2);
+  box-shadow: 0 0 10px var(--c);
+  opacity: 0;
+}
+
+/* Chosen: lifts, flares, breaks into light that falls into the tower. */
+.gift-chosen {
+  z-index: 2;
+  animation: chosen 0.82s cubic-bezier(0.3, 0.9, 0.3, 1) both;
+}
+
+.gift-chosen .gift-halo {
+  animation: flare 0.6s ease-out both;
+}
+
+.gift-chosen .gift-burst i {
+  animation: burst 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) 0.18s both;
+}
+
+.gift-left {
+  animation: sink 0.5s ease-in both;
+}
+
+@keyframes deal {
+  0% {
+    opacity: 0;
+    transform: translateY(180px) rotate(calc(var(--tilt) * 3.5)) rotateY(90deg);
+  }
+  60% {
+    opacity: 1;
+    filter: brightness(1.8);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--tilt));
+    filter: brightness(1);
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: rotate(var(--tilt)) translateY(0);
+  }
+  50% {
+    transform: rotate(calc(var(--tilt) * 0.8)) translateY(-6px);
+  }
+}
+
+@keyframes chosen {
+  0% {
+    transform: rotate(var(--tilt));
+  }
+  30% {
+    transform: rotate(0) translateY(-30px) scale(1.12);
+    filter: brightness(1.6);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-36px) scale(1.16);
+    filter: brightness(2.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(160px) scale(0.3);
+    filter: brightness(3);
+  }
+}
+
+@keyframes flare {
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: rotate(calc(var(--k) * 30deg)) translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--k) * 30deg)) translateX(120px);
+  }
+}
+
+@keyframes sink {
+  to {
+    opacity: 0;
+    transform: rotate(var(--tilt)) translateY(80px) scale(0.85);
+    filter: brightness(0.3);
+  }
+}
+
+@keyframes gifts-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sheen {
+  0% {
+    transform: translateX(-160%) skewX(-20deg);
+  }
+  60%,
+  100% {
+    transform: translateX(340%) skewX(-20deg);
+  }
+}
+
+.gifts-hint {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.5;
+  animation: veil-in 0.6s ease-out 1s both;
 }
 
 .world-concept {
@@ -1798,14 +2265,6 @@
 }
 
 /* The story, and the worlds. */
-.story .story-line {
-  margin-top: 0.7rem;
-  font-size: 15px;
-  line-height: 1.45;
-  text-align: left;
-  animation: rise 700ms ease-out both;
-}
-
 .worlds {
   display: flex;
   flex-direction: column;

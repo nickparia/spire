@@ -41,7 +41,7 @@ import { FeatToasts, Journey } from "./journey";
 import { ThrowShade } from "./shade";
 import type { FeatId } from "@/game/feats";
 import { worldOf } from "@/game/worlds";
-import { LANDING_BY_ID } from "@/game/landing";
+import { GiftCards } from "./gifts";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { formatPercent, formatTime, starCount } from "@/game/logic";
@@ -107,30 +107,7 @@ function Build({
 /** The run paused: one of three upgrades, one from each class where it can. */
 export function PickPanel({ hud, onChoose }: { hud: Hud; onChoose: (index: number) => void }) {
   if (hud.landing) {
-    return (
-      <section className="panel panel-in" aria-label="A landing" data-ui>
-        <p className="kicker">Landing · floor {hud.landing.floor}</p>
-        <p className="landing-line">
-          The stone below is set. A topple can't take you under it now.
-        </p>
-        <div className="mt-3 flex flex-col gap-2">
-          {hud.landing.offers.map((id, index) => {
-            const def = LANDING_BY_ID[id];
-            return (
-              <button
-                key={id}
-                type="button"
-                className="pick pick-landing"
-                onClick={() => onChoose(index)}
-              >
-                <span className="pick-name">{def.name}</span>
-                <span className="pick-blurb">{def.blurb}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    );
+    return <GiftCards floor={hud.landing.floor} offers={hud.landing.offers} onChoose={onChoose} />;
   }
   return (
     <section className="panel panel-in" aria-label="Choose an upgrade" data-ui>

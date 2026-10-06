@@ -1,30 +1,40 @@
+import { useEffect, useState } from "react";
 import type { Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { isBoss } from "@/game/worlds";
 
 /**
- * Said once before each climb: the sky's line of the story, and what the
- * slab will do here. It sits over the stage and the first tap begins.
+ * Said before each climb, over the sky, clear of the stack: the sky's line
+ * and what the slab does here. It asks for nothing; the first drop fades it.
  */
 export function ReadyCard({ hud }: { hud: Hud }) {
-  if (hud.phase !== "ready" || hud.mode !== "level") return null;
-  const level = LEVELS[hud.levelIndex]!;
+  const ready = hud.phase === "ready" && hud.mode === "level" && !hud.paused;
+  const [shown, setShown] = useState<number | null>(null);
+  const [fading, setFading] = useState(false);
+  useEffect(() => {
+    if (ready) {
+      setShown(hud.levelIndex);
+      setFading(false);
+      return;
+    }
+    setFading(true);
+    const t = window.setTimeout(() => setShown(null), 900);
+    return () => window.clearTimeout(t);
+  }, [ready, hud.levelIndex]);
+  if (shown === null) return null;
+  const level = LEVELS[shown]!;
   const what: string[] = [level.blurb];
   if (level.wind && !/wind/i.test(level.blurb))
     what.push("The slab falls, and the wind carries it");
   if (level.bombs) what.push("Bombs: wait out the fuse");
-  if (level.keystones) what.push("Keystones pay double for a perfect");
   if (isBoss(level.id)) what.push("Something waits at the top");
   return (
-    <div className="ready panel-in" aria-live="polite">
-      <p className="kicker">
-        Sky {hud.levelIndex + 1} · {level.name}
+    <div className={"ready" + (fading ? " ready-out" : "")} aria-live="polite">
+      <p className="ready-kicker">
+        Sky {shown + 1} · {level.name}
       </p>
       <p className="ready-line">{level.line}</p>
-      {what.filter(Boolean).length > 0 ? (
-        <p className="ready-what">{what.filter(Boolean).join(" · ")}</p>
-      ) : null}
-      <p className="ready-tap">Tap to begin</p>
+      <p className="ready-what">{what.join(" · ")}</p>
     </div>
   );
 }
