@@ -400,7 +400,10 @@ export function BoardScreen({
           </button>
         </p>
       ) : (
-        <p className="board-rival">Pick anyone to race their ghost on every sky they hold.</p>
+        <p className="board-rival">
+          Pick anyone to race their ghost on every sky they hold. Beat them, and you can throw
+          shade.
+        </p>
       )}
       {entries === undefined ? <p className="board-note">Fetching…</p> : null}
       {entries === null ? (
