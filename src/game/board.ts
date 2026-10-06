@@ -172,6 +172,79 @@ export async function fetchShade(publicId: string, since: string): Promise<Shade
     }));
 }
 
+export type Challenge = {
+  id: string;
+  fromPublic: string;
+  toPublic: string;
+  fromName: string;
+  toName: string;
+  status: "pending" | "accepted";
+};
+
+/** The live challenge a handle is part of, pending or accepted. */
+export async function fetchChallenge(publicId: string): Promise<Challenge | null> {
+  const h = encodeURIComponent(publicId);
+  const q = `or=(from_public.eq.${h},to_public.eq.${h})&status=in.(pending,accepted)&order=created_at.desc&limit=1&select=id,from_public,to_public,from_name,to_name,status`;
+  const res = await call(`/rest/v1/challenges?${q}`, { method: "GET" }, 6000);
+  if (!res) return null;
+  const rows = (await res.json()) as Record<string, unknown>[];
+  const r = rows[0];
+  if (!r || typeof r.id !== "string") return null;
+  return {
+    id: r.id,
+    fromPublic: String(r.from_public),
+    toPublic: String(r.to_public),
+    fromName: String(r.from_name),
+    toName: String(r.to_name),
+    status: r.status === "accepted" ? "accepted" : "pending",
+  };
+}
+
+export type SendResult = "sent" | "self" | "closed" | "busy" | "unknown" | "offline";
+
+export async function sendChallenge(playerId: string, toPublicId: string): Promise<SendResult> {
+  const res = await call(
+    "/rest/v1/rpc/send_challenge",
+    { method: "POST", body: JSON.stringify({ p_player: playerId, p_to: toPublicId }) },
+    8000,
+  );
+  if (!res) return "offline";
+  const out = (await res.json()) as string;
+  return (
+    (["sent", "self", "closed", "busy", "unknown"] as const).find((s) => s === out) ?? "offline"
+  );
+}
+
+export async function answerChallenge(
+  playerId: string,
+  id: string,
+  accept: boolean,
+): Promise<boolean> {
+  const res = await call(
+    "/rest/v1/rpc/answer_challenge",
+    { method: "POST", body: JSON.stringify({ p_player: playerId, p_id: id, p_accept: accept }) },
+    8000,
+  );
+  return res !== null && (await res.json()) === true;
+}
+
+export async function endChallenge(playerId: string): Promise<boolean> {
+  const res = await call(
+    "/rest/v1/rpc/end_challenge",
+    { method: "POST", body: JSON.stringify({ p_player: playerId }) },
+    8000,
+  );
+  return res !== null && (await res.json()) === true;
+}
+
+export async function setChallenges(playerId: string, on: boolean): Promise<void> {
+  await call(
+    "/rest/v1/rpc/set_challenges",
+    { method: "POST", body: JSON.stringify({ p_player: playerId, p_on: on }) },
+    8000,
+  );
+}
+
 export async function renamePlayer(playerId: string, name: string): Promise<void> {
   await call(
     "/rest/v1/rpc/rename_player",

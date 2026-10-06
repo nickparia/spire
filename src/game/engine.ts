@@ -725,7 +725,13 @@ export class SpireEngine {
   updateSave(
     patch: Pick<
       Partial<Save>,
-      "name" | "rival" | "rivalGhosts" | "shadeSeen" | "whatsNewSeen" | "updateSnoozed"
+      | "name"
+      | "rival"
+      | "rivalGhosts"
+      | "shadeSeen"
+      | "whatsNewSeen"
+      | "updateSnoozed"
+      | "challengesOn"
     >,
   ): void {
     Object.assign(this.save, patch);

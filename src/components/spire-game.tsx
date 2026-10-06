@@ -6,6 +6,9 @@ import { emptySave, isUnlocked, nextLevelIndex, type Save } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
 import { useShade } from "./use-shade";
+import { Invite, SettingsSheet } from "./challenge";
+import { adoptRival, partnerOf, useChallenge, type Rival } from "./use-challenge";
+import type { Ghost } from "@/game/logic";
 import { WhatsNew } from "./whats-new";
 
 const INITIAL: Hud = {
@@ -68,6 +71,19 @@ export function SpireGame() {
   const [menu, setMenu] = useState<Menu>("title");
   const [selected, setSelected] = useState(0);
   const shade = useShade(save);
+  const { challenge, me, refresh } = useChallenge(save);
+  const [options, setOptions] = useState(false);
+  const setRival = useCallback((rival: Rival | null, ghosts: Record<string, Ghost>) => {
+    engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
+  }, []);
+  // The rival is whoever you are in a challenge with; nobody, otherwise.
+  useEffect(() => {
+    if (!me) return;
+    if (challenge === null && save.rival) setRival(null, {});
+    else if (challenge && save.rival?.id !== partnerOf(challenge, me).id) {
+      adoptRival(partnerOf(challenge, me), setRival);
+    }
+  }, [challenge, me, save.rival, setRival]);
 
   // Engine callbacks and key handlers read the latest state through this ref,
   // so the engine is created once and never torn down by a re-render.
@@ -226,11 +242,21 @@ export function SpireGame() {
           <TitleScreen
             save={save}
             shade={shade}
-            onRace={(rival, ghosts, index) => {
-              engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
-              play(index);
-            }}
+            onRace={(_rival, _ghosts, index) => play(index)}
             onShadeSeen={(at) => engineRef.current?.updateSave({ shadeSeen: at })}
+            invite={
+              <Invite
+                challenge={challenge}
+                me={me}
+                save={save}
+                onRival={setRival}
+                onAnswered={refresh}
+              />
+            }
+            onOptions={() => {
+              engineRef.current?.click();
+              setOptions(true);
+            }}
             onPlay={play}
             onLevels={() => openLevels()}
             onEndless={endless}
@@ -245,13 +271,16 @@ export function SpireGame() {
           <BoardScreen
             save={save}
             levelIndex={selected}
+            challenge={challenge}
+            me={me}
             onBack={() => {
               engineRef.current?.click();
               setMenu("levels");
             }}
-            onRival={(rival, ghosts) => {
+            onSent={(rival, ghosts) => {
               engineRef.current?.click();
-              engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
+              setRival(rival, ghosts);
+              refresh();
             }}
           />
         ) : null}
@@ -260,10 +289,7 @@ export function SpireGame() {
           <LevelSelect
             save={save}
             shade={shade}
-            onRace={(rival, ghosts, index) => {
-              engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
-              play(index);
-            }}
+            onRace={(_rival, _ghosts, index) => play(index)}
             onShadeSeen={(at) => engineRef.current?.updateSave({ shadeSeen: at })}
             selected={selected}
             onSelect={select}
@@ -321,7 +347,22 @@ export function SpireGame() {
         ) : null}
       </div>
 
-      {hud.phase === "menu" && menu === "title" ? (
+      {options ? (
+        <SettingsSheet
+          save={save}
+          challenge={challenge}
+          me={me}
+          onName={(name) => engineRef.current?.updateSave({ name })}
+          onChallenges={(on) => engineRef.current?.updateSave({ challengesOn: on })}
+          onEnded={() => {
+            setRival(null, {});
+            refresh();
+          }}
+          onClose={() => setOptions(false)}
+        />
+      ) : null}
+
+      {hud.phase === "menu" && menu === "title" && !options ? (
         <WhatsNew
           save={save}
           onSeen={(build) =>

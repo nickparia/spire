@@ -1,11 +1,9 @@
 {
-  "build": 24,
-  "title": "The journey, feats and shade",
+  "build": 25,
+  "title": "Challenges",
   "notes": [
-    "The journey: eight beacons, one per sky, that burn as you relight them. The sky you light ignites on the summit card.",
-    "Feats: medals for first light, a true column, beating your ghost, a top-ten board placing and more.",
-    "A calmer summit card: the stars, the numbers, the purse and the forge, in that order, one beat at a time.",
-    "Throw shade: beat the person you compete with and tell them. They get a mark on that sky, and can race you straight back.",
-    "This window. Builds announce themselves here, and tell you what is in them."
+    "Options on the title: your name, and a switch for whether anyone can challenge you.",
+    "Competing is by invitation now. Challenge someone on a leaderboard: you race their ghost at once, they accept on their title, and then it is mutual, one challenge at a time.",
+    "Shade only flies between the two of you. Beat the person you compete with and the summit card lets you throw it; they see it on that sky and can race you back."
   ]
 }

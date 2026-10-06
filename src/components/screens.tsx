@@ -10,10 +10,12 @@ import {
   VolumeX,
   LayoutGrid,
 } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ShadeMark, type Rival } from "./shade";
+import { SettingsButton } from "./challenge";
+import { sendChallenge, type Challenge, type SendResult } from "@/game/board";
 import type { Shade } from "@/game/board";
-import { fetchBoard, fetchPlayer, publicIdOf, type Entry } from "@/game/board";
+import { fetchBoard, fetchPlayer, type Entry } from "@/game/board";
 import type { Ghost } from "@/game/logic";
 import { LEVELS, type LevelDef } from "@/game/levels";
 import { formatPercent, formatTime } from "@/game/logic";
@@ -84,6 +86,8 @@ export function TitleScreen({
   shade,
   onRace,
   onShadeSeen,
+  invite,
+  onOptions,
   onPlay,
   onLevels,
   onEndless,
@@ -96,6 +100,8 @@ export function TitleScreen({
   shade: Shade[];
   onRace: (rival: Rival, ghosts: Record<string, Ghost>, index: number) => void;
   onShadeSeen: (at: string) => void;
+  invite?: ReactNode;
+  onOptions: () => void;
   onPlay: (index: number) => void;
   onLevels: () => void;
   onEndless: () => void;
@@ -126,8 +132,12 @@ export function TitleScreen({
             <Medals save={save} />
           </div>
         </div>
-        <SoundToggles save={save} onMusic={onMusic} onSfx={onSfx} />
+        <div className="flex gap-2">
+          <SettingsButton onPress={onOptions} />
+          <SoundToggles save={save} onMusic={onMusic} onSfx={onSfx} />
+        </div>
       </div>
+      {invite}
 
       <div className="flex-1" />
 
@@ -345,21 +355,32 @@ export function LevelSelect({
 export function BoardScreen({
   save,
   levelIndex,
+  challenge,
+  me,
   onBack,
-  onRival,
+  onSent,
 }: {
   save: Save;
   levelIndex: number;
+  challenge: Challenge | null;
+  me: string;
   onBack: () => void;
-  onRival: (rival: { id: string; name: string } | null, ghosts: Record<string, Ghost>) => void;
+  onSent: (rival: Rival, ghosts: Record<string, Ghost>) => void;
 }) {
   const level = LEVELS[levelIndex]!;
   const [entries, setEntries] = useState<Entry[] | null | undefined>(undefined);
   const [busy, setBusy] = useState<string | null>(null);
-  const [me, setMe] = useState("");
-  useEffect(() => {
-    publicIdOf(save.playerId).then(setMe);
-  }, [save.playerId]);
+  const [note, setNote] = useState<string | null>(null);
+  const partnerId = challenge
+    ? challenge.fromPublic === me
+      ? challenge.toPublic
+      : challenge.fromPublic
+    : null;
+  const partnerName = challenge
+    ? challenge.fromPublic === me
+      ? challenge.toName
+      : challenge.fromName
+    : null;
   useEffect(() => {
     let live = true;
     setEntries(undefined);
@@ -371,12 +392,24 @@ export function BoardScreen({
     };
   }, [level.id]);
 
-  const compete = async (entry: Entry) => {
+  const WORDS: Record<SendResult, string> = {
+    sent: "",
+    self: "",
+    closed: "isn't taking challenges.",
+    busy: "already has a challenge on.",
+    unknown: "hasn't posted a time yet.",
+    offline: "couldn't be reached. Try again later.",
+  };
+  const challengeThem = async (entry: Entry) => {
     setBusy(entry.playerId);
-    const ghosts = (await fetchPlayer(entry.playerId)) ?? { [level.id]: entry };
-    const traces: Record<string, Ghost> = {};
-    for (const [id, e] of Object.entries(ghosts)) traces[id] = e.trace;
-    onRival({ id: entry.playerId, name: entry.name }, traces);
+    setNote(null);
+    const out = await sendChallenge(save.playerId, entry.playerId);
+    if (out === "sent") {
+      const ghosts = (await fetchPlayer(entry.playerId)) ?? { [level.id]: entry };
+      const traces: Record<string, Ghost> = {};
+      for (const [id, e] of Object.entries(ghosts)) traces[id] = e.trace;
+      onSent({ id: entry.playerId, name: entry.name }, traces);
+    } else setNote(`${entry.name} ${WORDS[out]}`);
     setBusy(null);
   };
 
@@ -392,19 +425,20 @@ export function BoardScreen({
         <span style={{ width: 44 }} />
       </div>
       <h2 className="sheet-title mt-2">Leaderboard</h2>
-      {save.rival ? (
+      {challenge && partnerName ? (
         <p className="board-rival">
-          Racing <b>{save.rival.name}</b> on every sky ·{" "}
-          <button type="button" className="link" onClick={() => onRival(null, {})}>
-            race my own best instead
-          </button>
+          {challenge.status === "accepted" ? "Competing with" : "Waiting for"} <b>{partnerName}</b>{" "}
+          · their ghost races you on every sky. End it in Options to challenge someone else.
+        </p>
+      ) : save.challengesOn ? (
+        <p className="board-rival">
+          Challenge anyone: you race each other's ghosts on every sky, and the winner can throw
+          shade. One challenge at a time.
         </p>
       ) : (
-        <p className="board-rival">
-          Pick anyone to race their ghost on every sky they hold. Beat them, and you can throw
-          shade.
-        </p>
+        <p className="board-rival">Challenges are off in Options.</p>
       )}
+      {note ? <p className="board-note">{note}</p> : null}
       {entries === undefined ? <p className="board-note">Fetching…</p> : null}
       {entries === null ? (
         <p className="board-note">Couldn't reach the board. Try again later.</p>
@@ -416,7 +450,7 @@ export function BoardScreen({
         <ol className="board">
           {entries.map((e, i) => {
             const mine = e.playerId === me;
-            const racing = save.rival?.id === e.playerId;
+            const racing = partnerId === e.playerId;
             return (
               <li key={e.playerId} className={"board-row" + (mine ? " board-me" : "")}>
                 <span className="board-rank">{i + 1}</span>
@@ -428,14 +462,18 @@ export function BoardScreen({
                 <span className="board-acc">{formatPercent(e.accuracy)}</span>
                 {mine ? (
                   <span className="board-cta" />
+                ) : racing ? (
+                  <span className="board-cta board-racing">
+                    {challenge?.status === "accepted" ? "Competing" : "Invited"}
+                  </span>
                 ) : (
                   <button
                     type="button"
-                    className={"board-cta" + (racing ? " board-racing" : "")}
-                    disabled={busy !== null}
-                    onClick={() => (racing ? onRival(null, {}) : compete(e))}
+                    className="board-cta"
+                    disabled={busy !== null || challenge !== null || !save.challengesOn}
+                    onClick={() => challengeThem(e)}
                   >
-                    {racing ? "Racing" : busy === e.playerId ? "…" : "Compete"}
+                    {busy === e.playerId ? "…" : "Challenge"}
                   </button>
                 )}
               </li>

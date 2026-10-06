@@ -47,6 +47,8 @@ export type Save = {
   whatsNewSeen: number;
   /** An update prompt for this build was dismissed. */
   updateSnoozed: number;
+  /** Whether others may challenge you. */
+  challengesOn: boolean;
 };
 
 export function emptySave(): Save {
@@ -70,6 +72,7 @@ export function emptySave(): Save {
     shadeSeen: new Date(0).toISOString(),
     whatsNewSeen: 0,
     updateSnoozed: 0,
+    challengesOn: true,
   };
 }
 
@@ -125,6 +128,7 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
       if (typeof data.shadeSeen === "string" && !Number.isNaN(Date.parse(data.shadeSeen))) {
         save.shadeSeen = data.shadeSeen;
       }
+      save.challengesOn = data.challengesOn !== false;
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));
       save.updateSnoozed = Math.max(0, Math.floor(num(data.updateSnoozed, 0)));
       for (const [id, at] of Object.entries(data.feats ?? {})) {
