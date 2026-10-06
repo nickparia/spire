@@ -2929,9 +2929,13 @@ export class SpireEngine {
     if (this.plan.goal <= 0 || (this.phase !== "ready" && this.phase !== "play")) return;
     const near = this.plan.goal - this.floors <= 3;
     const beat = near && !this.reduceMotion ? 0.75 + 0.25 * Math.sin(this.clock * 7) : 0.6;
+    // On the stage rubble is height without being floors, so the line sits
+    // where the count will reach the goal: that many floors above the top.
+    const left = Math.max(0, this.plan.goal - this.floors);
+    const y = this.stage ? this.seat.y + left * SLAB_H : this.plan.goal * SLAB_H;
     this.drawMarker(
       ctx,
-      this.plan.goal * SLAB_H,
+      y,
       "SUMMIT",
       rgbCss(this.theme.accent, 0.6 * beat),
       rgbCss(this.theme.accent, 0.95 * beat),
