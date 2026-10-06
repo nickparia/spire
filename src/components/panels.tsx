@@ -36,6 +36,7 @@ import {
 import { nextWeapon } from "./use-count-up";
 import { Post } from "./post";
 import { FeatToasts, Journey } from "./journey";
+import { ThrowShade } from "./shade";
 import type { FeatId } from "@/game/feats";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
@@ -568,6 +569,9 @@ export function ResultsPanel({
           </p>
         ) : null}
         <Post save={save} result={result} onName={onName} onFeat={onFeat} />
+        {result.ghost?.beaten && result.ghost.name !== "BEST" && save.name ? (
+          <ThrowShade save={save} levelId={level.id} />
+        ) : null}
       </div>
 
       <FeatToasts ids={result.feats} />

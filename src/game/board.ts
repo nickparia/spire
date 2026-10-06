@@ -129,6 +129,49 @@ export async function rankOf(levelId: string, time: number): Promise<number | nu
   return Number(total) + 1;
 }
 
+export type Shade = {
+  from: string;
+  fromName: string;
+  levelId: string;
+  margin: number;
+  at: string;
+};
+
+/** Throws shade at a rival over a sky; the server checks you really beat them. */
+export async function throwShade(
+  playerId: string,
+  toPublicId: string,
+  levelId: string,
+): Promise<boolean> {
+  const res = await call(
+    "/rest/v1/rpc/throw_shade",
+    {
+      method: "POST",
+      body: JSON.stringify({ p_player: playerId, p_to: toPublicId, p_level: levelId }),
+    },
+    8000,
+  );
+  if (!res) return false;
+  return (await res.json()) === true;
+}
+
+/** Shade thrown at a handle since a moment, newest first. */
+export async function fetchShade(publicId: string, since: string): Promise<Shade[] | null> {
+  const q = `to_public=eq.${encodeURIComponent(publicId)}&created_at=gt.${encodeURIComponent(since)}&order=created_at.desc&limit=10&select=from_public,from_name,level_id,margin,created_at`;
+  const res = await call(`/rest/v1/shade?${q}`, { method: "GET" }, 6000);
+  if (!res) return null;
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows
+    .filter((r) => typeof r.from_public === "string" && typeof r.from_name === "string")
+    .map((r) => ({
+      from: String(r.from_public),
+      fromName: String(r.from_name),
+      levelId: String(r.level_id),
+      margin: Number(r.margin),
+      at: String(r.created_at),
+    }));
+}
+
 export async function renamePlayer(playerId: string, name: string): Promise<void> {
   await call(
     "/rest/v1/rpc/rename_player",

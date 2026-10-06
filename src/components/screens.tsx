@@ -1,5 +1,6 @@
 import {
   ChevronLeft,
+  Flame,
   Infinity as InfinityIcon,
   Lock,
   Music,
@@ -10,6 +11,8 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { ShadeMark, type Rival } from "./shade";
+import type { Shade } from "@/game/board";
 import { fetchBoard, fetchPlayer, publicIdOf, type Entry } from "@/game/board";
 import type { Ghost } from "@/game/logic";
 import { LEVELS, type LevelDef } from "@/game/levels";
@@ -78,6 +81,9 @@ export function SoundToggles({
 
 export function TitleScreen({
   save,
+  shade,
+  onRace,
+  onShadeSeen,
   onPlay,
   onLevels,
   onEndless,
@@ -87,6 +93,9 @@ export function TitleScreen({
   onSfx,
 }: {
   save: Save;
+  shade: Shade[];
+  onRace: (rival: Rival, ghosts: Record<string, Ghost>, index: number) => void;
+  onShadeSeen: (at: string) => void;
   onPlay: (index: number) => void;
   onLevels: () => void;
   onEndless: () => void;
@@ -131,6 +140,12 @@ export function TitleScreen({
             <Coin size={15} /> {save.coins}
           </p>
         </div>
+        <ShadeMark
+          shade={shade.find((s) => s.levelId === level.id)}
+          levelName={level.name}
+          onRace={(rival, ghosts) => onRace(rival, ghosts, next)}
+          onSeen={onShadeSeen}
+        />
         <button type="button" className="btn btn-primary" onClick={() => onPlay(next)}>
           <Play size={18} strokeWidth={2.4} fill="currentColor" />
           <span>
@@ -200,9 +215,15 @@ export function LevelSelect({
   onPlay,
   onBoard,
   onBack,
+  shade,
+  onRace,
+  onShadeSeen,
 }: {
   save: Save;
   selected: number;
+  shade: Shade[];
+  onRace: (rival: Rival, ghosts: Record<string, Ghost>, index: number) => void;
+  onShadeSeen: (at: string) => void;
   onSelect: (index: number) => void;
   onPlay: (index: number) => void;
   onBoard: (index: number) => void;
@@ -263,6 +284,9 @@ export function LevelSelect({
                         : `Clear ${LEVELS[index - 1]?.name ?? "the last level"} to open`}
                     </span>
                   </span>
+                  {shade.some((s) => s.levelId === level.id) ? (
+                    <Flame className="level-shade" size={15} strokeWidth={2.4} />
+                  ) : null}
                   <Stars count={levelStars(save, level.id)} size={15} />
                 </button>
                 {active && open ? (
@@ -288,6 +312,12 @@ export function LevelSelect({
                       </Goal>
                       <Goal done={Boolean(rec?.swift)}>Finish in {formatTime(level.parTime)}</Goal>
                     </ul>
+                    <ShadeMark
+                      shade={shade.find((s) => s.levelId === level.id)}
+                      levelName={level.name}
+                      onRace={(rival, ghosts) => onRace(rival, ghosts, index)}
+                      onSeen={onShadeSeen}
+                    />
                     <button type="button" className="btn btn-primary" onClick={() => onPlay(index)}>
                       <Play size={18} strokeWidth={2.4} fill="currentColor" />
                       Play

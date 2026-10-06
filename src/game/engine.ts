@@ -722,7 +722,12 @@ export class SpireEngine {
   }
 
   /** The shell's way to change what the leaderboard needs: name and rival. */
-  updateSave(patch: Pick<Partial<Save>, "name" | "rival" | "rivalGhosts">): void {
+  updateSave(
+    patch: Pick<
+      Partial<Save>,
+      "name" | "rival" | "rivalGhosts" | "shadeSeen" | "whatsNewSeen" | "updateSnoozed"
+    >,
+  ): void {
     Object.assign(this.save, patch);
     this.commit();
   }

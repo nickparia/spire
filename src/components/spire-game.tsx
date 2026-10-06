@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
+import { BUILD } from "@/game/version";
 import { emptySave, isUnlocked, nextLevelIndex, type Save } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
+import { useShade } from "./use-shade";
+import { WhatsNew } from "./whats-new";
 
 const INITIAL: Hud = {
   phase: "menu",
@@ -64,6 +67,7 @@ export function SpireGame() {
   const [save, setSave] = useState<Save>(emptySave);
   const [menu, setMenu] = useState<Menu>("title");
   const [selected, setSelected] = useState(0);
+  const shade = useShade(save);
 
   // Engine callbacks and key handlers read the latest state through this ref,
   // so the engine is created once and never torn down by a re-render.
@@ -221,6 +225,12 @@ export function SpireGame() {
         {hud.phase === "menu" && menu === "title" ? (
           <TitleScreen
             save={save}
+            shade={shade}
+            onRace={(rival, ghosts, index) => {
+              engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
+              play(index);
+            }}
+            onShadeSeen={(at) => engineRef.current?.updateSave({ shadeSeen: at })}
             onPlay={play}
             onLevels={() => openLevels()}
             onEndless={endless}
@@ -249,6 +259,12 @@ export function SpireGame() {
         {hud.phase === "menu" && menu === "levels" ? (
           <LevelSelect
             save={save}
+            shade={shade}
+            onRace={(rival, ghosts, index) => {
+              engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
+              play(index);
+            }}
+            onShadeSeen={(at) => engineRef.current?.updateSave({ shadeSeen: at })}
             selected={selected}
             onSelect={select}
             onPlay={play}
@@ -304,6 +320,18 @@ export function SpireGame() {
           />
         ) : null}
       </div>
+
+      {hud.phase === "menu" && menu === "title" ? (
+        <WhatsNew
+          save={save}
+          onSeen={(build) =>
+            engineRef.current?.updateSave({
+              whatsNewSeen: Math.max(save.whatsNewSeen, Math.min(build, BUILD)),
+              updateSnoozed: build > BUILD ? build : save.updateSnoozed,
+            })
+          }
+        />
+      ) : null}
 
       {hud.paused ? (
         <PauseSheet

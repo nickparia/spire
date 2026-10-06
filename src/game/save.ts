@@ -41,6 +41,12 @@ export type Save = {
   rivalGhosts: Record<string, Ghost>;
   /** Feats earned, by id, with when. */
   feats: Record<string, number>;
+  /** Shade up to this moment (ISO) has been shown. */
+  shadeSeen: string;
+  /** The last build whose what's-new window was shown. */
+  whatsNewSeen: number;
+  /** An update prompt for this build was dismissed. */
+  updateSnoozed: number;
 };
 
 export function emptySave(): Save {
@@ -61,6 +67,9 @@ export function emptySave(): Save {
     rival: null,
     rivalGhosts: {},
     feats: {},
+    shadeSeen: new Date(0).toISOString(),
+    whatsNewSeen: 0,
+    updateSnoozed: 0,
   };
 }
 
@@ -113,6 +122,11 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
           }
         }
       }
+      if (typeof data.shadeSeen === "string" && !Number.isNaN(Date.parse(data.shadeSeen))) {
+        save.shadeSeen = data.shadeSeen;
+      }
+      save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));
+      save.updateSnoozed = Math.max(0, Math.floor(num(data.updateSnoozed, 0)));
       for (const [id, at] of Object.entries(data.feats ?? {})) {
         if (typeof at === "number" && at > 0) save.feats[id] = at;
       }
