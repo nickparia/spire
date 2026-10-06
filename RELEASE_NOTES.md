@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 29 — Landings
+
+- **Every eight floors the climb stops at a landing.** The stone below sets for good — a topple can never take you under it — and you choose one of two gifts whose effect you feel at once: _Set Stone_ (the next five slabs set and count wherever they land), _Lantern_ (the Dark holds for twelve seconds), _Broad Stone_ (three wider slabs), _Two Braces_, _Ember_ (Heat to full), _Slow Stone_ (six slow slabs), _Keel_ (half the sway for the sky), _Light_ (the Dark driven down six floors).
+- An **ember** caught on the climb hands you one of those gifts on the spot, instead of the old pick list.
+
+**Please try**: reach a landing, take a gift, then deliberately play badly — your floors below the landing should stand whatever happens.
+
 ## Build 28 — Clearer starts and exits
 
 - The line before each sky now sits up under the HUD, clear of the stack, and your **first tap only puts it away**; the next tap is your first drop.

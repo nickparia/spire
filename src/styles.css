@@ -1745,6 +1745,16 @@
   color: rgba(255, 245, 230, 0.8);
 }
 
+.landing-line {
+  margin-top: 6px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.pick-landing {
+  border-color: rgba(255, 245, 230, 0.35);
+}
+
 /* Said before the climb. */
 .ready {
   align-self: center;

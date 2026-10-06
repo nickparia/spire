@@ -77,6 +77,7 @@ import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import { isBoss } from "./worlds";
+import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
 import {
   BOMB_RGB,
   drawBomb,
@@ -240,6 +241,8 @@ export type Hud = {
   ghostName: string;
   /** The fight at the top of a boss sky: which surge, of how many. */
   boss: { surge: number; of: number } | null;
+  /** A landing to choose from. */
+  landing: { floor: number; offers: LandingId[] } | null;
 };
 
 export type EngineEvents = {
@@ -525,6 +528,12 @@ export class SpireEngine {
    * the third sends it under for good. It climbs on your mistakes.
    */
   private boss: { surge: number; tendril: number; eye: number; crown: number } | null = null;
+  /** The landing being chosen from, if the climb is stopped at one. */
+  private landing: { floor: number; offers: LandingId[] } | null = null;
+  /** Landings already taken this run, by floor. */
+  private landed = new Set<number>();
+  /** Gifts in effect: slabs left that set wherever they land, wide, or slow. */
+  private gift = { set: 0, broad: 0, slow: 0 };
   /** This run's trace: the second each floor was first reached. */
   private trace: number[] = [0];
   /** The run to race on this level, your own best or a rival's; null the first time. */
@@ -698,6 +707,10 @@ export class SpireEngine {
   /** Takes one of the upgrades on offer and resumes the run. */
   choose(index: number): void {
     if (this.phase !== "pick") return;
+    if (this.landing) {
+      this.takeLanding(index);
+      return;
+    }
     const id = this.offers[index];
     if (!id) return;
     const def = upgrade(id);
@@ -984,6 +997,9 @@ export class SpireEngine {
     this.summitHold = 0;
     this.breather = 0;
     this.boss = null;
+    this.landing = null;
+    this.landed.clear();
+    this.gift = { set: 0, broad: 0, slow: 0 };
     this.trace = [0];
     this.ghost = null;
     this.ghostName = "BEST";
@@ -1105,7 +1121,11 @@ export class SpireEngine {
 
   private spawnMover(): void {
     const prev = this.peak()!;
-    const w = prev.w;
+    let w = prev.w;
+    if (this.gift.broad > 0) {
+      this.gift.broad -= 1;
+      w = Math.min(this.startW * 1.6, w * 1.33);
+    }
     const course: CourseId = this.boss ? "slide" : this.plan.courseAt(this.floors);
     const halfSpan = Math.max(w * 0.98, 80);
     const center = prev.x + prev.w / 2;
@@ -1120,7 +1140,9 @@ export class SpireEngine {
       this.windTurnedAt = this.floors;
     }
     const slipping = this.slip > 0;
-    const slowed = this.lull || slipping;
+    const slowGift = this.gift.slow > 0;
+    if (slowGift) this.gift.slow -= 1;
+    const slowed = this.lull || slipping || slowGift;
     const period = this.plan.periodAt(this.floors) * (slowed ? 1.8 : 1);
     this.lull = false;
     if (slipping) this.slip -= 1;
@@ -1425,6 +1447,16 @@ export class SpireEngine {
         this.floors = reached;
         this.mark(reached);
         this.emit();
+        if (
+          this.mode === "level" &&
+          !this.boss &&
+          isLanding(reached, this.plan.goal) &&
+          !this.landed.has(reached) &&
+          this.mover.fallT < 0
+        ) {
+          this.openLanding(reached);
+          return;
+        }
       }
       // The summit counts once the top has stood at goal height for a
       // moment: not in passing, and not while a crooked slab beneath it is
@@ -1455,6 +1487,82 @@ export class SpireEngine {
       this.save.ghosts[id] = this.trace.slice();
       storeSave(this.save);
     }
+  }
+
+  /**
+   * A landing: the climb stops, the stone below sets for good, and one of
+   * two gifts is chosen. The Dark waits while you choose.
+   */
+  private openLanding(floor: number): void {
+    this.landed.add(floor);
+    const set = this.setSpire();
+    this.phase = "pick";
+    this.landing = {
+      floor,
+      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.plan.sway > 0),
+    };
+    this.offers = [];
+    this.mote = null;
+    this.bomb = null;
+    this.tip = "";
+    const cx = this.seat.x;
+    this.float("LANDING", cx, this.seat.y + 70, true, 26);
+    if (set > 0) this.float(`${set} SET`, cx, this.seat.y + 40, false, 16);
+    this.fx.ring(cx, this.seat.y, BONE, 220, 5);
+    for (let i = 0; i < this.stack.length; i++)
+      this.stack[i]!.ripple = (this.stack.length - i) * 0.02;
+    this.flash = 0.35;
+    this.sfx.chime();
+    haptics.medium();
+    this.emit();
+  }
+
+  /** Takes a landing's gift; the climb goes on. */
+  private takeLanding(index: number): void {
+    const id = this.landing?.offers[index];
+    if (!id) return;
+    this.landing = null;
+    this.applyGift(id);
+    this.sfx.pick();
+    this.phase = "play";
+    this.spawnMover();
+    this.emit();
+  }
+
+  /** A gift takes effect at once, and says so. */
+  private applyGift(id: LandingId): void {
+    const cx = this.seat.x;
+    const y = this.seat.y + 60;
+    switch (id) {
+      case "setstone":
+        this.gift.set = 5;
+        break;
+      case "lantern":
+        this.breather = Math.max(this.breather, 12);
+        break;
+      case "broad":
+        this.gift.broad = 3;
+        break;
+      case "braces":
+        this.shields = Math.min(MAX_SHIELDS, this.shields + 2);
+        this.shieldAge = 0;
+        this.sfx.shieldUp();
+        break;
+      case "ember":
+        this.heat = 1;
+        break;
+      case "slow":
+        this.gift.slow = 6;
+        break;
+      case "keel":
+        if (this.stage) this.stage.sway *= 0.5;
+        break;
+      case "push":
+        this.pushDark(SLAB_H * 6);
+        this.fx.rayBurst(cx, this.dark, [150, 80, 220], 160, 10);
+        break;
+    }
+    this.float(LANDING_BY_ID[id].name.toUpperCase(), cx, y, true, 22);
   }
 
   /** The summit of a boss sky: the Dark wakes, and the goal changes. */
@@ -1933,10 +2041,15 @@ export class SpireEngine {
         this.shields -= 1;
         this.shieldAge = 0;
       }
-      const onto = result.perfect || braced ? prev.body : null;
+      // Set Stone from a landing: the next few slabs set and count wherever they land.
+      const gifted = this.gift.set > 0;
+      if (gifted) this.gift.set -= 1;
+      const onto = result.perfect || braced || gifted ? prev.body : null;
       slab.body = this.stage.drop(result.x, this.mover.y, result.w, SLAB_H, onto);
-      slab.loose = !result.perfect && !braced;
-      slab.counts = result.perfect || braced || result.close;
+      slab.loose = !result.perfect && !braced && !gifted;
+      slab.counts = result.perfect || braced || gifted || result.close;
+      if (gifted && !result.perfect)
+        this.float("SET", result.x + result.w / 2, this.mover.y + 40, true, 20);
     }
     slab.pieces = pieces;
     slab.key = this.mover.keystone && result.perfect;
@@ -2112,8 +2225,9 @@ export class SpireEngine {
     }
     storeSave(this.save);
     if (grabbed === "ember") {
-      this.openPicks();
-      return;
+      // An ember is a gift taken on the move: one of the landing's, at once.
+      const [id] = landingOffer(Math.random, this.plan.darkRate > 0, this.plan.sway > 0);
+      this.applyGift(id!);
     }
     this.spawnMover();
     // After the next slab is up, so the fresh slab does not wipe the tip.
@@ -2667,6 +2781,7 @@ export class SpireEngine {
           : null,
       ghostName: this.ghostName,
       boss: this.boss ? { surge: this.boss.surge + 1, of: BOSS_SURGES } : null,
+      landing: this.landing,
     });
   }
 
