@@ -1218,10 +1218,10 @@ export class SpireEngine {
     for (const slab of this.stack) {
       if (slab.body === null) continue;
       const view = this.stage.read(slab.body);
-      // Only a slab lying level enough to build on is a floor: anything in
-      // flight, mid-topple or leaning hard is not, however high it sits.
-      if (!view || (!view.resting && view.speed > 30)) continue;
-      if (Math.abs(view.angle) > LEVEL_TILT) continue;
+      // The top is the top however it moves: a slab that creeps under the
+      // sway is still the one you build on. Only a crooked slab, which is
+      // about to crumble, is passed over.
+      if (!view || Math.abs(view.angle) > LEVEL_TILT) continue;
       const t = this.stage.topOf(slab.body);
       if (t > top) {
         top = t;
@@ -1239,6 +1239,20 @@ export class SpireEngine {
   }
 
   /** Floors of height reached: on the stage, measured; otherwise counted. */
+  /**
+   * The highest point of anything still standing, crooked or not, settled or
+   * not. The Dark has to reach this, whatever the state of the top.
+   */
+  private crownY(): number {
+    if (!this.stage) return this.peak().y + SLAB_H;
+    let top = this.seat.y;
+    for (const slab of this.stack) {
+      if (slab.body === null) continue;
+      top = Math.max(top, this.stage.topOf(slab.body));
+    }
+    return top;
+  }
+
   private floorsNow(): number {
     if (!this.stage) return this.floors;
     // The foundation's top sits one slab up and is floor zero.
@@ -1307,8 +1321,12 @@ export class SpireEngine {
       // The summit counts once the top has stood at goal height for a
       // moment: not in passing, and not while a crooked slab beneath it is
       // about to crumble.
-      this.summitHold = this.plan.goal > 0 && reached >= this.plan.goal ? this.summitHold + dt : 0;
-      if (this.summitHold >= SUMMIT_HOLD) this.win();
+      // Measured with slack either side, so a top creeping across the
+      // rounding line under the sway does not keep resetting the hold.
+      const height = this.seat.y / SLAB_H - 1;
+      if (this.plan.goal > 0 && height >= this.plan.goal - 0.45) this.summitHold += dt;
+      else if (height < this.plan.goal - 0.7) this.summitHold = 0;
+      if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD) this.win();
     }
   }
 
@@ -1320,10 +1338,7 @@ export class SpireEngine {
 
   /** Floors of tower still above the Dark. */
   private darkGap(): number {
-    const top = this.peak();
-    if (!top) return 0;
-    const seat = this.stage ? this.seat.y : top.y + SLAB_H;
-    return (seat - this.dark) / SLAB_H;
+    return (this.crownY() - this.dark) / SLAB_H;
   }
 
   /**
@@ -1335,8 +1350,9 @@ export class SpireEngine {
     if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0 && this.breather <= 0) {
       this.dark += this.plan.darkRate * dt;
       const top = this.peak()!;
-      // On the stage the Dark judges the settled top, never a slab mid-topple.
-      const seat = this.stage ? this.seat.y : top.y + SLAB_H;
+      // The Dark must climb to the highest slab still standing, settled or
+      // not, crooked or not.
+      const seat = this.crownY();
       if (this.dark >= seat - SLAB_H * 0.5 && this.kit.secondWind && !this.secondWindUsed) {
         // Second Wind: the first time the Dark reaches the top, it is thrown back.
         this.secondWindUsed = true;
@@ -1774,6 +1790,8 @@ export class SpireEngine {
     let push = 0;
     if (result.perfect) push += slab.key ? DARK_PUSH.keystone : DARK_PUSH.perfect;
     else if (clean) push += DARK_PUSH.clean;
+    // A split landed home is two perfects, and pushes like it.
+    if (result.perfect && this.mover.split) push += DARK_PUSH.perfect;
     if (fast) push += DARK_PUSH.fast;
     this.pushDark(push);
     const heatBefore = this.heat;

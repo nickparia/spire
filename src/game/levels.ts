@@ -203,7 +203,7 @@ export function levelPlan(level: LevelDef, index: number): Plan {
     difficulty: index * 6,
     sway: 0.1 + index * 0.025,
     // Slow enough to outbuild with steady play, never slow enough to ignore.
-    darkRate: Math.min(20, 14 + index * 1.2),
+    darkRate: Math.min(20, 16 + index),
     physics: true,
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
