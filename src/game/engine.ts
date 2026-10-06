@@ -105,6 +105,8 @@ import { rgbCss, THEMES, type Theme } from "./themes";
 
 const STEP = 1 / 60;
 const SLAB_H = 28;
+/** The dust rubble is drawn in. */
+const RUBBLE_RGB: RGB = [112, 100, 94];
 /** Coins for beating your own ghost to the summit. */
 const GHOST_PURSE = 25;
 /** Seconds the top must stand at goal height before the summit counts. */
@@ -3127,7 +3129,10 @@ export class SpireEngine {
       // up, leaving the usual seam above it.
       const c = this.worldToScreen(slab.x + slab.w / 2, slab.y + SLAB_H / 2);
       if (c.y < -80 || c.y > this.vh + 120) return;
-      const body = slab.flash > 0 ? mix(slab.rgb, [255, 255, 255], slab.flash * 0.82) : slab.rgb;
+      // Rubble is drawn dusty and drained of the sky's colour: what still
+      // holds its colour is what counts.
+      const stone = slab.counts ? slab.rgb : mix(slab.rgb, RUBBLE_RGB, 0.72);
+      const body = slab.flash > 0 ? mix(stone, [255, 255, 255], slab.flash * 0.82) : stone;
       ctx.save();
       ctx.translate(c.x, c.y);
       ctx.rotate(-slab.rot);
