@@ -36,6 +36,8 @@ export type BodyView = {
   /** Px per second. */
   speed: number;
   resting: boolean;
+  /** True once the body has come down onto something; it stays true however it creeps after. */
+  landed: boolean;
 };
 
 export class Stage {
@@ -48,6 +50,7 @@ export class Stage {
   private still = new Map<number, number>();
   /** Seconds each body has been tilted past LEVEL_TILT. */
   private crooked = new Map<number, number>();
+  private landed = new Set<number>();
   private toppled = false;
   private lost: number[] = [];
   /** Bodies waiting to set onto the body they were dropped on, once they land. */
@@ -121,6 +124,7 @@ export class Stage {
     this.still.delete(id);
     this.crooked.delete(id);
     this.setting.delete(id);
+    this.landed.delete(id);
   }
 
   step(dt: number): void {
@@ -161,6 +165,15 @@ export class Stage {
       const v = body.getLinearVelocity();
       const speed = Math.hypot(v.x, v.y) * SCALE;
       const spin = Math.abs(body.getAngularVelocity());
+      // Landed: it has touched something. Creeping afterwards does not undo it.
+      if (!this.landed.has(id)) {
+        for (let ce = body.getContactList(); ce; ce = ce.next) {
+          if (ce.contact.isTouching()) {
+            this.landed.add(id);
+            break;
+          }
+        }
+      }
       const was = this.still.get(id) ?? 0;
       if (speed < REST && spin < 0.2) {
         const now = was + dt;
@@ -256,6 +269,7 @@ export class Stage {
       h: size.h,
       angle: body.getAngle(),
       speed: Math.hypot(v.x, v.y) * SCALE,
+      landed: !body.isDynamic() || this.landed.has(id),
       resting: !body.isDynamic() || (this.still.get(id) ?? 0) >= REST_TIME,
     };
   }

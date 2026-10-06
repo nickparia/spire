@@ -278,6 +278,39 @@ export const DARK_PUSH = {
 /** Where the Dark starts, px below the foundation. */
 export const DARK_START = -168;
 
+/**
+ * A ghost is the trace of a best run: the second each floor was first
+ * reached, index by floor, so trace[0] is 0. Its height at any moment is
+ * read back off the trace, with the climb between two floors spread evenly.
+ */
+export type Ghost = number[];
+
+export function ghostHeight(trace: Ghost, t: number): number {
+  if (trace.length === 0) return 0;
+  let f = 0;
+  while (f + 1 < trace.length && trace[f + 1]! <= t) f++;
+  if (f + 1 >= trace.length) return f;
+  const a = trace[f]!;
+  const b = trace[f + 1]!;
+  return b > a ? f + (t - a) / (b - a) : f + 1;
+}
+
+/**
+ * Whether a run's trace should replace the ghost: a summit beats any ghost
+ * that never summited and any slower summit; short of the summit, only a
+ * higher climb beats a ghost that also fell short.
+ */
+export function ghostBetter(old: Ghost | undefined, trace: Ghost, goal: number): boolean {
+  if (trace.length < 2) return false;
+  const summited = trace.length > goal;
+  if (!old || old.length < 2) return true;
+  const oldSummited = old.length > goal;
+  if (summited && !oldSummited) return true;
+  if (summited && oldSummited) return trace[goal]! < old[goal]!;
+  if (!oldSummited) return trace.length > old.length;
+  return false;
+}
+
 export const SHRINK_RATE = 0.07;
 export const SHRINK_FLOOR = 0.5;
 /** A clean drop inside the grace grows the slab by this much, up to its start. */

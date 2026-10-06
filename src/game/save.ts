@@ -1,7 +1,7 @@
 import { isWeaponId, type WeaponId } from "./build";
 import { refundDevices, type Levels, type Tracks } from "./gear";
 import { LEVELS } from "./levels";
-import { starCount, type Goals } from "./logic";
+import { starCount, type Ghost, type Goals } from "./logic";
 
 const SAVE_KEY = "spire-v2";
 const LEGACY_KEY = "spire-v1";
@@ -28,6 +28,8 @@ export type Save = {
   levels2: Levels;
   /** The class weapon carried into runs. */
   weapon: WeaponId;
+  /** The best run's trace on each level, to race against. */
+  ghosts: Record<string, Ghost>;
 };
 
 export function emptySave(): Save {
@@ -42,6 +44,7 @@ export function emptySave(): Save {
     tracks: {},
     levels2: {},
     weapon: "buttress",
+    ghosts: {},
   };
 }
 
@@ -81,6 +84,16 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
       if (gear && typeof gear === "object") save.coins += refundDevices(gear);
       for (const [kind, shown] of Object.entries(data.tips ?? {})) {
         save.tips[kind] = num(shown, 0);
+      }
+      for (const [id, trace] of Object.entries(data.ghosts ?? {})) {
+        if (!Array.isArray(trace) || trace.length < 2) continue;
+        const clean: number[] = [];
+        for (const t of trace) {
+          if (typeof t !== "number" || !Number.isFinite(t) || t < (clean[clean.length - 1] ?? 0))
+            break;
+          clean.push(t);
+        }
+        if (clean.length >= 2) save.ghosts[id] = clean;
       }
       for (const [id, rec] of Object.entries(data.levels ?? {})) {
         if (!rec || typeof rec !== "object") continue;

@@ -68,6 +68,9 @@ import {
   type Goals,
   type Plan,
   type RGB,
+  ghostBetter,
+  ghostHeight,
+  type Ghost,
 } from "./logic";
 import { Music } from "./music";
 import { LEVEL_TILT, Stage } from "./physics";
@@ -102,6 +105,8 @@ import { rgbCss, THEMES, type Theme } from "./themes";
 
 const STEP = 1 / 60;
 const SLAB_H = 28;
+/** Coins for beating your own ghost to the summit. */
+const GHOST_PURSE = 25;
 /** Seconds the top must stand at goal height before the summit counts. */
 const SUMMIT_HOLD = 0.45;
 const VISUAL_H = 24;
@@ -152,6 +157,8 @@ export type LevelResult = {
   rebuilt: boolean;
   /** What the forge has on the table, priced for your house. */
   offers: Offer[];
+  /** The ghost's summit time, and whether this run beat it. Null the first time. */
+  ghost: { time: number; beaten: boolean } | null;
 };
 
 export type Hud = {
@@ -208,6 +215,8 @@ export type Hud = {
   rescue: { price: number; seconds: number } | null;
   /** True when the Dark, not a missed drop, ended the run. */
   taken: boolean;
+  /** Floors ahead of your best run's ghost, negative when behind; null without one. */
+  ghostGap: number | null;
 };
 
 export type EngineEvents = {
@@ -483,6 +492,10 @@ export class SpireEngine {
   private summitHold = 0;
   /** Seconds the Dark holds still after a topple, for the Runner's Breather. */
   private breather = 0;
+  /** This run's trace: the second each floor was first reached. */
+  private trace: number[] = [0];
+  /** The best run on this level, to race against; null the first time. */
+  private ghost: Ghost | null = null;
   private camY = 0;
   private camDrop = 0;
   private look = 0;
@@ -902,6 +915,11 @@ export class SpireEngine {
     this.slowmo = 0;
     this.summitHold = 0;
     this.breather = 0;
+    this.trace = [0];
+    this.ghost =
+      phase === "ready" && this.mode === "level"
+        ? (this.save.ghosts[LEVELS[this.levelIndex]!.id] ?? null)
+        : null;
     this.taken = false;
     this.demoAge = 0;
     this.demoNext = 0.8;
@@ -1218,10 +1236,10 @@ export class SpireEngine {
     for (const slab of this.stack) {
       if (slab.body === null) continue;
       const view = this.stage.read(slab.body);
-      // The top is the top however it moves: a slab that creeps under the
-      // sway is still the one you build on. Only a crooked slab, which is
-      // about to crumble, is passed over.
-      if (!view || Math.abs(view.angle) > LEVEL_TILT) continue;
+      // The top is the top however it creeps: once a slab has landed it is
+      // the one you build on. A slab still falling is not there yet, and a
+      // crooked one, about to crumble, is passed over.
+      if (!view || !view.landed || Math.abs(view.angle) > LEVEL_TILT) continue;
       const t = this.stage.topOf(slab.body);
       if (t > top) {
         top = t;
@@ -1316,6 +1334,7 @@ export class SpireEngine {
       const reached = this.floorsNow();
       if (reached !== this.floors) {
         this.floors = reached;
+        this.mark(reached);
         this.emit();
       }
       // The summit counts once the top has stood at goal height for a
@@ -1324,9 +1343,29 @@ export class SpireEngine {
       // Measured with slack either side, so a top creeping across the
       // rounding line under the sway does not keep resetting the hold.
       const height = this.seat.y / SLAB_H - 1;
-      if (this.plan.goal > 0 && height >= this.plan.goal - 0.45) this.summitHold += dt;
-      else if (height < this.plan.goal - 0.7) this.summitHold = 0;
+      if (this.plan.goal > 0 && height >= this.plan.goal - 0.5) this.summitHold += dt;
+      else if (height < this.plan.goal - 0.75) this.summitHold = 0;
       if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD) this.win();
+    }
+  }
+
+  /** Notes the first time a floor is reached, for the ghost. */
+  private mark(floor: number): void {
+    for (let f = this.trace.length; f <= floor; f++) this.trace[f] = this.runTime;
+  }
+
+  /** Where the ghost stands right now, in floors; null without one. */
+  private ghostNow(): number | null {
+    return this.ghost ? ghostHeight(this.ghost, this.runTime) : null;
+  }
+
+  /** Keeps this run's trace as the ghost if it is the better run. */
+  private keepGhost(): void {
+    if (this.mode !== "level") return;
+    const id = LEVELS[this.levelIndex]!.id;
+    if (ghostBetter(this.save.ghosts[id], this.trace, this.plan.goal)) {
+      this.save.ghosts[id] = this.trace.slice();
+      storeSave(this.save);
     }
   }
 
@@ -2173,6 +2212,7 @@ export class SpireEngine {
 
   private die(): void {
     this.phase = "fall";
+    this.keepGhost();
     this.fallAge = 0;
     this.hint = false;
     this.bomb = null;
@@ -2235,7 +2275,13 @@ export class SpireEngine {
       coins: this.paySummit(accuracy, goals, outcome),
       rebuilt: this.rebuilt,
       offers: [],
+      ghost: this.ghostResult(),
     };
+    // The ghost summits when the run did, by the official clock.
+    this.mark(this.plan.goal);
+    this.trace.length = this.plan.goal + 1;
+    this.trace[this.plan.goal] = this.runTime;
+    this.keepGhost();
     this.result.offers = this.offersNow();
     this.phase = "won";
     this.wonAge = 0;
@@ -2305,6 +2351,19 @@ export class SpireEngine {
     });
     if (coins >= 5) this.fx.sparkle(x, y + 10, 20, GOLD_RGB, 6);
     this.sfx.coin(coins);
+  }
+
+  /** How the summit stands against the ghost; a win pays a little. */
+  private ghostResult(): { time: number; beaten: boolean } | null {
+    const g = this.ghost;
+    if (!g || g.length <= this.plan.goal) return null;
+    const time = g[this.plan.goal]!;
+    const beaten = this.runTime < time;
+    if (beaten) {
+      this.save.coins += GHOST_PURSE;
+      this.runCoins += GHOST_PURSE;
+    }
+    return { time, beaten };
   }
 
   /** The purse for a summit. Banked here; the results card itemises it. */
@@ -2385,6 +2444,10 @@ export class SpireEngine {
         ? { price: this.rescue!.price, seconds: Math.ceil(this.rescue!.until - this.fallAge) }
         : null,
       taken: this.taken,
+      ghostGap:
+        live && this.ghost !== null && this.phase === "play"
+          ? Math.round(this.floors - this.ghostNow()!)
+          : null,
     });
   }
 
@@ -2664,6 +2727,7 @@ export class SpireEngine {
 
     for (const slab of this.stack) this.drawSlab(ctx, slab, inZone && slab === prev);
     if (this.stage && aiming && this.phase !== "menu") this.drawPlumb(ctx, prev);
+    if (this.phase === "play" && this.ghost) this.drawGhostLine(ctx);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
     if (this.plan.darkRate > 0 && this.phase !== "menu") this.drawDark(ctx);
@@ -2938,6 +3002,37 @@ export class SpireEngine {
     g.addColorStop(1, rgbCss(this.theme.accent, 0));
     ctx.fillStyle = g;
     ctx.fillRect(s.x - reach, s.y - reach, reach * 2, reach * 2);
+    ctx.restore();
+  }
+
+  /**
+   * Your best run climbs beside you: a faint line at the height it had
+   * reached by now, with its time on it. Ahead of it the line is below the
+   * top; behind it, above.
+   */
+  private drawGhostLine(ctx: CanvasRenderingContext2D): void {
+    const h = this.ghostNow();
+    if (h === null) return;
+    const y = (h + 1) * SLAB_H;
+    const p = this.worldToScreen(-this.startW / 2 - 28, y);
+    const q = this.worldToScreen(this.startW / 2 + 28, y);
+    if (p.y < -20 || p.y > this.vh + 20) return;
+    const ahead = this.floors >= h;
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = ahead ? "rgba(140,220,255,0.55)" : "rgba(255,180,120,0.75)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(q.x, q.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = '700 11px system-ui, -apple-system, "Helvetica Neue", sans-serif';
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillStyle = ahead ? "rgba(140,220,255,0.8)" : "rgba(255,180,120,0.95)";
+    ctx.fillText("BEST", q.x - 34, p.y - 3);
     ctx.restore();
   }
 

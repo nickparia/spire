@@ -1253,6 +1253,25 @@
   -webkit-backdrop-filter: blur(16px);
 }
 
+.ghost-gap {
+  color: rgb(140, 220, 255);
+}
+
+.ghost-behind {
+  color: rgb(255, 180, 120);
+}
+
+.ghost-line {
+  margin-top: 4px;
+  font-size: 14px;
+  color: rgba(255, 245, 230, 0.7);
+}
+
+.ghost-won {
+  color: rgb(140, 220, 255);
+  font-weight: 700;
+}
+
 /* A panel that has just appeared ignores touches until it is armed. */
 .panel:not([data-armed]) {
   pointer-events: none;

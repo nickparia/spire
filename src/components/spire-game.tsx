@@ -39,6 +39,7 @@ const INITIAL: Hud = {
   darkGap: null,
   rescue: null,
   taken: false,
+  ghostGap: null,
   accent: "rgb(255,77,26)",
   result: null,
 };

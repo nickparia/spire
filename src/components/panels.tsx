@@ -201,6 +201,16 @@ export function RunHud({
             </p>
           </>
         ) : null}
+        {hud.ghostGap !== null ? (
+          <>
+            <p className="kicker mt-2">Your best</p>
+            <p className={"stat-num ghost-gap" + (hud.ghostGap < 0 ? " ghost-behind" : "")}>
+              {hud.ghostGap === 0
+                ? "level"
+                : `${Math.abs(hud.ghostGap)} ${hud.ghostGap > 0 ? "ahead" : "behind"}`}
+            </p>
+          </>
+        ) : null}
         <p className="stat-num purse-live mt-2" aria-label={`${hud.runCoins} coins this run`}>
           <Coin size={14} />
           <span key={hud.runCoins} className="score-pop inline-block">
@@ -383,6 +393,7 @@ function Purse({ result }: { result: LevelResult }) {
   const total = useCountUp(coins.total, 1300, 900);
   const parts = [
     ["slabs", coins.drops],
+    ["ghost", result.ghost?.beaten ? 25 : 0],
     ["summit", coins.clear],
     ["accuracy", coins.accuracy],
     ["pace", coins.pace],
@@ -484,6 +495,13 @@ export function ResultsPanel({
         Sky {result.levelIndex + 1} · {level.name}
       </p>
       <h2 className="sheet-title">Summit reached</h2>
+      {result.ghost ? (
+        <p className={"ghost-line" + (result.ghost.beaten ? " ghost-won" : "")}>
+          {result.ghost.beaten
+            ? `Beat your ghost by ${formatTime(result.ghost.time - result.time)}`
+            : `Your ghost summited in ${formatTime(result.ghost.time)}`}
+        </p>
+      ) : null}
       <div className="mt-2">
         <Stars count={starCount(goals)} size={34} popFrom={1.05} />
       </div>
