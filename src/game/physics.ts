@@ -171,16 +171,9 @@ export class Stage {
       // Landed: it rests on something that is itself landed, the ground or
       // the foundation or a slab that got there first. Two slabs meeting in
       // the air are not landed. Creeping afterwards does not undo it.
-      if (!this.landed.has(id)) {
-        for (let ce = body.getContactList(); ce; ce = ce.next) {
-          const other = ce.other;
-          if (!other || !ce.contact.isTouching()) continue;
-          if (!other.isDynamic() || this.landedBodies.has(other)) {
-            this.landed.add(id);
-            this.landedBodies.add(body);
-            break;
-          }
-        }
+      if (!this.landed.has(id) && this.anchored(body)) {
+        this.landed.add(id);
+        this.landedBodies.add(body);
       }
       const was = this.still.get(id) ?? 0;
       if (speed < REST && spin < 0.2) {
@@ -197,6 +190,23 @@ export class Stage {
         this.still.set(id, 0);
       }
     }
+  }
+
+  /**
+   * Whether a body touches, or is welded to, something landed. Welded pairs
+   * no longer collide, so the joint has to count as well as the contact.
+   */
+  private anchored(body: Body): boolean {
+    for (let ce = body.getContactList(); ce; ce = ce.next) {
+      const other = ce.other;
+      if (!other || !ce.contact.isTouching()) continue;
+      if (!other.isDynamic() || this.landedBodies.has(other)) return true;
+    }
+    for (let je = body.getJointList(); je; je = je.next) {
+      const other = je.other;
+      if (other && (!other.isDynamic() || this.landedBodies.has(other))) return true;
+    }
+    return false;
   }
 
   /** Welds a resting slab to another at once, whatever its tilt: a brace. */
