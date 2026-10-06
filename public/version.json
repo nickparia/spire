@@ -1,9 +1,9 @@
 {
-  "build": 25,
-  "title": "Challenges",
+  "build": 26,
+  "title": "Saved as you go",
   "notes": [
-    "Options on the title: your name, and a switch for whether anyone can challenge you.",
-    "Competing is by invitation now. Challenge someone on a leaderboard: you race their ghost at once, they accept on their title, and then it is mutual, one challenge at a time.",
-    "Shade only flies between the two of you. Beat the person you compete with and the summit card lets you throw it; they see it on that sky and can race you back."
+    "Your progress is now also kept in the phone's own storage, so it survives the app being closed hard. If a save ever went missing, this is the fix.",
+    "The pause sheet says End run, and says what that keeps: your skies, stars and coins.",
+    "A Board button on the title, with arrows to browse every sky's leaderboard."
   ]
 }

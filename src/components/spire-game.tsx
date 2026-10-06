@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { BUILD } from "@/game/version";
-import { emptySave, isUnlocked, nextLevelIndex, type Save } from "@/game/save";
+import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
 import { useShade } from "./use-shade";
@@ -211,6 +211,10 @@ export function SpireGame() {
         engine.setSfx(on);
       }
     };
+    // A phone keeps a second copy of the save; take it if it is the newer one.
+    restoreNativeSave(state.current.save).then((restored) => {
+      if (restored) engineRef.current?.adoptSave(restored);
+    });
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [next, openTitle, play, quit, retry]);

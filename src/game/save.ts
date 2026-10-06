@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { Preferences } from "@capacitor/preferences";
 import { cleanName, newPlayerId } from "./board";
 import { isWeaponId, type WeaponId } from "./build";
 import { refundDevices, type Levels, type Tracks } from "./gear";
@@ -49,6 +51,8 @@ export type Save = {
   updateSnoozed: number;
   /** Whether others may challenge you. */
   challengesOn: boolean;
+  /** When this save was last written, ms since the epoch. */
+  savedAt: number;
 };
 
 export function emptySave(): Save {
@@ -73,6 +77,7 @@ export function emptySave(): Save {
     whatsNewSeen: 0,
     updateSnoozed: 0,
     challengesOn: true,
+    savedAt: 0,
   };
 }
 
@@ -129,6 +134,7 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
         save.shadeSeen = data.shadeSeen;
       }
       save.challengesOn = data.challengesOn !== false;
+      save.savedAt = Math.max(0, num(data.savedAt, 0));
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));
       save.updateSnoozed = Math.max(0, Math.floor(num(data.updateSnoozed, 0)));
       for (const [id, at] of Object.entries(data.feats ?? {})) {
@@ -185,11 +191,34 @@ export function loadSave(): Save {
   }
 }
 
+/**
+ * Written twice: to the page's storage, which is instant, and to the native
+ * store on a phone, which survives the WebView's storage being dropped.
+ */
 export function storeSave(save: Save): void {
+  save.savedAt = Date.now();
+  let text = "";
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    text = JSON.stringify(save);
+    localStorage.setItem(SAVE_KEY, text);
   } catch {
     /* private mode */
+  }
+  if (text && Capacitor.isNativePlatform()) {
+    Preferences.set({ key: SAVE_KEY, value: text }).catch(() => undefined);
+  }
+}
+
+/** The native copy, if it is newer than what the page has. */
+export async function restoreNativeSave(current: Save): Promise<Save | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const { value } = await Preferences.get({ key: SAVE_KEY });
+    if (!value) return null;
+    const native = parseSave(value);
+    return native.savedAt > current.savedAt ? native : null;
+  } catch {
+    return null;
   }
 }
 

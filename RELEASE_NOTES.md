@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 26 — Saved as you go
+
+- Progress is now kept in the phone's own storage as well as the game's, so it survives the app being closed hard. If a save ever went missing, this is the fix.
+- The pause sheet's exit is now **End run**, with a line saying what that keeps: your skies, stars and coins are saved as you go; only the climb ends.
+- A **Board** button on the title opens the leaderboard on your current sky, with arrows to browse every sky.
+
+**Please try**: play a sky, press pause → End run, close the app fully (swipe it away), reopen — your skies and coins should be exactly as they were.
+
 ## Build 25 — Challenges
 
 **What's new**

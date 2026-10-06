@@ -6,6 +6,7 @@ import {
   Play,
   RotateCcw,
   Shield,
+  Square,
   Wind,
   type LucideIcon,
 } from "lucide-react";
@@ -266,10 +267,13 @@ export function PauseSheet({
               Restart
             </button>
             <button type="button" className="btn" onClick={onQuit}>
-              <LayoutGrid size={17} strokeWidth={2.2} />
-              {hud.mode === "level" ? "Levels" : "Menu"}
+              <Square size={15} strokeWidth={2.4} fill="currentColor" />
+              End run
             </button>
           </div>
+          <p className="panel-meta">
+            Your skies, stars and coins are saved as you go. Ending the run only loses this climb.
+          </p>
         </div>
         <div className="mt-4 flex justify-center">
           <SoundToggles save={save} onMusic={onMusic} onSfx={onSfx} />

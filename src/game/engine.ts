@@ -714,6 +714,15 @@ export class SpireEngine {
     this.emit();
   }
 
+  /** Takes a save restored from elsewhere, when nothing is being played. */
+  adoptSave(save: Save): void {
+    if (this.phase !== "menu") return;
+    this.save = save;
+    this.kit = kitFor(this.save.tracks, this.save.levels2, this.save.weapon);
+    this.commit();
+    this.showMenu(this.levelIndex);
+  }
+
   /** Awards a feat earned outside a summit; true when it is new. */
   award(id: FeatId): boolean {
     const fresh = earn(this.save.feats, [id], Date.now()).length > 0;
