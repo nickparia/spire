@@ -70,7 +70,7 @@ import {
   type RGB,
 } from "./logic";
 import { Music } from "./music";
-import { Stage } from "./physics";
+import { LEVEL_TILT, Stage } from "./physics";
 import {
   BOMB_RGB,
   drawBomb,
@@ -885,7 +885,8 @@ export class SpireEngine {
     this.stage = null;
     if (this.plan.physics && phase === "ready") {
       this.stage = new Stage();
-      this.stack[0]!.body = this.stage.addStatic(-this.startW / 2, 0, this.startW, VISUAL_H);
+      this.stage.sway = this.plan.sway;
+      this.stack[0]!.body = this.stage.addStatic(-this.startW / 2, 0, this.startW, SLAB_H);
     }
     this.seat = { x: 0, y: SLAB_H };
     this.slowmo = 0;
@@ -1204,7 +1205,10 @@ export class SpireEngine {
     for (const slab of this.stack) {
       if (slab.body === null) continue;
       const view = this.stage.read(slab.body);
-      if (!view || !view.resting) continue;
+      // Only a slab lying level enough to build on is a floor: anything in
+      // flight, mid-topple or leaning hard is not, however high it sits.
+      if (!view || (!view.resting && view.speed > 30)) continue;
+      if (Math.abs(view.angle) > LEVEL_TILT) continue;
       const t = this.stage.topOf(slab.body);
       if (t > top) {
         top = t;
@@ -1217,14 +1221,15 @@ export class SpireEngine {
   /** World height a new slab's bottom sits at when it lands on the peak. */
   private seatY(): number {
     const top = this.peak();
-    if (this.stage && top.body !== null) return this.stage.topOf(top.body) + (SLAB_H - VISUAL_H);
+    if (this.stage && top.body !== null) return this.stage.topOf(top.body);
     return top.y + SLAB_H;
   }
 
   /** Floors of height reached: on the stage, measured; otherwise counted. */
   private floorsNow(): number {
     if (!this.stage) return this.floors;
-    return Math.max(0, Math.round(this.seat.y / SLAB_H));
+    // The foundation's top sits one slab up and is floor zero.
+    return Math.max(0, Math.round(this.seat.y / SLAB_H) - 1);
   }
 
   /** Steps the stage and reads the bodies back into their slabs. */
@@ -1240,13 +1245,25 @@ export class SpireEngine {
       this.float("TOPPLE", top.x + top.w / 2, top.y + 50, false, 22);
       this.sfx.fail();
     }
+    const lost = new Set(stage.takeLost());
     for (let i = this.stack.length - 1; i >= 0; i--) {
       const slab = this.stack[i]!;
       if (slab.body === null) continue;
       const view = stage.read(slab.body);
       if (!view) continue;
-      if (i > 0 && (view.cy < -300 || Math.abs(view.cx) > 1600)) {
-        // Gone over the edge of the world: let it go.
+      if (i > 0 && (lost.has(slab.body) || view.cy < -300 || Math.abs(view.cx) > 1600)) {
+        // Down on the ground, or over the edge of the world: it crumbles.
+        this.scraps.push({
+          x: view.cx - view.w / 2,
+          y: view.cy - view.h / 2,
+          w: view.w,
+          vx: 0,
+          vy: 0,
+          rot: view.angle,
+          vr: 0,
+          rgb: slab.rgb,
+          life: 0.7,
+        });
         stage.remove(slab.body);
         this.stack.splice(i, 1);
         continue;
@@ -1255,7 +1272,7 @@ export class SpireEngine {
       slab.y = view.cy - view.h / 2;
       slab.rot = view.angle;
     }
-    if (stage.settled()) {
+    {
       const top = this.peak();
       this.seat = { x: top.x + top.w / 2, y: this.seatY() };
     }
@@ -1270,7 +1287,12 @@ export class SpireEngine {
         this.floors = reached;
         this.emit();
       }
-      if (this.plan.goal > 0 && reached >= this.plan.goal) this.win();
+      // The summit counts once the top slab has come to rest, not in passing.
+      if (this.plan.goal > 0 && reached >= this.plan.goal) {
+        const top = this.peak();
+        const view = top.body !== null ? stage.read(top.body) : null;
+        if (view?.resting) this.win();
+      }
     }
   }
 
@@ -1648,7 +1670,11 @@ export class SpireEngine {
       this.stage ? 1 : 0,
       1,
     );
-    if (this.stage) slab.body = this.stage.drop(result.x, this.mover.y, result.w, VISUAL_H);
+    if (this.stage) {
+      // A perfect sets to the slab beneath it; a miss stays loose.
+      const onto = result.perfect ? prev.body : null;
+      slab.body = this.stage.drop(result.x, this.mover.y, result.w, SLAB_H, onto);
+    }
     slab.pieces = pieces;
     slab.key = this.mover.keystone && result.perfect;
     let points = result.points;
@@ -1656,7 +1682,13 @@ export class SpireEngine {
     this.stack.push(slab);
     if (this.stage && half) {
       const other = this.makeSlab(half.x, this.mover.y, half.w, floor, 1, 1);
-      other.body = this.stage.drop(half.x, this.mover.y, half.w, VISUAL_H);
+      other.body = this.stage.drop(
+        half.x,
+        this.mover.y,
+        half.w,
+        SLAB_H,
+        result.perfect ? prev.body : null,
+      );
       this.stack.push(other);
     }
     this.floors = floor;
@@ -2842,7 +2874,7 @@ export class SpireEngine {
   private drawPlumb(ctx: CanvasRenderingContext2D, top: Slab): void {
     if (top.body === null || top.floor === 0) return;
     const deg = Math.abs((top.rot * 180) / Math.PI);
-    const c = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
+    const c = this.worldToScreen(top.x + top.w / 2, top.y + SLAB_H / 2);
     const foot = this.worldToScreen(top.x + top.w / 2, 0);
     const tilt = clamp01((deg - 1.5) / 6);
     ctx.save();
@@ -2866,13 +2898,15 @@ export class SpireEngine {
 
   private drawSlab(ctx: CanvasRenderingContext2D, slab: Slab, hotGroove: boolean): void {
     if (slab.body !== null && slab.floor > 0) {
-      const c = this.worldToScreen(slab.x + slab.w / 2, slab.y + VISUAL_H / 2);
+      // Bodies are a full floor tall; the stone is painted from the bottom
+      // up, leaving the usual seam above it.
+      const c = this.worldToScreen(slab.x + slab.w / 2, slab.y + SLAB_H / 2);
       if (c.y < -80 || c.y > this.vh + 120) return;
       const body = slab.flash > 0 ? mix(slab.rgb, [255, 255, 255], slab.flash * 0.82) : slab.rgb;
       ctx.save();
       ctx.translate(c.x, c.y);
       ctx.rotate(-slab.rot);
-      this.paintSlab(ctx, -slab.w / 2, VISUAL_H / 2, slab.w, VISUAL_H, body, 1, 0, hotGroove);
+      this.paintSlab(ctx, -slab.w / 2, SLAB_H / 2, slab.w, VISUAL_H, body, 1, 0, hotGroove);
       ctx.restore();
       return;
     }

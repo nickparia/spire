@@ -16,7 +16,7 @@ Once a run is live, the Dark climbs the tower from below, faster on later skies.
 
 ## Weight
 
-Slabs are rigid bodies (Box2D via `planck`, in `src/game/physics.ts`). A slab keeps its whole width; where it lands is where it sits. A plumb line hangs from the top slab, faint while the spire is true and red with the angle once it tilts. A topple plays in slow motion, and rubble that comes to rest on the ground is set in place so the heap becomes a base you can read. The column above it stays live and can topple again. Floors are counted from the settled top, so a topple costs height and time rather than the run.
+Slabs are rigid bodies (Box2D via `planck`, in `src/game/physics.ts`). A slab keeps its whole width; where it lands is where it sits. **A perfect sets, a miss stays loose**: a slab seated in the groove is welded to the one beneath it, so a true column is solid however tall, while an off-centre slab is a loose hinge and everything built on it can tip as a unit. A breath of air (`sway`, stronger each sky) swings sides every few seconds, never enough to move a true column, enough to finish off a lean. A plumb line hangs from the top slab, faint while the spire is true and red with the angle once it tilts. A topple plays in slow motion. Only a slab lying level enough to build on (`LEVEL_TILT`) is a floor; a slab that settles crooked, or on the ground, crumbles. Floors are counted from the highest level slab, so a topple costs height and time rather than the run, and the summit counts once the top slab has come to rest.
 
 ## Heat, weapons and upgrades
 

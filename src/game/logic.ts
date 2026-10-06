@@ -136,6 +136,8 @@ export type Plan = {
   difficulty: number;
   /** How fast the Dark climbs the tower, px per second; 0 keeps it away. */
   darkRate: number;
+  /** How hard height pushes on the spire: a slow sideways force per metre up. */
+  sway: number;
   /** Slabs are rigid bodies: they lean, slide and topple, and rubble can be built on. */
   physics: boolean;
   hazardsAt: (floors: number) => Hazards;
@@ -274,7 +276,7 @@ export const DARK_PUSH = {
 } as const;
 
 /** Where the Dark starts, px below the foundation. */
-export const DARK_START = -96;
+export const DARK_START = -168;
 
 export const SHRINK_RATE = 0.07;
 export const SHRINK_FLOOR = 0.5;
