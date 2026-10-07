@@ -76,6 +76,7 @@ export function SettingsSheet({
   me,
   onName,
   onChallenges,
+  onTester,
   onEnded,
   onClose,
 }: {
@@ -84,6 +85,7 @@ export function SettingsSheet({
   me: string;
   onName: (name: string) => void;
   onChallenges: (on: boolean) => void;
+  onTester: (patch: { tester?: boolean; practice?: boolean }) => void;
   onEnded: () => void;
   onClose: () => void;
 }) {
@@ -175,6 +177,32 @@ export function SettingsSheet({
             No challenge on. Pick someone on a sky's leaderboard to challenge.
           </p>
         )}
+
+        <p className="kicker settings-section">Tester tools</p>
+        <label className="switch-row">
+          <span>
+            <b>Unlock every sky</b>
+            <small>Play any sky in any order. Apex's card gets a button to fight its boss.</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={save.tester}
+            onChange={(e) => onTester({ tester: e.target.checked })}
+          />
+        </label>
+        <label className="switch-row">
+          <span>
+            <b>No Dark (practice)</b>
+            <small>The Dark stays away. Practice runs aren't posted or kept as ghosts.</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={save.practice}
+            onChange={(e) => onTester({ practice: e.target.checked })}
+          />
+        </label>
 
         <div className="mt-3">
           <button type="button" className="btn btn-primary" onClick={onClose}>

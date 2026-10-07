@@ -53,6 +53,10 @@ export type Save = {
   updateSnoozed: number;
   /** Whether others may challenge you. */
   challengesOn: boolean;
+  /** Tester tools: every sky open, and the boss a tap away. */
+  tester: boolean;
+  /** Practice: the Dark stays away; runs are not posted or kept as ghosts. */
+  practice: boolean;
   /** When this save was last written, ms since the epoch. */
   savedAt: number;
 };
@@ -80,6 +84,8 @@ export function emptySave(): Save {
     storySeen: false,
     updateSnoozed: 0,
     challengesOn: true,
+    tester: false,
+    practice: false,
     savedAt: 0,
   };
 }
@@ -137,6 +143,8 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
         save.shadeSeen = data.shadeSeen;
       }
       save.challengesOn = data.challengesOn !== false;
+      save.tester = data.tester === true;
+      save.practice = data.practice === true;
       save.savedAt = Math.max(0, num(data.savedAt, 0));
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));
       save.storySeen = data.storySeen === true;
@@ -290,7 +298,7 @@ export function skiesLit(save: Save): number {
 
 /** A level opens once the one before it has been cleared. */
 export function isUnlocked(save: Save, index: number): boolean {
-  if (index <= 0) return true;
+  if (index <= 0 || save.tester) return true;
   const before = LEVELS[index - 1];
   return Boolean(before && save.levels[before.id]?.clear);
 }

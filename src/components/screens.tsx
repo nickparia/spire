@@ -238,6 +238,7 @@ export function LevelSelect({
   selected,
   onSelect,
   onPlay,
+  onBossFight,
   onBoard,
   onBack,
   shade,
@@ -251,6 +252,7 @@ export function LevelSelect({
   onShadeSeen: (at: string) => void;
   onSelect: (index: number) => void;
   onPlay: (index: number) => void;
+  onBossFight: (index: number) => void;
   onBoard: (index: number) => void;
   onBack: () => void;
 }) {
@@ -354,6 +356,16 @@ export function LevelSelect({
                       <Play size={18} strokeWidth={2.4} fill="currentColor" />
                       Play
                     </button>
+                    {save.tester && isBoss(level.id) ? (
+                      <button
+                        type="button"
+                        className="btn btn-board"
+                        onClick={() => onBossFight(index)}
+                      >
+                        Fight the boss
+                        <small>tester · starts at the summit</small>
+                      </button>
+                    ) : null}
                     <button type="button" className="btn btn-board" onClick={() => onBoard(index)}>
                       <Trophy size={16} strokeWidth={2.2} />
                       Leaderboard

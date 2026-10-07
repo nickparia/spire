@@ -184,6 +184,8 @@ export type LevelResult = {
   lit: number;
   /** This summit beat a world's boss. */
   boss: boolean;
+  /** Practice or a boss-only run: shown, not posted. */
+  unranked: boolean;
 };
 
 export type Hud = {
@@ -525,6 +527,8 @@ export class SpireEngine {
   private slowmo = 0;
   /** Seconds the settled top has stood at or above the goal. */
   private summitHold = 0;
+  /** A practice or boss-only run: not posted, not kept as a ghost. */
+  private unranked = false;
   /** The last ten-second step past par the Dark was called out quickening on. */
   private quickStep = -1;
   /** Seconds the Dark holds still after a topple, for the Runner's Breather. */
@@ -659,6 +663,30 @@ export class SpireEngine {
     this.music.setMood("menu");
   }
 
+  /**
+   * Tester tools: a boss sky started at its summit on a finished, set tower,
+   * straight into the fight. The run is unranked.
+   */
+  startBoss(levelIndex: number): void {
+    this.startLevel(levelIndex);
+    if (!this.stage) return;
+    this.unranked = true;
+    const goal = this.plan.goal;
+    const x = -this.startW / 2;
+    for (let f = 1; f <= goal; f++) {
+      const slab = this.makeSlab(x, f * SLAB_H, this.startW, f, 0, 0);
+      slab.body = this.stage.addStatic(x, f * SLAB_H, this.startW, SLAB_H);
+      this.stack.push(slab);
+    }
+    this.floors = goal;
+    this.mark(goal);
+    this.seat = { x: 0, y: (goal + 1) * SLAB_H };
+    this.camY = Math.max(0, this.seat.y - this.viewH * LEAD);
+    this.phase = "play";
+    this.hint = false;
+    this.wakeBoss();
+  }
+
   startLevel(levelIndex: number): void {
     this.mode = "level";
     this.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, levelIndex));
@@ -779,6 +807,8 @@ export class SpireEngine {
       | "whatsNewSeen"
       | "updateSnoozed"
       | "challengesOn"
+      | "tester"
+      | "practice"
       | "storySeen"
     >,
   ): void {
@@ -1005,6 +1035,7 @@ export class SpireEngine {
     this.slowmo = 0;
     this.summitHold = 0;
     this.quickStep = -1;
+    this.unranked = phase === "ready" && this.save.practice;
     this.breather = 0;
     this.boss = null;
     this.landing = null;
@@ -1492,7 +1523,7 @@ export class SpireEngine {
 
   /** Keeps this run's trace as the ghost if it is the better run. */
   private keepGhost(): void {
-    if (this.mode !== "level") return;
+    if (this.mode !== "level" || this.unranked) return;
     const id = LEVELS[this.levelIndex]!.id;
     if (ghostBetter(this.save.ghosts[id], this.trace, this.plan.goal)) {
       this.save.ghosts[id] = this.trace.slice();
@@ -1688,7 +1719,8 @@ export class SpireEngine {
   private pushDark(px: number): void {
     if (this.plan.darkRate <= 0 || px <= 0) return;
     // Light buys time, never safety: the Dark is held within reach of the top.
-    const floor = this.stage ? this.crownY() - SLAB_H * DARK_REACH : -Infinity;
+    // Not in the boss fight: there the Dark must be driven deep to beat it.
+    const floor = this.stage && !this.boss ? this.crownY() - SLAB_H * DARK_REACH : -Infinity;
     this.dark = Math.max(DARK_START, Math.min(this.dark, Math.max(floor, this.dark - px)));
   }
 
@@ -1703,7 +1735,14 @@ export class SpireEngine {
    */
   private riseDark(dt: number): void {
     this.breather = Math.max(0, this.breather - dt);
-    if (this.plan.darkRate > 0 && this.phase === "play" && this.freeze <= 0 && this.breather <= 0) {
+    const practice = this.save.practice && this.mode === "level" && !this.boss;
+    if (
+      !practice &&
+      this.plan.darkRate > 0 &&
+      this.phase === "play" &&
+      this.freeze <= 0 &&
+      this.breather <= 0
+    ) {
       const base = this.boss
         ? this.plan.darkRate * (1 + this.boss.surge * 0.25)
         : this.plan.darkRate;
@@ -2633,6 +2672,7 @@ export class SpireEngine {
       feats: [],
       lit: 0,
       boss: this.mode === "level" && isBoss(level.id),
+      unranked: this.unranked,
     };
     this.result.lit = skiesLit(this.save);
     this.result.feats = earn(

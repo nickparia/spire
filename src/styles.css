@@ -2579,6 +2579,11 @@
   transform: translateX(18px);
 }
 
+.settings-section {
+  margin-top: 1.4rem;
+  text-align: left;
+}
+
 .settings .btn {
   width: 100%;
 }

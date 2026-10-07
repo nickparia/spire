@@ -29,6 +29,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 36 Tester tools in Options (`save.tester`, `save.practice`; `engine.startBoss`); unranked runs not posted; boss fight exempt from `DARK_REACH` (the cap made the Hollow unbeatable in 35). `tools/bots/tester.mjs`.
 - 35 Music driven by the climb (form A/B/A/break, earned layers, landing swell, topple strip; `music.ts` `setClimb`, `tools/bots/music.mjs`); the Dark quickens past par (`QUICKEN_RATE`, `QUICKEN_EVERY`) and light can push it at most `DARK_REACH` = 12 floors below the top (`tools/bots/linger.mjs`).
 - 34 Audio heals after backgrounding: a stuck or interrupted context is rebuilt on the next gesture and the music graph follows it (`audio.ts`, `music.ts`; `tools/bots/audio.mjs`).
 - 33 Nunito everywhere: CSS `--font-sans` and the canvas fonts in `engine.ts`/`props.ts`.

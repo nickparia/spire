@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 36 — Tester tools
+
+- **Options → Tester tools**:
+  - **Unlock every sky** — play any sky in any order. Apex's card gets a **Fight the boss** button that starts you at its summit on a finished tower, straight into the Hollow.
+  - **No Dark (practice)** — the Dark stays away so you can learn a sky. Practice runs and boss-only runs say "Practice run · not posted" and don't reach the leaderboard or your ghosts.
+- **Fixed:** in build 35 the Hollow could not be beaten (the new limit on pushing the Dark back also applied to the boss fight). Use this build to test it.
+
 ## Build 35 — A score that climbs with you, and a Dark that won't wait
 
 **Music**

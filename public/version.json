@@ -1,8 +1,8 @@
 {
-  "build": 35,
-  "title": "A score that climbs with you, and a Dark that won't wait",
+  "build": 36,
+  "title": "Tester tools",
   "notes": [
-    "The music now follows your climb: it moves between sections, the bass comes in at your first landing and the drums at your second, the melody joins on a streak of three perfects, a landing swells into a new section, and a topple strips it back.",
-    "Stay on a sky past its par time and the Dark quickens, faster every ten seconds. Perfect drops still push it back, but never more than twelve floors below you."
+    "Options has tester tools: unlock every sky, fight Apex's boss straight from the summit, and a practice mode with no Dark.",
+    "Fixed: the Hollow could not be beaten in build 35."
   ]
 }

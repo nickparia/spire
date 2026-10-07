@@ -29,7 +29,7 @@ export function Post({
   // Posts once per result, as soon as there is a name to post under.
   const posted = useRef<LevelResult | null>(null);
   useEffect(() => {
-    if (!save.name || posted.current === result) return;
+    if (!save.name || result.unranked || posted.current === result) return;
     posted.current = result;
     setState("posting");
     postGhost(
@@ -55,6 +55,7 @@ export function Post({
     if (name) onName(name);
   };
 
+  if (result.unranked) return <p className="post-line">Practice run · not posted</p>;
   if (!save.name) {
     return (
       <form className="post" onSubmit={submit} data-ui>

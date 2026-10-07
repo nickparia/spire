@@ -366,6 +366,13 @@ export function SpireGame() {
             selected={selected}
             onSelect={select}
             onPlay={play}
+            onBossFight={(index) => {
+              const engine = engineRef.current;
+              if (!engine) return;
+              engine.click();
+              setSelected(index);
+              engine.startBoss(index);
+            }}
             onBoard={(index) => {
               engineRef.current?.click();
               setSelected(index);
@@ -455,6 +462,7 @@ export function SpireGame() {
           me={me}
           onName={(name) => engineRef.current?.updateSave({ name })}
           onChallenges={(on) => engineRef.current?.updateSave({ challengesOn: on })}
+          onTester={(patch) => engineRef.current?.updateSave(patch)}
           onEnded={() => {
             setRival(null, {});
             refresh();
