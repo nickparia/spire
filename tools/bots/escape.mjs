@@ -72,7 +72,7 @@ while (Date.now() - t < 60000) {
     phase: window.__spire.phase,
     left: window.__spire.stack.length - 1,
   }));
-  if (out && !shot && st.left < 22) {
+  if (out && !shot && st.left < 30 && st.left > 0) {
     shot = true;
     await page.screenshot({ path: `${out}/esc-2.png` });
   }

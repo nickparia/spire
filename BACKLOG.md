@@ -32,6 +32,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 39 Escape chains: consecutive charged slabs detonate in a cascade (`ESCAPE_CHAIN_STEP`). Later worlds may need seals or caps so a perfect climb isn't always a one-tap escape.
 - 38 The Escape (Apex's boss): sky lit at the summit, tower frozen, the source descends (tentacles, tracking eyes), tap to break floors, perfects are charged light, heavy slabs two taps, six-quick-tap surge, retry from the summit. Tuning `ESCAPE_*` in engine.ts; difficulty rises per world. Bots: `escape.mjs <rate> [charged] [heavy]`, `fullboss.mjs`. Old Hollow fight code (`wakeBoss`, `bossTurn`, `drawEyes`) is unused; remove with the dead-systems tidy.
 - 37 The app shell: title splash (`home.tsx` TitleSplash), world select with per-world constellation panels and Continue/New (per-world active game in `save.progress`, `progress.ts`), bottom bar (Options, Leaderboard, Achievements, Story), Achievements = star map + feats; coins/forge/rescue/Endless removed from the UI; weapon and new game moved to Options. House style: the story's ember ground, rising text, glowing pill and constellations.
 - (next build) Update prompt only for builds released with `tools/release.mjs`; the build's own info moved to `src/game/build.json`.

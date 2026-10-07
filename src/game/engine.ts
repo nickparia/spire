@@ -128,6 +128,8 @@ const ESCAPE_ACCEL = 0.12;
 const ESCAPE_CHARGE = 0.6;
 const ESCAPE_SURGE_AT = 6;
 const ESCAPE_COMBO_GAP = 0.42;
+/** Seconds between slabs in a chain of perfects going off. */
+const ESCAPE_CHAIN_STEP = 0.07;
 /** Floors below the top that light can drive the Dark, and no further. */
 const DARK_REACH = 12;
 /** Past par, the Dark climbs this much faster per second over, called out every QUICKEN_EVERY seconds. */
@@ -585,6 +587,9 @@ export class SpireEngine {
     heavy: Set<Slab>;
     total: number;
     eye: number;
+    /** A chain of charged slabs going off one after another: seconds to the next. */
+    chain: number | null;
+    chained: number;
   } | null = null;
   /** The tower as it stood at the summit, kept so a failed escape can be retried from there. */
   private escapeTower: EscapeSlab[] | null = null;
@@ -1736,6 +1741,8 @@ export class SpireEngine {
       heavy,
       total: tower.length,
       eye: 0,
+      chain: null,
+      chained: 0,
     };
     this.tip = "";
     // The slab that was coming next is put away: the light is what moves now.
@@ -1762,6 +1769,8 @@ export class SpireEngine {
   private breakTop(): void {
     const esc = this.escape;
     if (!esc || this.phase !== "play" || esc.hold > 0.6 || this.stack.length <= 1) return;
+    // A chain is going off: the light is already falling.
+    if (esc.chain !== null) return;
     const top = this.stack[this.stack.length - 1]!;
     esc.hits -= 1;
     if (esc.hits > 0) {
@@ -1774,7 +1783,17 @@ export class SpireEngine {
     const quick = this.runTime - esc.lastBreak < ESCAPE_COMBO_GAP;
     esc.combo = quick ? esc.combo + 1 : 1;
     esc.lastBreak = this.runTime;
+    const charged = esc.charged.has(top);
     this.shatter(top);
+    // Perfects laid in a row are one fuse: the rest of the run goes off by itself.
+    const fuse = this.stack[this.stack.length - 1];
+    if (charged && fuse && this.stack.length > 1 && esc.charged.has(fuse)) {
+      esc.chain = ESCAPE_CHAIN_STEP;
+      esc.chained = 1;
+      esc.combo = 0;
+      this.emit();
+      return;
+    }
     if (esc.combo >= ESCAPE_SURGE_AT) {
       // A surge: the light blows out the next floors at once.
       esc.combo = 0;
@@ -1840,7 +1859,33 @@ export class SpireEngine {
       }
       return;
     }
-    if (this.runTime - esc.lastBreak > ESCAPE_COMBO_GAP) esc.combo = 0;
+    if (esc.chain !== null) {
+      esc.chain -= dt;
+      while (esc.chain !== null && esc.chain <= 0) {
+        const top = this.stack[this.stack.length - 1];
+        if (!top || this.stack.length <= 1 || !esc.charged.has(top)) {
+          // The run of perfects is spent.
+          if (esc.chained >= 3) {
+            const t = this.stack[this.stack.length - 1]!;
+            this.float(`CHAIN ×${esc.chained}`, t.x + t.w / 2, t.y + 90, true, 30);
+          }
+          esc.chain = null;
+          esc.lastBreak = this.runTime;
+          if (this.stack.length <= 1) {
+            this.escaped();
+            return;
+          }
+          esc.hits = esc.heavy.has(top!) ? 2 : 1;
+          this.emit();
+          break;
+        }
+        this.shatter(top);
+        esc.chained += 1;
+        // The chain quickens as it runs.
+        esc.chain += Math.max(ESCAPE_CHAIN_STEP * 0.45, ESCAPE_CHAIN_STEP - esc.chained * 0.004);
+        if (esc.chained % 4 === 0) this.emit();
+      }
+    } else if (this.runTime - esc.lastBreak > ESCAPE_COMBO_GAP) esc.combo = 0;
     esc.speed += esc.accel * dt;
     esc.source -= esc.speed * dt;
     const top = this.stack[this.stack.length - 1]!;

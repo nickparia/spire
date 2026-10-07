@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 39 — Chain reaction
+
+- In the escape, **perfect slabs laid in a row are one fuse**. Break the first and the whole run detonates down the tower on its own, quickening as it goes and blasting the thing above back. A loose or rubble slab stops the chain. A climb with no misses is one tap and a cascade all the way to the ground.
+
 ## Build 38 — The Escape
 
 - **A new boss for Apex.** Reach the summit and the sky is lit — and that wakes what put the skies out: not the Dark below, but something vast above, all eyes and reaching tentacles. It comes down for the light.
