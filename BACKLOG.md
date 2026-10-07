@@ -9,7 +9,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 ## Next, in order
 
 - **Unlocks from stars and feats** (agreed Oct 7, replaces the forge): e.g. three stars on a sky unlocks a stone finish for your slabs, finishing a world a beacon style, a feat a slab trail; chosen under Achievements.
-- **World art slots for Higgsfield**: a still panel image and an optional short loop per world (and the title loop); `WorldDef` gains `art`/`loop` fields and the panels use them when present, the procedural gradient otherwise.
+- **Painted art (Higgsfield)**: brief and prompts in `ART.md`; slots are built (`src/components/art.tsx`), files go in `public/art/` by name and replace the procedural version when present. Waiting on the user's generation run (or an API key, if his plan has one, so Claude can drive it). Still to wire: the optional `escape-sting.mp4`, and matching the in-game source to `source-ref.jpg`.
+- **Pixel-art side test**: decide the in-game style (toggle in Options) before generating art in volume.
 - **Tidy the dead systems**: coins, ranks (`gear.ts` tracks), the forge offers, rescue and Endless are hidden but still in the engine and save; remove them once unlocks replace them.
 - **Motif per world** (music idea 3): a short theme for Hearth that each sky varies, the Hollow breaks and the world-end scene resolves; world two arrives with its own.
 

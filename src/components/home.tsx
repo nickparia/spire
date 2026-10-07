@@ -13,15 +13,30 @@ import { levelStars, type Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
 import { levelsOf, WORLDS, WORLDS_TO_COME } from "@/game/worlds";
 import { StarIcon } from "./bits";
+import { ArtImage, ArtLoop } from "./art";
 
 /**
  * The title: the Spire building itself out of the dark behind (the engine's
  * attract scene), a column of light released into the sky, and one tap.
  */
 export function TitleSplash({ onEnter }: { onEnter: () => void }) {
+  // When the painted title loop is there, it replaces the drawn beam and tower.
+  const [painted, setPainted] = useState(false);
   return (
-    <div className="splash" data-ui onClick={onEnter} role="button" aria-label="Enter">
-      <span className="splash-beam" />
+    <div
+      className={"splash" + (painted ? " splash-painted" : "")}
+      data-ui
+      onClick={onEnter}
+      role="button"
+      aria-label="Enter"
+    >
+      <ArtLoop
+        name="title.mp4"
+        poster="title.jpg"
+        className="splash-art"
+        onReady={() => setPainted(true)}
+      />
+      {painted ? null : <span className="splash-beam" />}
       <div className="splash-text">
         <p className="splash-kicker">Relight the sky</p>
         <h1 className="splash-word">Spire</h1>
@@ -33,7 +48,8 @@ export function TitleSplash({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-type Panel = { kind: "world"; index: number } | { kind: "soon"; name: string; blurb: string };
+type Panel =
+  { kind: "world"; index: number } | { kind: "soon"; id: string; name: string; blurb: string };
 
 /**
  * Choose your world: slanted panels to swipe through, the sky behind
@@ -69,7 +85,12 @@ export function WorldSelect({
 }) {
   const panels: Panel[] = [
     ...WORLDS.map((_, index) => ({ kind: "world" as const, index })),
-    ...WORLDS_TO_COME.map((w) => ({ kind: "soon" as const, name: w.name, blurb: w.blurb })),
+    ...WORLDS_TO_COME.map((w) => ({
+      kind: "soon" as const,
+      id: w.id,
+      name: w.name,
+      blurb: w.blurb,
+    })),
   ];
   const rowRef = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(focus);
@@ -122,7 +143,9 @@ export function WorldSelect({
               key={panel.name}
               className={"wpanel wpanel-locked" + (i === current ? " wpanel-focus" : "")}
             >
-              <div className="wpanel-art wpanel-art-dark" />
+              <div className="wpanel-art wpanel-art-dark">
+                <ArtImage name={`world-${panel.id}.jpg`} className="wpanel-paint" />
+              </div>
               <div className="wpanel-body">
                 <p className="wpanel-num">World {i + 1}</p>
                 <p className="wpanel-name">{panel.name}</p>
@@ -197,6 +220,8 @@ function WorldPanel({
         aria-label={`See the skies of ${world.name}`}
         onClick={() => open && onOpen(LEVELS.indexOf(nextLevel))}
       >
+        <ArtImage name={`world-${world.id}.jpg`} className="wpanel-paint" />
+        <ArtLoop name={`world-${world.id}.mp4`} className="wpanel-paint" />
         <svg className="wpanel-stars" viewBox="0 0 100 100" aria-hidden="true">
           {world.stars.slice(1).map((to, i) => {
             const from = world.stars[i]!;

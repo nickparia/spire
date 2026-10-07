@@ -45,8 +45,13 @@ export const WORLDS: WorldDef[] = [
 
 /** Worlds yet to be written sit on the map as dark patches. */
 export const WORLDS_TO_COME = [
-  { name: "The Descent", blurb: "Build down. Something is climbing up.", at: [0.82, 0.62] },
-  { name: "The Wheel", blurb: "A world that turns.", at: [0.22, 0.22] },
+  {
+    id: "descent",
+    name: "The Descent",
+    blurb: "Build down. Something is climbing up.",
+    at: [0.82, 0.62],
+  },
+  { id: "wheel", name: "The Wheel", blurb: "A world that turns.", at: [0.22, 0.22] },
 ] as const;
 
 export function levelsOf(world: WorldDef): LevelDef[] {

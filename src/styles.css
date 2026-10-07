@@ -2002,6 +2002,40 @@
   }
 }
 
+/* Painted art slots (ART.md). */
+.art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.splash-art {
+  z-index: -1;
+}
+
+.splash-painted {
+  background: linear-gradient(rgba(7, 6, 11, 0.35), rgba(7, 6, 11, 0) 40%, rgba(7, 6, 11, 0.45));
+}
+
+.wpanel-paint {
+  opacity: 0.92;
+}
+
+.we-paint {
+  z-index: 0;
+}
+
+.world-end:has(.we-paint) .we-drawn {
+  display: none;
+}
+
+.world-end svg {
+  z-index: 1;
+}
+
 /* The title: the Spire behind, a column of light, one tap. */
 .splash {
   position: fixed;

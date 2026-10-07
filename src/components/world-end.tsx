@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { rgbCss, THEMES } from "@/game/themes";
 import { levelsOf, type WorldDef } from "@/game/worlds";
+import { ArtImage } from "./art";
 
 /**
  * When a world's boss falls: far away, on a hill on Earth, a family looks up
@@ -34,6 +35,7 @@ export function WorldEnd({ world, onDone }: { world: WorldDef; onDone: () => voi
       data-ui
       onClick={onDone}
     >
+      <ArtImage name={`end-${world.id}.jpg`} className="we-paint" />
       <svg viewBox="0 0 100 178" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
         <defs>
           <linearGradient id="we-sky" x1="0" y1="0" x2="0" y2="1">
@@ -46,7 +48,7 @@ export function WorldEnd({ world, onDone }: { world: WorldDef; onDone: () => voi
             <stop offset="1" stopColor="#fff" stopOpacity="0" />
           </radialGradient>
         </defs>
-        <rect width="100" height="178" fill="url(#we-sky)" />
+        <rect width="100" height="178" fill="url(#we-sky)" className="we-drawn" />
         {dust.map((s, i) => (
           <circle
             key={i}
@@ -86,9 +88,9 @@ export function WorldEnd({ world, onDone }: { world: WorldDef; onDone: () => voi
           );
         })}
         {/* The hill, and on it the family, seen from behind, looking up. */}
-        <path d="M0 150 Q30 136 55 140 T100 146 V178 H0 Z" fill="#06060c" />
-        <path d="M0 162 Q40 150 100 158 V178 H0 Z" fill="#030307" />
-        <g fill="#020205" className="we-family">
+        <path d="M0 150 Q30 136 55 140 T100 146 V178 H0 Z" fill="#06060c" className="we-drawn" />
+        <path d="M0 162 Q40 150 100 158 V178 H0 Z" fill="#030307" className="we-drawn" />
+        <g fill="#020205" className="we-family we-drawn">
           {/* Two parents and a child between them, holding a hand, pointing up. */}
           <circle cx="39" cy="115" r="2.8" />
           <path d="M35 122 Q39 117 43 122 L44.5 141.5 H33.5 Z" />
