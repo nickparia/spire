@@ -7,6 +7,7 @@ import { nextSkyIn } from "@/game/progress";
 import { StarMap } from "./star-map";
 import { WorldEnd } from "./world-end";
 import { ReadyCard } from "./ready";
+import { EscapeBrief } from "./escape-brief";
 import { StoryCard } from "./story";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
@@ -435,6 +436,7 @@ export function SpireGame() {
           />
         ) : null}
         <ReadyCard hud={hud} />
+        {running && !hud.paused ? <EscapeBrief hud={hud} /> : null}
 
         {hud.phase !== "menu" ? <div className="flex-1" /> : null}
 

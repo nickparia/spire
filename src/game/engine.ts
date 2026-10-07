@@ -128,6 +128,15 @@ const ESCAPE_ACCEL = 0.12;
 const ESCAPE_CHARGE = 0.6;
 const ESCAPE_SURGE_AT = 6;
 const ESCAPE_COMBO_GAP = 0.42;
+/**
+ * Bindings: a slab wrapped in every few floors of the tower at the start,
+ * seconds between new tendrils during the run, and taps to tear one free.
+ * Seconds the first-time briefing shows before the countdown.
+ */
+const ESCAPE_BIND_EVERY = 7;
+const ESCAPE_BIND_INTERVAL = 2.8;
+const ESCAPE_BIND_TAPS = 3;
+const ESCAPE_BRIEF = 4;
 /** Seconds between slabs in a chain of perfects going off. */
 const ESCAPE_CHAIN_STEP = 0.07;
 /** Floors below the top that light can drive the Dark, and no further. */
@@ -262,7 +271,7 @@ export type Hud = {
   /** The fight at the top of a boss sky: which surge, of how many. */
   boss: { surge: number; of: number } | null;
   /** The escape: floors left to the ground, and the combo toward a surge. */
-  escape: { left: number; combo: number } | null;
+  escape: { left: number; combo: number; briefing: boolean; count: number; bound: number } | null;
   /** A landing to choose from. */
   landing: { floor: number; offers: LandingId[] } | null;
 };
@@ -590,6 +599,15 @@ export class SpireEngine {
     /** A chain of charged slabs going off one after another: seconds to the next. */
     chain: number | null;
     chained: number;
+    /** Slabs a tendril has wrapped: taps left to tear each free, and when it took hold. */
+    bound: Map<Slab, { taps: number; at: number }>;
+    /** Seconds to the next tendril reaching in. */
+    bindT: number;
+    bindEvery: number;
+    /** The briefing is showing (first time only); then the countdown. */
+    briefing: boolean;
+    /** Whole seconds left on the countdown, or 0 once running. */
+    count: number;
   } | null = null;
   /** The tower as it stood at the summit, kept so a failed escape can be retried from there. */
   private escapeTower: EscapeSlab[] | null = null;
@@ -1733,7 +1751,7 @@ export class SpireEngine {
       // Hearth's source is the gentlest; each later world's comes faster.
       speed: SLAB_H * (ESCAPE_SPEED + world * 0.7),
       accel: SLAB_H * (ESCAPE_ACCEL + world * 0.03),
-      hold: 1.4,
+      hold: 0,
       hits: heavy.has(top) ? 2 : 1,
       combo: 0,
       lastBreak: -9,
@@ -1743,7 +1761,25 @@ export class SpireEngine {
       eye: 0,
       chain: null,
       chained: 0,
+      bound: new Map(),
+      bindT: 0,
+      bindEvery: Math.max(0.9, ESCAPE_BIND_INTERVAL - world * 0.25),
+      briefing: false,
+      count: 3,
     };
+    const esc = this.escape;
+    // The source has already wrapped some of the tower: one slab in every few floors.
+    const every = Math.max(3, ESCAPE_BIND_EVERY - world);
+    for (let i = this.stack.length - 1 - 3; i > 0; i -= every) {
+      esc.bound.set(this.stack[i]!, { taps: ESCAPE_BIND_TAPS + Math.floor(world / 2), at: -9 });
+    }
+    // First time: the rules, then the count. After that, just the count.
+    esc.briefing = (this.save.tips["escape"] ?? 0) < 1;
+    if (esc.briefing) {
+      this.save.tips["escape"] = 1;
+      storeSave(this.save);
+    }
+    esc.hold = (esc.briefing ? ESCAPE_BRIEF : 0) + 3;
     this.tip = "";
     // The slab that was coming next is put away: the light is what moves now.
     this.mover.fallT = -1;
@@ -1768,10 +1804,27 @@ export class SpireEngine {
   /** A tap in the escape: the light breaks the slab it is in and drops to the next. */
   private breakTop(): void {
     const esc = this.escape;
-    if (!esc || this.phase !== "play" || esc.hold > 0.6 || this.stack.length <= 1) return;
+    if (!esc || this.phase !== "play" || esc.hold > 0 || this.stack.length <= 1) return;
     // A chain is going off: the light is already falling.
     if (esc.chain !== null) return;
     const top = this.stack[this.stack.length - 1]!;
+    const bind = esc.bound.get(top);
+    if (bind) {
+      // A bound slab: each tap tears at the tendril; the last tears it free.
+      bind.taps -= 1;
+      top.flash = 1;
+      this.fx.burst(top.x + top.w / 2, top.y + VISUAL_H / 2, [170, 90, 255], 12, 170);
+      this.trauma = Math.min(1, this.trauma + 0.18);
+      haptics.medium();
+      if (bind.taps > 0) {
+        this.sfx.hiss();
+        this.emit();
+        return;
+      }
+      esc.bound.delete(top);
+      this.float("TORN FREE", top.x + top.w / 2, top.y + 70, true, 20);
+      esc.hits = 1;
+    }
     esc.hits -= 1;
     if (esc.hits > 0) {
       top.flash = 1;
@@ -1787,7 +1840,7 @@ export class SpireEngine {
     this.shatter(top);
     // Perfects laid in a row are one fuse: the rest of the run goes off by itself.
     const fuse = this.stack[this.stack.length - 1];
-    if (charged && fuse && this.stack.length > 1 && esc.charged.has(fuse)) {
+    if (charged && fuse && this.stack.length > 1 && esc.charged.has(fuse) && !esc.bound.has(fuse)) {
       esc.chain = ESCAPE_CHAIN_STEP;
       esc.chained = 1;
       esc.combo = 0;
@@ -1852,18 +1905,44 @@ export class SpireEngine {
     esc.eye += dt;
     if (esc.hold > 0) {
       esc.hold -= dt;
+      const count = esc.hold > 3 ? 3 : Math.max(0, Math.ceil(esc.hold));
+      if (esc.hold <= 3 && esc.briefing) {
+        esc.briefing = false;
+        this.emit();
+      }
+      if (count !== esc.count) {
+        esc.count = count;
+        if (count > 0) this.sfx.tick();
+        this.emit();
+      }
       if (esc.hold <= 0) {
+        esc.count = 0;
         const top = this.stack[this.stack.length - 1]!;
-        this.float("IT COMES FOR THE LIGHT · RUN", top.x + top.w / 2, top.y + 150, false, 20);
+        this.float("RUN", top.x + top.w / 2, top.y + 150, true, 34);
         this.sfx.fail();
+        haptics.heavy();
+        this.emit();
       }
       return;
+    }
+    // Tendrils keep reaching in and wrapping slabs just below the light.
+    esc.bindT -= dt;
+    if (esc.bindT <= 0) {
+      esc.bindT = esc.bindEvery;
+      const n = this.stack.length;
+      for (let d = 3; d <= 6; d++) {
+        const slab = this.stack[n - 1 - d];
+        if (!slab || slab.floor === 0 || esc.bound.has(slab)) continue;
+        esc.bound.set(slab, { taps: ESCAPE_BIND_TAPS, at: this.clock });
+        this.sfx.hiss();
+        break;
+      }
     }
     if (esc.chain !== null) {
       esc.chain -= dt;
       while (esc.chain !== null && esc.chain <= 0) {
         const top = this.stack[this.stack.length - 1];
-        if (!top || this.stack.length <= 1 || !esc.charged.has(top)) {
+        if (!top || this.stack.length <= 1 || !esc.charged.has(top) || esc.bound.has(top)) {
           // The run of perfects is spent.
           if (esc.chained >= 3) {
             const t = this.stack[this.stack.length - 1]!;
@@ -1876,6 +1955,11 @@ export class SpireEngine {
             return;
           }
           esc.hits = esc.heavy.has(top!) ? 2 : 1;
+          if (top && esc.bound.has(top)) {
+            this.float("BOUND", top.x + top.w / 2, top.y + 70, false, 22);
+            this.trauma = Math.min(1, this.trauma + 0.4);
+            haptics.heavy();
+          }
           this.emit();
           break;
         }
@@ -1916,7 +2000,9 @@ export class SpireEngine {
    */
   private drawEscape(ctx: CanvasRenderingContext2D): void {
     const esc = this.escape!;
-    const edge = this.worldToScreen(0, esc.source).y;
+    // The source's mass is always there, filling the top of the sky; when it
+    // is close its edge comes down to meet the light.
+    const edge = Math.max(this.worldToScreen(0, esc.source).y, 120);
     const clock = this.reduceMotion ? 0 : this.clock;
     const top = this.stack[this.stack.length - 1]!;
     const light = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
@@ -2008,6 +2094,49 @@ export class SpireEngine {
         ctx.fill();
       });
     }
+    // Tendrils wrapped round the slabs they have bound, reaching down from the mass.
+    for (const [slab, bind] of esc.bound) {
+      const c = this.worldToScreen(slab.x + slab.w / 2, slab.y + VISUAL_H / 2);
+      if (c.y > this.vh + 40) continue;
+      const grow = bind.at < 0 ? 1 : clamp01((this.clock - bind.at) / 0.45);
+      const side = slab.floor % 2 === 0 ? 1 : -1;
+      const root = c.x + side * (slab.w * 0.5 + 30);
+      const len = (c.y - edge + 10) * grow;
+      this.drawTentacle(
+        ctx,
+        root,
+        edge - 6,
+        len,
+        (c.x + side * slab.w * 0.42 - root) * grow,
+        clock + slab.floor,
+        11,
+      );
+      if (grow < 1) continue;
+      // Coils round the stone.
+      const halfW = (slab.w / 2) * Math.cos(slab.rot);
+      ctx.save();
+      for (const k of [-0.28, 0.28]) {
+        const x = c.x + halfW * k * 2;
+        ctx.fillStyle = "rgba(28,10,46,0.95)";
+        ctx.beginPath();
+        ctx.ellipse(x, c.y, 9, VISUAL_H * 0.75, 0.25 * side, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(170,90,255,0.55)";
+        for (let j = -1; j <= 1; j++) {
+          ctx.beginPath();
+          ctx.arc(x + 2 * side, c.y + j * 6, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // Taps left, over a binding the light has reached.
+      if (slab === top && this.stack.length > 1) {
+        ctx.font = '900 13px "Nunito Variable", system-ui, sans-serif';
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(225,200,255,0.95)";
+        ctx.fillText(`TEAR ×${bind.taps}`, c.x, c.y - 26);
+      }
+      ctx.restore();
+    }
     // The light, in the slab it will break next.
     if (this.stack.length > 1) {
       const c = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
@@ -2022,7 +2151,7 @@ export class SpireEngine {
       ctx.fillStyle = glow;
       ctx.fillRect(c.x - r * 2.4, c.y - r * 2.4, r * 4.8, r * 4.8);
       ctx.restore();
-      if (esc.hits > 1) {
+      if (esc.hits > 1 && !esc.bound.has(top)) {
         ctx.save();
         ctx.font = '800 12px "Nunito Variable", system-ui, sans-serif';
         ctx.textAlign = "center";
@@ -3333,7 +3462,16 @@ export class SpireEngine {
       ghostName: this.ghostName,
       boss: this.boss ? { surge: this.boss.surge + 1, of: BOSS_SURGES } : null,
       escape: this.escape
-        ? { left: Math.max(0, this.stack.length - 1), combo: this.escape.combo }
+        ? {
+            left: Math.max(0, this.stack.length - 1),
+            combo: this.escape.combo,
+            briefing: this.escape.briefing,
+            count: this.escape.count,
+            bound: (() => {
+              const top = this.stack[this.stack.length - 1];
+              return top ? (this.escape!.bound.get(top)?.taps ?? 0) : 0;
+            })(),
+          }
         : null,
       landing: this.landing,
     });

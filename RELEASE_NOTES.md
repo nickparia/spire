@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 41 — Bound
+
+- **The thing above binds the tower.** Its dark fills the top of the sky and tentacles snake down to wrap slabs: some before you start, and new ones every few seconds just below the light. A bound slab **stops a chain** and takes **three taps** to tear free ("TEAR ×3"). A perfect tower is now a rhythm of cascades and hard stops, not one tap.
+- **Before the run**: the first time, a short frame with the three rules (tap to break, perfects in a row go off together, bound slabs take three taps), then a big **3 · 2 · 1 · RUN**. Retries go straight to the countdown.
+- Tuned on the first world: a perfect tower escapes at a relaxed pace; a sloppy one needs fast tapping.
+
 ## Build 40 — Boss button
 
 - With **Options → Unlock every sky** on, each world's panel on the world screen has a **Boss · tester** button that starts that world's boss straight away, without playing its skies. The run isn't posted.

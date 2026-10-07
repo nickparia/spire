@@ -67,7 +67,7 @@ await page.evaluate((rate) => {
 }, rate);
 let shot = false;
 const t = Date.now();
-while (Date.now() - t < 60000) {
+while (Date.now() - t < 90000) {
   const st = await page.evaluate(() => ({
     phase: window.__spire.phase,
     left: window.__spire.stack.length - 1,

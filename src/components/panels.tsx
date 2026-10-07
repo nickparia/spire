@@ -223,7 +223,11 @@ export function RunHud({
         </p>
         <p className="kicker mt-2">Accuracy</p>
         <p className="stat-num">{started ? formatPercent(hud.accuracy) : "—"}</p>
-        {hud.escape ? <p className="boss-hud">Escape · perfects in a row go off together</p> : null}
+        {hud.escape && hud.escape.count === 0 ? (
+          <p className="boss-hud">
+            {hud.escape.bound > 0 ? `Bound · tear ×${hud.escape.bound}` : "Escape"}
+          </p>
+        ) : null}
         {hud.darkGap !== null && started ? (
           <>
             <p className="kicker mt-2">The Dark</p>

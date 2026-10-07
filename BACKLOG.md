@@ -32,6 +32,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 41 Escape bindings (`ESCAPE_BIND_EVERY/INTERVAL/TAPS`, stop chains, tear with taps), the cloud always in view, first-time briefing + 3-2-1 (`escape-brief.tsx`, tip key `escape`). Hearth: perfect tower escapes at 2.5 taps/s, sloppy (40% perfect, 40% heavy) needs 5.
 - 40 Tester Boss button on each world panel (`home.tsx` `onBoss` → `engine.startBoss`).
 - 39 Escape chains: consecutive charged slabs detonate in a cascade (`ESCAPE_CHAIN_STEP`). Later worlds may need seals or caps so a perfect climb isn't always a one-tap escape.
 - 38 The Escape (Apex's boss): sky lit at the summit, tower frozen, the source descends (tentacles, tracking eyes), tap to break floors, perfects are charged light, heavy slabs two taps, six-quick-tap surge, retry from the summit. Tuning `ESCAPE_*` in engine.ts; difficulty rises per world. Bots: `escape.mjs <rate> [charged] [heavy]`, `fullboss.mjs`. Old Hollow fight code (`wakeBoss`, `bossTurn`, `drawEyes`) is unused; remove with the dead-systems tidy.

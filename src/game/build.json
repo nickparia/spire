@@ -1,7 +1,8 @@
 {
-  "build": 40,
-  "title": "Boss button",
+  "build": 41,
+  "title": "Bound",
   "notes": [
-    "With tester tools on, each world's panel has a Boss button that starts its boss straight away."
+    "The thing above wraps the tower: bound slabs stop a chain and take three taps to tear free, and new tendrils reach in as you run. The escape is a fight even with a perfect tower.",
+    "Before the run, the rules once, then a 3-2-1."
   ]
 }
