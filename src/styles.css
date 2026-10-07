@@ -2140,6 +2140,13 @@
   inset: 0;
   z-index: -1;
   overflow: hidden;
+  /* The painting never takes a tap: it all goes to the title itself. */
+  pointer-events: none;
+}
+
+.splash-stage video,
+.splash-stage img {
+  pointer-events: none;
 }
 
 .splash-stage .splash-art {

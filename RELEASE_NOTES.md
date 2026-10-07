@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 59 — Tap the title any time (internal)
+
+- **Fixed:** tapping the title did nothing until its "Tap to begin" button appeared. The painting behind no longer takes taps, and the title goes in as your finger lifts.
+
 ## Build 58 — Sound, for real (internal)
 
 - **Fixed: no new sound on iPhone.** The app serves its own files in a way the loader read as "failed", so the new sound effects never loaded and the music fell back to the old synth. Both work now: the composed tracks and every effect from build 57 (checked on an iPhone 17 Pro Max simulator: all 22 effects load).

@@ -40,8 +40,11 @@ export function TitleSplash({ onEnter, onAwaken }: { onEnter: () => void; onAwak
   // When the painted title loop is there, it replaces the drawn beam and tower.
   const [painted, setPainted] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  // A ref, not the state: a lift and a click arrive together, and only one may go in.
+  const gone = useRef(false);
   const enter = () => {
-    if (leaving) return;
+    if (gone.current) return;
+    gone.current = true;
     setLeaving(true);
     onAwaken?.();
     window.setTimeout(onEnter, TITLE_LEAVE * 1000);
@@ -51,6 +54,9 @@ export function TitleSplash({ onEnter, onAwaken }: { onEnter: () => void; onAwak
       className={"splash" + (painted ? " splash-painted" : "") + (leaving ? " splash-leaving" : "")}
       data-ui
       onClick={enter}
+      // On iPhone a tap on the title's video could be swallowed before it became
+      // a click; going in as the finger lifts doesn't wait for one.
+      onPointerUp={enter}
       role="button"
       aria-label="Enter"
     >

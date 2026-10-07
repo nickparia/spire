@@ -1,8 +1,7 @@
 {
-  "build": 58,
-  "title": "Sound, for real",
+  "build": 59,
+  "title": "Tap the title any time",
   "notes": [
-    "Fixed: on iPhone the new sound effects and your composed music never loaded, so you heard the old synth. Both work now.",
-    "Fixed: the Hearth boss's opening scene never played on iPhone."
+    "Fixed: tapping the title did nothing until its button appeared."
   ]
 }
