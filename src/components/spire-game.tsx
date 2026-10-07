@@ -56,6 +56,7 @@ const INITIAL: Hud = {
   ghostGap: null,
   ghostName: "BEST",
   boss: null,
+  escape: null,
   landing: null,
   accent: "rgb(255,77,26)",
   result: null,

@@ -3,6 +3,17 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 38 — The Escape
+
+- **A new boss for Apex.** Reach the summit and the sky is lit — and that wakes what put the skies out: not the Dark below, but something vast above, all eyes and reaching tentacles. It comes down for the light.
+- **Run.** The light drops into the top slab of your tower. Tap anywhere to break the slab it's in; it falls to the next. Race the light down the tower you built, floor by floor, before the thing above reaches it. Reach the ground and the light escapes.
+- **Your climb is your ammo.** Every perfect slab you built is stored light: breaking it drives the source back. Loose and rubble slabs take two taps. Six quick taps in a row **surge** through the next three floors at once.
+- **The tower holds still** for the escape — it may sway, but nothing falls.
+- **Caught?** _Try again_ starts the escape from the summit on the same tower; you don't climb Apex again.
+- The first world's escape is the gentlest; later worlds' sources will come faster.
+
+**Please try**: tester tools → Apex → Fight the boss. Is the pace exciting? Too easy at a normal tapping speed?
+
 ## Build 37 — A new home
 
 - **New title**: the Spire rising behind, a column of light released into the sky, and _Tap to begin_.

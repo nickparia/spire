@@ -29,7 +29,7 @@ export const WORLDS: WorldDef[] = [
     blurb: "The column. Honest gravity, the Dark below.",
     concept: "This is where the Spire was cut and raised. The stone still knows the shape.",
     levelIds: ["foundry", "tide", "city", "canyon", "ridge", "glacier", "eclipse", "apex"],
-    revelation: "The Hollow did not put the sky out. It only ate what fell.",
+    revelation: "It was never the Dark below. What put the skies out was waiting above them.",
     stars: [
       [0.18, 0.72],
       [0.27, 0.6],

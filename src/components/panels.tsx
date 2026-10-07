@@ -170,7 +170,21 @@ export function RunHud({
       </div>
 
       <div className="flex flex-col items-center">
-        {level ? (
+        {hud.escape ? (
+          <>
+            <p className="score score-escape">
+              <span key={hud.escape.left} className="score-pop inline-block">
+                {hud.escape.left}
+              </span>
+            </p>
+            <p className="kicker mt-1">to the ground</p>
+            {hud.escape.combo >= 2 ? (
+              <p key={hud.escape.combo} className="escape-combo score-pop">
+                ×{hud.escape.combo}
+              </p>
+            ) : null}
+          </>
+        ) : level ? (
           <>
             <p className="score">
               <span key={hud.floors} className="score-pop inline-block">
@@ -194,8 +208,8 @@ export function RunHud({
             {hud.score}
           </p>
         )}
-        <p className="kicker mt-2">{hud.course}</p>
-        {hud.blurb ? <p className="blurb">{hud.blurb}</p> : null}
+        {hud.escape ? null : <p className="kicker mt-2">{hud.course}</p>}
+        {hud.blurb && !hud.escape ? <p className="blurb">{hud.blurb}</p> : null}
         {hud.relic ? <p className="relic">{hud.relic}</p> : null}
         {hud.hold ? <p className="relic">Wait</p> : null}
         {started || hud.heat > 0 ? <Heat hud={hud} /> : null}
@@ -209,11 +223,7 @@ export function RunHud({
         </p>
         <p className="kicker mt-2">Accuracy</p>
         <p className="stat-num">{started ? formatPercent(hud.accuracy) : "—"}</p>
-        {hud.boss ? (
-          <p className="boss-hud">
-            The Hollow · surge {hud.boss.surge} of {hud.boss.of}
-          </p>
-        ) : null}
+        {hud.escape ? <p className="boss-hud">Escape · six fast taps surge</p> : null}
         {hud.darkGap !== null && started ? (
           <>
             <p className="kicker mt-2">The Dark</p>
@@ -444,7 +454,7 @@ export function ResultsPanel({
         <p className="kicker">
           Sky {result.levelIndex + 1} · {level.name}
         </p>
-        <h2 className="sheet-title">{result.boss ? "The Hollow falls" : "Relit"}</h2>
+        <h2 className="sheet-title">{result.boss ? "The light escapes" : "Relit"}</h2>
         {result.boss ? <p className="revelation">{worldOf(level.id).revelation}</p> : null}
       </div>
       <Journey save={save} ignite={result.levelIndex} size="large" />

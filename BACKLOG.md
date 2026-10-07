@@ -24,7 +24,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Pinned ideas (not scheduled)
 
-- **"Tear it down" / the escape** — after the summit the light becomes your cursor; tap each slab of the spire you built, in whatever shape you left it; each explodes as you race back down through the worlds having escaped with the light. A sloppy tower is a harder escape. A fallback boss, or a world twist.
+- **Cosmic horror theme** (user, Oct 7): lean into it — the source above is Lovecraftian (eyes, tentacles, the sky swallowed). Every world's boss is an inversion of its climb and shows more of the source.
 - **More worlds** from the four dials (direction, slab behaviour, enemy, goal): low moon (slow falling, the tender world), heavy world (double gravity), the deep (underwater, currents), twin suns (gravity tilts through the run), ice (slabs slide to a lip), seed (slabs sprout ledges), the tide (waves surge and pull back), the watcher (the Dark drawn to loose slabs), hold-out and squash goals.
 - **The Trial**: the old precision game (shrinking slabs) as a special sky with milestone scoring. Only if it is missed.
 - **Over-the-air web updates** (Capgo or similar), only if build churn annoys testers.
@@ -32,6 +32,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 38 The Escape (Apex's boss): sky lit at the summit, tower frozen, the source descends (tentacles, tracking eyes), tap to break floors, perfects are charged light, heavy slabs two taps, six-quick-tap surge, retry from the summit. Tuning `ESCAPE_*` in engine.ts; difficulty rises per world. Bots: `escape.mjs <rate> [charged] [heavy]`, `fullboss.mjs`. Old Hollow fight code (`wakeBoss`, `bossTurn`, `drawEyes`) is unused; remove with the dead-systems tidy.
 - 37 The app shell: title splash (`home.tsx` TitleSplash), world select with per-world constellation panels and Continue/New (per-world active game in `save.progress`, `progress.ts`), bottom bar (Options, Leaderboard, Achievements, Story), Achievements = star map + feats; coins/forge/rescue/Endless removed from the UI; weapon and new game moved to Options. House style: the story's ember ground, rising text, glowing pill and constellations.
 - (next build) Update prompt only for builds released with `tools/release.mjs`; the build's own info moved to `src/game/build.json`.
 - 36 Tester tools in Options (`save.tester`, `save.practice`; `engine.startBoss`); unranked runs not posted; boss fight exempt from `DARK_REACH` (the cap made the Hollow unbeatable in 35). `tools/bots/tester.mjs`.

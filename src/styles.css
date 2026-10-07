@@ -1725,6 +1725,19 @@
   opacity: 0.6;
 }
 
+.score-escape {
+  color: #ffe2b8;
+  text-shadow: 0 0 24px rgba(255, 190, 120, 0.6);
+}
+
+.escape-combo {
+  margin-top: 2px;
+  font-size: 22px;
+  font-weight: 900;
+  color: #d6b8ff;
+  text-shadow: 0 0 14px rgba(180, 120, 255, 0.8);
+}
+
 .boss-hud {
   margin-top: 6px;
   font-size: 12px;

@@ -29,9 +29,11 @@ _The column. Honest gravity, the Dark below._ This is where the Spire was cut an
 | The Eclipse | The last sky they lit was the first to go dark. Watch for the flare.                  |
 | Apex        | The top. It has been waiting, and so has what lives beneath it.                       |
 
-**Boss: The Hollow.** The Dark awake, with eyes. It climbs on your mistakes.
+**Boss: the Escape.** At Apex's summit the sky is lit, and the light wakes what put the skies out: not the Dark below, but the source above them, a vast thing of eyes and reaching tentacles. It comes down for the light. The light drops into the top slab and you run down the tower you built, breaking it floor by floor; every perfect from the climb is stored light that drives the source back. Reach the ground and the light escapes into the world.
 
-**Revelation:** _The Hollow did not put the sky out. It only ate what fell._
+**Revelation:** _It was never the Dark below. What put the skies out was waiting above them._
+
+The Dark below "eats what falls"; its source above only shows itself when you take a sky back. Every world's boss is an inversion of that world's climb.
 
 ## Worlds to come
 

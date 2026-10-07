@@ -76,7 +76,7 @@ import {
 import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
-import { isBoss, worldOf } from "./worlds";
+import { isBoss, worldOf, WORLDS } from "./worlds";
 import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
 import {
   BOMB_RGB,
@@ -117,6 +117,17 @@ const BOSS_SURGES = 3;
 const BOSS_DEPTH = 12;
 const BOSS_START = 6;
 const BOSS_TENDRIL = 4;
+/**
+ * The escape: floors above the top the source starts, its speed and
+ * acceleration on the first world in floors per second, floors a charged slab
+ * drives it back, and the combo of quick breaks that makes a surge.
+ */
+const ESCAPE_START = 7;
+const ESCAPE_SPEED = 3.2;
+const ESCAPE_ACCEL = 0.12;
+const ESCAPE_CHARGE = 0.6;
+const ESCAPE_SURGE_AT = 6;
+const ESCAPE_COMBO_GAP = 0.42;
 /** Floors below the top that light can drive the Dark, and no further. */
 const DARK_REACH = 12;
 /** Past par, the Dark climbs this much faster per second over, called out every QUICKEN_EVERY seconds. */
@@ -248,6 +259,8 @@ export type Hud = {
   ghostName: string;
   /** The fight at the top of a boss sky: which surge, of how many. */
   boss: { surge: number; of: number } | null;
+  /** The escape: floors left to the ground, and the combo toward a surge. */
+  escape: { left: number; combo: number } | null;
   /** A landing to choose from. */
   landing: { floor: number; offers: LandingId[] } | null;
 };
@@ -299,6 +312,20 @@ type Slab = {
 };
 
 type Piece = { x: number; w: number };
+
+/** One slab of the tower as it stood when the sky was lit: what the escape runs down. */
+type EscapeSlab = {
+  x: number;
+  y: number;
+  w: number;
+  rot: number;
+  floor: number;
+  rgb: RGB;
+  /** Set true by a perfect: breaking it releases light that drives the source back. */
+  charged: boolean;
+  /** Loose or rubble: takes two taps. */
+  heavy: boolean;
+};
 
 type Scrap = {
   x: number;
@@ -539,6 +566,28 @@ export class SpireEngine {
    * the third sends it under for good. It climbs on your mistakes.
    */
   private boss: { surge: number; tendril: number; eye: number; crown: number } | null = null;
+  /**
+   * The escape: the sky is lit, its source comes down for the light, and the
+   * light runs down the tower it was carried up, breaking it floor by floor.
+   */
+  private escape: {
+    /** World y of the source's lower edge; it comes down. */
+    source: number;
+    speed: number;
+    accel: number;
+    /** Seconds before it moves: the beat of lighting the sky. */
+    hold: number;
+    /** Taps left to break the top slab. */
+    hits: number;
+    combo: number;
+    lastBreak: number;
+    charged: Set<Slab>;
+    heavy: Set<Slab>;
+    total: number;
+    eye: number;
+  } | null = null;
+  /** The tower as it stood at the summit, kept so a failed escape can be retried from there. */
+  private escapeTower: EscapeSlab[] | null = null;
   /** The landing being chosen from, if the climb is stopped at one. */
   private landing: { floor: number; offers: LandingId[] } | null = null;
   /** Landings already taken this run, by floor. */
@@ -638,7 +687,13 @@ export class SpireEngine {
     }
     if (this.phase === "fall") {
       // While a rebuild is on offer, a stray tap must not throw it away.
-      if (this.fallAge >= 0.68 && !this.rescueOpen()) this.retry();
+      // After the escape, frantic tapping must not skip what happened.
+      const wait = this.escapeTower ? 1.6 : 0.68;
+      if (this.fallAge >= wait && !this.rescueOpen()) this.retry();
+      return;
+    }
+    if (this.escape) {
+      this.breakTop();
       return;
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
@@ -652,6 +707,7 @@ export class SpireEngine {
 
   /** Back to the menus, with the given level's sky behind them. */
   showMenu(levelIndex: number): void {
+    this.escapeTower = null;
     this.mode = "level";
     this.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, levelIndex));
     const level = LEVELS[this.levelIndex]!;
@@ -684,7 +740,7 @@ export class SpireEngine {
     this.camY = Math.max(0, this.seat.y - this.viewH * LEAD);
     this.phase = "play";
     this.hint = false;
-    this.wakeBoss();
+    this.lightTheSky();
   }
 
   startLevel(levelIndex: number): void {
@@ -705,7 +761,14 @@ export class SpireEngine {
 
   retry(): void {
     if (this.mode === "endless") this.startEndless();
-    else this.startLevel(this.levelIndex);
+    else if (this.escapeTower && isBoss(LEVELS[this.levelIndex]!.id)) {
+      // A failed escape is retried from the summit, on the same tower.
+      const tower = this.escapeTower;
+      const unranked = this.unranked;
+      this.startLevel(this.levelIndex);
+      this.unranked = unranked;
+      this.beginEscape(tower);
+    } else this.startLevel(this.levelIndex);
   }
 
   pause(): void {
@@ -1039,6 +1102,7 @@ export class SpireEngine {
     this.unranked = phase === "ready" && this.save.practice;
     this.breather = 0;
     this.boss = null;
+    this.escape = null;
     this.landing = null;
     this.landed.clear();
     this.gift = { set: 0, broad: 0, slow: 0 };
@@ -1506,7 +1570,7 @@ export class SpireEngine {
       // about to crumble.
       this.summitHold = this.plan.goal > 0 && reached >= this.plan.goal ? this.summitHold + dt : 0;
       if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD && !this.boss) {
-        if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.wakeBoss();
+        if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.lightTheSky();
         else this.win();
       }
     }
@@ -1614,6 +1678,360 @@ export class SpireEngine {
       this.stack[i]!.ripple = (this.stack.length - i) * 0.025;
     this.flash = Math.max(this.flash, 0.4);
     haptics.heavy();
+  }
+
+  /**
+   * The summit of a boss sky: the sky is lit, the tower stops moving, and the
+   * escape begins on it as it stands.
+   */
+  private lightTheSky(): void {
+    const tower: EscapeSlab[] = [];
+    for (const slab of this.stack) {
+      if (slab.floor === 0) continue;
+      tower.push({
+        x: slab.x,
+        y: slab.y,
+        w: slab.w,
+        rot: slab.rot,
+        floor: slab.floor,
+        rgb: slab.rgb,
+        charged: !slab.loose && slab.counts,
+        heavy: slab.loose || !slab.counts,
+      });
+    }
+    tower.sort((a, b) => a.y - b.y);
+    this.escapeTower = tower;
+    this.beginEscape(tower);
+  }
+
+  /** Lays the tower out frozen and sets the source above it. */
+  private beginEscape(tower: EscapeSlab[]): void {
+    const base = this.stack[0]!;
+    base.body = null;
+    // The physics stops here: nothing falls during the escape.
+    this.stage = null;
+    const charged = new Set<Slab>();
+    const heavy = new Set<Slab>();
+    this.stack = [base];
+    for (const t of tower) {
+      const slab = this.makeSlab(t.x, t.y, t.w, t.floor, 0, 0);
+      slab.rot = t.rot;
+      slab.rgb = t.rgb;
+      if (t.charged) charged.add(slab);
+      if (t.heavy) heavy.add(slab);
+      this.stack.push(slab);
+    }
+    const top = this.stack[this.stack.length - 1]!;
+    const world = Math.max(0, WORLDS.indexOf(worldOf(LEVELS[this.levelIndex]!.id)));
+    this.escape = {
+      source: top.y + SLAB_H * ESCAPE_START,
+      // Hearth's source is the gentlest; each later world's comes faster.
+      speed: SLAB_H * (ESCAPE_SPEED + world * 0.7),
+      accel: SLAB_H * (ESCAPE_ACCEL + world * 0.03),
+      hold: 1.4,
+      hits: heavy.has(top) ? 2 : 1,
+      combo: 0,
+      lastBreak: -9,
+      charged,
+      heavy,
+      total: tower.length,
+      eye: 0,
+    };
+    this.tip = "";
+    // The slab that was coming next is put away: the light is what moves now.
+    this.mover.fallT = -1;
+    this.mover.hover = 0;
+    this.phase = "play";
+    this.hint = false;
+    this.mote = null;
+    this.bomb = null;
+    this.camY = Math.max(0, top.y + SLAB_H - this.viewH * LEAD);
+    const cx = top.x + top.w / 2;
+    this.float("THE SKY IS LIT", cx, top.y + 110, true, 26);
+    this.fx.rayBurst(cx, top.y + SLAB_H, this.theme.accent, 320, 22);
+    this.fx.ring(cx, top.y + SLAB_H, BONE, 260, 6);
+    this.flash = 0.7;
+    this.pulse = 1;
+    this.trauma = 0.6;
+    this.music.setClimb({ progress: 1, danger: 1, streak: 9, landings: 9 });
+    haptics.heavy();
+    this.emit();
+  }
+
+  /** A tap in the escape: the light breaks the slab it is in and drops to the next. */
+  private breakTop(): void {
+    const esc = this.escape;
+    if (!esc || this.phase !== "play" || esc.hold > 0.6 || this.stack.length <= 1) return;
+    const top = this.stack[this.stack.length - 1]!;
+    esc.hits -= 1;
+    if (esc.hits > 0) {
+      top.flash = 1;
+      this.fx.burst(top.x + top.w / 2, top.y + VISUAL_H / 2, top.rgb, 8, 120);
+      this.sfx.tick();
+      haptics.light();
+      return;
+    }
+    const quick = this.runTime - esc.lastBreak < ESCAPE_COMBO_GAP;
+    esc.combo = quick ? esc.combo + 1 : 1;
+    esc.lastBreak = this.runTime;
+    this.shatter(top);
+    if (esc.combo >= ESCAPE_SURGE_AT) {
+      // A surge: the light blows out the next floors at once.
+      esc.combo = 0;
+      for (let i = 0; i < 3 && this.stack.length > 1; i++)
+        this.shatter(this.stack[this.stack.length - 1]!);
+      esc.source += SLAB_H * 4;
+      const t = this.stack[this.stack.length - 1]!;
+      this.float("SURGE", t.x + t.w / 2, t.y + 80, true, 30);
+      this.fx.rayBurst(t.x + t.w / 2, t.y + SLAB_H, BONE, 260, 20);
+      this.flash = Math.max(this.flash, 0.5);
+      this.trauma = Math.min(1, this.trauma + 0.5);
+      this.sfx.forge();
+      haptics.heavy();
+    }
+    if (this.stack.length <= 1) {
+      this.escaped();
+      return;
+    }
+    const next = this.stack[this.stack.length - 1]!;
+    esc.hits = esc.heavy.has(next) ? 2 : 1;
+    this.emit();
+  }
+
+  /** One slab goes: in pieces, and in light if a perfect put light in it. */
+  private shatter(slab: Slab): void {
+    const esc = this.escape!;
+    const cx = slab.x + slab.w / 2;
+    for (let i = 0; i < 4; i++) {
+      this.scraps.push({
+        x: slab.x + (slab.w / 4) * i,
+        y: slab.y,
+        w: slab.w / 4,
+        vx: (i - 1.5) * (90 + Math.random() * 80),
+        vy: 120 + Math.random() * 120,
+        rot: slab.rot,
+        vr: (i - 1.5) * (3 + Math.random() * 3),
+        rgb: slab.rgb,
+        life: 1.1,
+      });
+    }
+    this.fx.burst(cx, slab.y + VISUAL_H / 2, slab.rgb, 14, 200);
+    if (esc.charged.has(slab)) {
+      esc.source += SLAB_H * ESCAPE_CHARGE;
+      this.fx.rayBurst(cx, slab.y + VISUAL_H / 2, BONE, 150, 10);
+      this.fx.sparkle(cx, slab.y + VISUAL_H, slab.w, [255, 230, 180], 10);
+      this.sfx.perfect(Math.min(8, esc.combo));
+    } else this.sfx.drop();
+    this.stack.pop();
+    this.trauma = Math.min(1, this.trauma + 0.12);
+    haptics.light();
+  }
+
+  /** The source comes down; if it reaches the light, the escape fails. */
+  private chase(dt: number): void {
+    const esc = this.escape!;
+    esc.eye += dt;
+    if (esc.hold > 0) {
+      esc.hold -= dt;
+      if (esc.hold <= 0) {
+        const top = this.stack[this.stack.length - 1]!;
+        this.float("IT COMES FOR THE LIGHT · RUN", top.x + top.w / 2, top.y + 150, false, 20);
+        this.sfx.fail();
+      }
+      return;
+    }
+    if (this.runTime - esc.lastBreak > ESCAPE_COMBO_GAP) esc.combo = 0;
+    esc.speed += esc.accel * dt;
+    esc.source -= esc.speed * dt;
+    const top = this.stack[this.stack.length - 1]!;
+    const light = top.y + SLAB_H;
+    const gap = (esc.source - light) / SLAB_H;
+    this.strain = Math.max(this.strain, gap < 3 ? 1 - gap / 3 : 0);
+    if (esc.source <= light + 6) {
+      this.float("THE LIGHT IS TAKEN", top.x + top.w / 2, top.y + 60, false, 24);
+      this.taken = true;
+      this.escape = null;
+      this.die();
+    }
+  }
+
+  /** The light reaches the ground with you: the sky stays lit. */
+  private escaped(): void {
+    const base = this.stack[0]!;
+    this.float("THE LIGHT ESCAPES", base.x + base.w / 2, base.y + 120, true, 28);
+    this.escape = null;
+    this.escapeTower = null;
+    this.win();
+  }
+
+  /**
+   * The source above: a mass that swallows the sky, with tentacles that reach
+   * and curl toward the light and a cluster of eyes that open as it nears,
+   * every pupil on the light.
+   */
+  private drawEscape(ctx: CanvasRenderingContext2D): void {
+    const esc = this.escape!;
+    const edge = this.worldToScreen(0, esc.source).y;
+    const clock = this.reduceMotion ? 0 : this.clock;
+    const top = this.stack[this.stack.length - 1]!;
+    const light = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
+    const near = clamp01(1 - (light.y - edge) / (this.vh * 0.7));
+    // The screen's edges darken as it comes.
+    const v = ctx.createRadialGradient(light.x, light.y, this.vw * 0.2, light.x, light.y, this.vh);
+    v.addColorStop(0, "rgba(8,3,16,0)");
+    v.addColorStop(1, `rgba(8,3,16,${0.35 + near * 0.5})`);
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, this.vw, this.vh);
+    if (edge > -120) {
+      const g = ctx.createLinearGradient(0, edge - 320, 0, edge + 30);
+      g.addColorStop(0, "rgba(4,2,10,1)");
+      g.addColorStop(0.75, "rgba(16,6,30,0.97)");
+      g.addColorStop(1, "rgba(16,6,30,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-60, -60, this.vw + 120, edge + 90);
+      // Its edge breathes, lit violet from within.
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let band = 0; band < 2; band++) {
+        ctx.strokeStyle = `rgba(170,90,255,${0.3 - band * 0.12})`;
+        ctx.lineWidth = 2 + band * 3;
+        ctx.beginPath();
+        for (let x = -20; x <= this.vw + 20; x += 8) {
+          const y =
+            edge - band * 6 + Math.sin(x * 0.025 + clock * (1.2 + band * 0.5)) * (5 + band * 3);
+          if (x === -20) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+      // Tentacles: rooted in the mass, tapering, reaching for the light.
+      const reach = 60 + near * 170;
+      for (let i = 0; i < 7; i++) {
+        const root = ((i + 0.5) / 7) * this.vw + Math.sin(i * 7.1) * 18;
+        const len =
+          reach *
+          (0.6 + 0.4 * Math.sin(i * 3.3 + 1) ** 2) *
+          (0.85 + 0.15 * Math.sin(clock * 0.8 + i));
+        const pull = (light.x - root) * 0.35 * near;
+        this.drawTentacle(ctx, root, edge - 6, len, pull, clock + i * 1.9, 18 - (i % 3) * 3);
+      }
+      // Eyes in the mass; more open the closer it is.
+      const eyes = [
+        [0, -70, 15],
+        [-62, -100, 9],
+        [58, -96, 10],
+        [-118, -60, 6],
+        [112, -64, 7],
+        [-30, -150, 7],
+        [34, -158, 6],
+      ] as const;
+      eyes.forEach(([dx, dy, r], k) => {
+        const wake = clamp01(near * 1.6 - k * 0.12) || (k === 0 ? 0.6 : 0);
+        if (wake <= 0) return;
+        const x = light.x + dx;
+        const y = edge + dy;
+        const blink = Math.max(
+          0,
+          Math.min(1, Math.abs(Math.sin(esc.eye * (0.45 + k * 0.07) + k)) * 10 - 9),
+        );
+        const open = wake * (1 - blink);
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+        glow.addColorStop(0, `rgba(200,120,255,${0.55 * open})`);
+        glow.addColorStop(1, "rgba(200,120,255,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - r * 3.2, y - r * 3.2, r * 6.4, r * 6.4);
+        ctx.fillStyle = `rgba(240,225,255,${open})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, r, r * 0.55 * open + 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // The pupil follows the light.
+        const ax = light.x - x;
+        const ay = light.y - y;
+        const d = Math.hypot(ax, ay) || 1;
+        ctx.fillStyle = "rgba(10,3,18,0.95)";
+        ctx.beginPath();
+        ctx.ellipse(
+          x + (ax / d) * r * 0.35,
+          y + (ay / d) * r * 0.2,
+          r * 0.3,
+          r * 0.45 * open + 0.2,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      });
+    }
+    // The light, in the slab it will break next.
+    if (this.stack.length > 1) {
+      const c = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H / 2);
+      const pulse = 1 + 0.12 * Math.sin(clock * 6);
+      const r = 26 * pulse;
+      const glow = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r * 2.4);
+      glow.addColorStop(0, "rgba(255,250,235,1)");
+      glow.addColorStop(0.25, "rgba(255,220,160,0.9)");
+      glow.addColorStop(1, "rgba(255,170,90,0)");
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = glow;
+      ctx.fillRect(c.x - r * 2.4, c.y - r * 2.4, r * 4.8, r * 4.8);
+      ctx.restore();
+      if (esc.hits > 1) {
+        ctx.save();
+        ctx.font = '800 12px "Nunito Variable", system-ui, sans-serif';
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,245,230,0.9)";
+        ctx.fillText("×2", c.x, c.y - 22);
+        ctx.restore();
+      }
+    }
+  }
+
+  /** One tentacle: a tapering curve from its root, swaying, its tip curling. */
+  private drawTentacle(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    len: number,
+    pull: number,
+    t: number,
+    width: number,
+  ): void {
+    const steps = 14;
+    const left: [number, number][] = [];
+    const right: [number, number][] = [];
+    for (let k = 0; k <= steps; k++) {
+      const u = k / steps;
+      const sway = Math.sin(t * 1.3 - u * 3.2) * 16 * u;
+      const curl = Math.sin(t * 0.9 + u * 5) * 10 * u * u;
+      const px = x + pull * u * u + sway + curl;
+      const py = y + len * u;
+      const w = width * (1 - u) ** 1.3 + 0.6;
+      const ang = Math.cos(t * 1.3 - u * 3.2) * 0.4;
+      left.push([px - w * Math.cos(ang), py + w * Math.sin(ang)]);
+      right.push([px + w * Math.cos(ang), py - w * Math.sin(ang)]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(left[0]![0], left[0]![1]);
+    for (const p of left) ctx.lineTo(p[0], p[1]);
+    for (let k = right.length - 1; k >= 0; k--) ctx.lineTo(right[k]![0], right[k]![1]);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(x, y, x, y + len);
+    g.addColorStop(0, "rgba(16,6,30,0.98)");
+    g.addColorStop(1, "rgba(40,14,60,0.95)");
+    ctx.fillStyle = g;
+    ctx.fill();
+    // Suckers along the underside, faintly lit.
+    ctx.fillStyle = "rgba(170,90,255,0.35)";
+    for (let k = 3; k < steps; k += 2) {
+      const a = left[k]!;
+      const b = right[k]!;
+      const r = Math.max(0.8, width * (1 - k / steps) * 0.22);
+      ctx.beginPath();
+      ctx.arc((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   /** The summit of a boss sky: the Dark wakes, and the goal changes. */
@@ -1736,7 +2154,8 @@ export class SpireEngine {
    */
   private riseDark(dt: number): void {
     this.breather = Math.max(0, this.breather - dt);
-    const practice = this.save.practice && this.mode === "level" && !this.boss;
+    const practice =
+      (this.save.practice && this.mode === "level" && !this.boss) || this.escape !== null;
     if (
       !practice &&
       this.plan.darkRate > 0 &&
@@ -2852,7 +3271,10 @@ export class SpireEngine {
           : null,
       house: houseOf(this.save.tracks, this.save.weapon),
       coins: this.save.coins,
-      darkGap: this.plan.darkRate > 0 && live ? Math.max(0, Math.floor(this.darkGap())) : null,
+      darkGap:
+        this.plan.darkRate > 0 && live && !this.escape
+          ? Math.max(0, Math.floor(this.darkGap()))
+          : null,
       accent: rgbCss(this.theme.accent),
       result: this.result,
       rescue: this.rescueOpen()
@@ -2865,6 +3287,9 @@ export class SpireEngine {
           : null,
       ghostName: this.ghostName,
       boss: this.boss ? { surge: this.boss.surge + 1, of: BOSS_SURGES } : null,
+      escape: this.escape
+        ? { left: Math.max(0, this.stack.length - 1), combo: this.escape.combo }
+        : null,
       landing: this.landing,
     });
   }
@@ -2937,6 +3362,7 @@ export class SpireEngine {
     // perfect must not cost time for the freeze frame that celebrates it.
     if (this.phase === "play" && this.freeze <= 0) this.runTime += dt;
     if (this.phase !== "won") this.settle(dt);
+    if (this.escape && this.phase === "play") this.chase(dt);
     this.riseDark(dt);
     if (this.stage && this.phase === "play") {
       // The score follows the climb: height, the Dark's nearness, the streak.
@@ -3144,7 +3570,7 @@ export class SpireEngine {
 
     this.drawGround(ctx);
     this.drawGhost(ctx);
-    this.drawSummitLine(ctx);
+    if (!this.escape) this.drawSummitLine(ctx);
     if (this.kit.sight && !this.mover.split) this.drawSight(ctx);
     this.drawPlinth(ctx);
     if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
@@ -3158,14 +3584,15 @@ export class SpireEngine {
     if (this.phase === "play" && this.ghost) this.drawGhostLine(ctx);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
-    if (this.plan.darkRate > 0 && this.phase !== "menu") this.drawDark(ctx);
+    if (this.plan.darkRate > 0 && this.phase !== "menu" && !this.escape) this.drawDark(ctx);
+    if (this.escape) this.drawEscape(ctx);
     if (this.shields > 0 && prev && this.phase !== "fall") {
       const dome = this.worldToScreen(prev.x + prev.w / 2, prev.y + VISUAL_H / 2);
       drawShieldDome(ctx, dome.x, dome.y, prev.w, this.clock, this.shieldAge);
     }
-    if (live) this.drawCourseCues(ctx);
+    if (live && !this.escape) this.drawCourseCues(ctx);
     if (live && this.bomb) this.drawBomb(ctx);
-    if (live) this.drawMover(ctx, inZone);
+    if (live && !this.escape) this.drawMover(ctx, inZone);
     if (live && this.mote) this.drawMote(ctx);
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
