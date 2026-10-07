@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 61 — Painted, always (internal)
+
+- **Fixed: the Dark showed only its line, with nothing underneath.** When the phone won't play a painted video (Low Power Mode does this), iOS draws nothing for it at all. Now each painted video falls back to a painted still of itself: the Dark, the skies, the Hearth source and the Descent's blind thing. If Low Power Mode is on, you'll see them still rather than moving.
+
 ## Build 60 — No more bands (internal)
 
 - **Fixed: the band at the top of the summit** on iPhone (Tidewater especially). The pillar of light's frames carried a faint haze to their edges, which lit a hard-edged rectangle over the sky as they flickered. Each frame now fades to black at its edges. Checked on an iPhone 17 Pro Max simulator.

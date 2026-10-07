@@ -2386,7 +2386,7 @@ export class SpireEngine {
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, this.vw, this.vh);
     this.eyeAt = { x: light.x, y: edge - 70, r: 15 };
-    if (this.sourceArtReady && this.sourceArt) {
+    if (this.sourceArt) {
       this.drawSourceArt(ctx, edge, near);
     } else if (edge > -120) {
       const g = ctx.createLinearGradient(0, edge - 320, 0, edge + 30);
@@ -2554,6 +2554,25 @@ export class SpireEngine {
   }
 
   /** Loads the painted source and the sting quietly; the drawn versions stand in until then. */
+  /** Stills to draw when a painted video won't play (Low Power Mode, say), by src. */
+  private stills = new Map<string, HTMLImageElement>();
+
+  /**
+   * What to draw for a painted video this frame: the video while it is really
+   * playing, else its still. A paused or blocked video draws nothing at all
+   * on iOS, which left the Dark blank under its line.
+   */
+  private frameOf(v: HTMLVideoElement, still: string): CanvasImageSource | null {
+    if (!v.paused && v.readyState >= 2 && v.currentTime > 0) return v;
+    let img = this.stills.get(still);
+    if (!img) {
+      img = Object.assign(new Image(), { src: still });
+      this.stills.set(still, img);
+    }
+    if (img.complete && img.naturalWidth > 0) return img;
+    return v.readyState >= 2 ? v : null;
+  }
+
   /** Loads the painted Dark quietly; the drawn gradient stands in until then. */
   private loadDarkArt(): void {
     if (typeof document === "undefined") return;
@@ -2589,6 +2608,8 @@ export class SpireEngine {
   private drawDarkArt(ctx: CanvasRenderingContext2D, surface: number): void {
     const v = this.darkArt!;
     if (v.paused) void v.play().catch(() => undefined);
+    const frame = this.frameOf(v, "art/dark-hearth.jpg");
+    if (!frame) return;
     const w = this.vw * 1.1;
     const h = w * (v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9);
     const top = surface - h * DARK_ART_SURFACE;
@@ -2603,7 +2624,7 @@ export class SpireEngine {
     const m = mask.getContext("2d")!;
     m.globalCompositeOperation = "source-over";
     m.clearRect(0, 0, mw, mh);
-    m.drawImage(v, 0, 0, mw, mh);
+    m.drawImage(frame, 0, 0, mw, mh);
     m.globalCompositeOperation = "destination-in";
     const fade = m.createLinearGradient(0, 0, 0, mh);
     fade.addColorStop(0, "rgba(0,0,0,0)");
@@ -2660,6 +2681,8 @@ export class SpireEngine {
    */
   private drawSourceArt(ctx: CanvasRenderingContext2D, edge: number, near: number): void {
     const v = this.sourceArt!;
+    const frame = this.frameOf(v, "art/source.jpg");
+    if (!frame) return;
     // It grows as it nears; its tentacle tips (three quarters down the
     // painting) hang at the source's edge, so its eyes stay in view above.
     const w = this.vw * (0.8 + near * 0.3);
@@ -2677,7 +2700,7 @@ export class SpireEngine {
     const m = mask.getContext("2d")!;
     m.globalCompositeOperation = "source-over";
     m.clearRect(0, 0, mw, mh);
-    m.drawImage(v, 0, 0, mw, mh);
+    m.drawImage(frame, 0, 0, mw, mh);
     m.globalCompositeOperation = "destination-in";
     const fade = m.createLinearGradient(0, 0, 0, mh);
     fade.addColorStop(0, "rgba(0,0,0,1)");
@@ -4639,7 +4662,9 @@ export class SpireEngine {
     // Only the sky in view plays.
     for (const [other, s] of this.skies) if (other !== id && !s.video.paused) s.video.pause();
     if (sky.video.paused) void sky.video.play().catch(() => undefined);
-    return sky.ready ? sky : null;
+    // Ready once its video plays, or its still has loaded to stand in.
+    if (sky.ready) return sky;
+    return this.frameOf(sky.video, sky.video.poster) ? sky : null;
   }
 
   /**
@@ -4659,7 +4684,8 @@ export class SpireEngine {
     // the shaft, from its mouth down to its depths.
     const y = (view.h - h) * (this.plan.descent ? climb : 1 - climb);
     const x = (view.w - w) / 2 - view.camX * 0.04;
-    ctx.drawImage(v, x, y, w, h);
+    const frame = this.frameOf(v, v.poster);
+    if (frame) ctx.drawImage(frame, x, y, w, h);
     // Held back, darkest down the middle, so the tower reads first.
     const shade = ctx.createLinearGradient(0, 0, view.w, 0);
     shade.addColorStop(0, "rgba(8,5,10,0.22)");
@@ -4845,6 +4871,8 @@ export class SpireEngine {
   private drawBlind(ctx: CanvasRenderingContext2D): void {
     const v = this.blindArt!;
     if (v.paused) void v.play().catch(() => undefined);
+    const frame = this.frameOf(v, "art/blind.jpg");
+    if (!frame) return;
     const surface = this.worldToScreen(0, this.darkShown).y;
     const w = this.vw * 1.12;
     const h = w * (v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9);
@@ -4860,7 +4888,7 @@ export class SpireEngine {
     const m = mask.getContext("2d")!;
     m.globalCompositeOperation = "source-over";
     m.clearRect(0, 0, mw, mh);
-    m.drawImage(v, 0, 0, mw, mh);
+    m.drawImage(frame, 0, 0, mw, mh);
     m.globalCompositeOperation = "destination-in";
     const fade = m.createLinearGradient(0, 0, 0, mh);
     fade.addColorStop(0, "rgba(0,0,0,0)");
@@ -4997,7 +5025,7 @@ export class SpireEngine {
     // Once the sky is won the Dark is gone: the pull-back must not reveal it.
     if (this.plan.darkRate > 0 && this.phase !== "menu" && this.phase !== "won" && !this.escape) {
       if (this.plan.descent) this.drawClimbers(ctx);
-      else if (this.ascent && this.blindReady) this.drawBlind(ctx);
+      else if (this.ascent && this.blindArt) this.drawBlind(ctx);
       else this.drawDark(ctx);
     }
     if (this.escape) this.drawEscape(ctx);
@@ -5127,7 +5155,7 @@ export class SpireEngine {
     const surface = this.worldToScreen(0, this.darkShown).y;
     if (surface < -120) return;
     const clock = this.reduceMotion ? 0 : this.clock;
-    if (this.darkArtReady && this.darkArt) {
+    if (this.darkArt) {
       this.drawDarkArt(ctx, surface);
     } else {
       const soft = 70;

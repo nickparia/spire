@@ -9,6 +9,15 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// NOPLAY=1: a phone that won't play videos (Low Power Mode): stills must stand in.
+if (process.env.NOPLAY) {
+  await page.evaluateOnNewDocument(() => {
+    HTMLMediaElement.prototype.play = function () {
+      return Promise.reject(new Error("blocked"));
+    };
+    Object.defineProperty(HTMLMediaElement.prototype, "autoplay", { set() {}, get: () => false });
+  });
+}
 await page.goto("http://localhost:8080/?l=" + (process.argv[3] ?? 1), {
   waitUntil: "networkidle0",
 });

@@ -1,7 +1,7 @@
 {
-  "build": 60,
-  "title": "No more bands",
+  "build": 61,
+  "title": "Painted, always",
   "notes": [
-    "Fixed: at the summit a band of a different style flickered across the top of the sky on iPhone."
+    "If your phone won't play the painted videos (Low Power Mode, say), the game now shows their painted stills instead of nothing: the Dark, the skies, the bosses."
   ]
 }

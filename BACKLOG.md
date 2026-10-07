@@ -34,6 +34,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 61 `frameOf(video, still)`: draws a video only while it is really playing (not paused, readyState ≥ 2, currentTime > 0), else its still (`art/dark-hearth.jpg`, `art/blind.jpg`, `art/source.jpg`, the sky's poster). Dark/blind/source/sky draw whenever their element exists, not only once "ready". Bot: `NOPLAY=1 node tools/bots/dark.mjs` blocks video playback.
 - 60 Summit band on iOS: beacon sheet frames had haze to their edges; rebuilt with a baked edge fade (`geq` mask: sides, top, below the foot). `drawPaintedGround` is a radial pool under the tower. Verified in the iOS simulator by a temp main.tsx hook (needs `__spire`, which is DEV-only: expose it temporarily in spire-game.tsx).
 - 59 Title takes a tap at any time: `.splash-stage` (and its video/img) `pointer-events: none`; `TitleSplash` enters on `pointerup` as well as click, guarded by a ref. Bot `early.mjs`.
 - 58 iOS file loading: Capacitor's scheme handler answers fetch with status 0 (bytes intact), so `r.ok` failed every bundled fetch; `okResponse` (music.ts, sfx.ts) and the escape-sting HEAD check now accept 0. Found by an audio self-test in the iOS simulator (`xcrun simctl launch --console-pty`, Capacitor forwards console.log). Lesson: never gate bundled-file loads on `r.ok` alone.
