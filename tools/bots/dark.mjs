@@ -9,7 +9,9 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-await page.goto("http://localhost:8080/", { waitUntil: "networkidle0" });
+await page.goto("http://localhost:8080/?l=" + (process.argv[3] ?? 1), {
+  waitUntil: "networkidle0",
+});
 await page.evaluate(() =>
   localStorage.setItem(
     "spire-v2",
@@ -35,6 +37,7 @@ await page.evaluate(() =>
   ),
 );
 await page.reload({ waitUntil: "networkidle0" });
+await page.evaluate(() => (window.__spire.pause(), window.__spire.resume()));
 await page.evaluate(() => {
   const e = window.__spire;
   e.startLevel(Number(new URLSearchParams(location.search).get("l") ?? 1));
@@ -55,7 +58,24 @@ await page.evaluate(() => {
   };
   loop();
 });
-await wait(14000);
+await wait(5000);
+await page.screenshot({ path: `${out}/dark-0.png` });
+await page.evaluate(() => {
+  // A deliberate miss: a third of the slab cut off, to watch it fall on them.
+  window.__bot.last = 1e12;
+  const e = window.__spire;
+  const t = setInterval(() => {
+    const p = e.probe();
+    if (Math.abs(p.offset) > p.tol * 2.5 && Math.abs(p.offset) < p.tol * 4) {
+      e.tap();
+      clearInterval(t);
+      setTimeout(() => (window.__bot.last = 0), 400);
+    }
+  }, 5);
+});
+await wait(450);
+await page.screenshot({ path: `${out}/dark-m.png` });
+await wait(9000);
 await page.screenshot({ path: `${out}/dark-a.png` });
 await page.evaluate(() => {
   const e = window.__spire;

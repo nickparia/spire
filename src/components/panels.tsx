@@ -232,9 +232,10 @@ export function RunHud({
         ) : null}
         {hud.darkGap !== null && started ? (
           <>
-            <p className="kicker mt-2">The Dark</p>
+            <p className="kicker mt-2">{hud.descent ? "They climb" : "The Dark"}</p>
             <p className={"stat-num dark-gap" + (hud.darkGap <= 3 ? " dark-near" : "")}>
-              {hud.darkGap} {hud.darkGap === 1 ? "floor" : "floors"} below
+              {hud.darkGap} {hud.darkGap === 1 ? "floor" : "floors"}{" "}
+              {hud.descent ? "away" : "below"}
             </p>
           </>
         ) : null}

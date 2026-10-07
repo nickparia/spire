@@ -149,6 +149,15 @@ const ESCAPE_LUNGE = 6;
 /** Seconds the summit sting plays, when it is there. */
 /** How far down the painted Dark its surface lies, as a share of its height. */
 const DARK_ART_SURFACE = 0.2;
+/** Down the screen the Descent's tip sits, as a share of the view. */
+const DESCENT_SEAT = 0.42;
+/** Climbers drawn at the front. */
+const CLIMBERS = 34;
+/** Floors behind the tip the climbers are held within, however fast you build. */
+const DESCENT_REACH = 7;
+/** Floors a cut-off piece knocks the climbers back, plus more for a wide one. */
+const SQUASH_PUSH = 0.6;
+const SQUASH_PER_WIDTH = 1.6;
 const ESCAPE_STING = 5;
 /** Seconds between slabs in a chain of perfects going off. */
 const ESCAPE_CHAIN_STEP = 0.07;
@@ -270,6 +279,8 @@ export type Hud = {
   coins: number;
   /** Floors between the Dark and the top of the stack; null when it isn't rising. */
   darkGap: number | null;
+  /** Built down: the Dark is the climbers. */
+  descent: boolean;
   /** The current sky's accent, as a CSS colour. */
   accent: string;
   result: LevelResult | null;
@@ -371,6 +382,8 @@ type Scrap = {
   vr: number;
   rgb: RGB;
   life: number;
+  /** Down the Descent: it has already landed on the climbers. */
+  squashed?: boolean;
 };
 
 type Floater = {
@@ -652,6 +665,8 @@ export class SpireEngine {
   private sourceArt: HTMLVideoElement | null = null;
   private sourceArtReady = false;
   private sourceMask: HTMLCanvasElement | null = null;
+  /** The Descent's painted shaft, behind everything when building down. */
+  private shaftArt: HTMLImageElement | null = null;
   /** The painted Dark (public/art/dark-<world>.mp4), drawn beneath its edge once loaded. */
   private darkArt: HTMLVideoElement | null = null;
   private darkArtReady = false;
@@ -2647,11 +2662,30 @@ export class SpireEngine {
     if (step > this.quickStep) {
       this.quickStep = step;
       const top = this.peak();
-      this.float("THE DARK QUICKENS", top.x + top.w / 2, this.dark + 70, false, 22);
+      this.float(
+        this.plan.descent ? "THEY QUICKEN" : "THE DARK QUICKENS",
+        top.x + top.w / 2,
+        this.dark + 70,
+        false,
+        22,
+      );
       this.sfx.hiss();
       this.pulse = Math.max(this.pulse, 0.5);
     }
     return 1 + QUICKEN_RATE * over;
+  }
+
+  /** A cut-off piece lands on the climbers: they are knocked back down the shaft. */
+  private squash(x: number, w: number): void {
+    const push = SLAB_H * (SQUASH_PUSH + SQUASH_PER_WIDTH * Math.min(1, w / this.startW));
+    this.dark = Math.max(DARK_START, this.dark - push);
+    const at = this.climbersY();
+    this.fx.burst(x, at, [200, 192, 214], 16, 220);
+    this.fx.ring(x, at, [150, 80, 220], 90 + w * 0.6, 4);
+    this.float("SQUASHED", x, at - 30, true, 20);
+    this.sfx.drop();
+    this.trauma = Math.min(1, this.trauma + 0.2);
+    haptics.medium();
   }
 
   /** Light pushes the Dark down, never below where it started. */
@@ -2706,7 +2740,13 @@ export class SpireEngine {
       }
       if (this.dark >= seat - SLAB_H * 0.5) {
         this.dark = seat - SLAB_H * 0.5;
-        this.float("TAKEN BY THE DARK", top.x + top.w / 2, seat + 40, false, 24);
+        this.float(
+          this.plan.descent ? "THEY REACH YOU" : "TAKEN BY THE DARK",
+          top.x + top.w / 2,
+          seat + 40,
+          false,
+          24,
+        );
         this.taken = true;
         this.die();
         for (const slab of this.stack) {
@@ -2717,6 +2757,10 @@ export class SpireEngine {
       }
       const gap = this.darkGap();
       if (gap < 3) this.strain = Math.max(this.strain, 1 - gap / 3);
+    }
+    // Down the shaft they never fall far behind: outbuild them and they keep pace.
+    if (this.plan.descent && this.phase === "play") {
+      this.dark = Math.max(this.dark, this.crownY() - SLAB_H * DESCENT_REACH);
     }
     const k = 1 - Math.exp(-(this.darkShown < this.dark ? 4 : 7) * dt);
     this.darkShown += (this.dark - this.darkShown) * k;
@@ -2942,7 +2986,8 @@ export class SpireEngine {
           rot: 0,
           vr: out * (2 + Math.random() * 3),
           rgb,
-          life: 1.1,
+          // Down the shaft it has further to fall before it lands on them.
+          life: this.plan.descent ? 2.4 : 1.1,
         });
       }
     }
@@ -3795,6 +3840,7 @@ export class SpireEngine {
         this.plan.darkRate > 0 && live && !this.escape
           ? Math.max(0, Math.floor(this.darkGap()))
           : null,
+      descent: !!this.plan.descent,
       accent: rgbCss(this.theme.accent),
       result: this.result,
       rescue: this.rescueOpen()
@@ -3968,8 +4014,19 @@ export class SpireEngine {
 
     for (let i = this.scraps.length - 1; i >= 0; i--) {
       const s = this.scraps[i]!;
-      s.vy -= 1400 * dt;
-      s.y += s.vy * dt;
+      if (this.plan.descent) {
+        // Down here what is cut off falls away from the ceiling, onto them.
+        s.vy += 1400 * dt;
+        s.y += s.vy * dt;
+        if (!s.squashed && s.y >= this.climbersY() && this.phase === "play") {
+          s.squashed = true;
+          s.life = Math.min(s.life, 0.25);
+          this.squash(s.x + s.w / 2, s.w);
+        }
+      } else {
+        s.vy -= 1400 * dt;
+        s.y += s.vy * dt;
+      }
       s.x += s.vx * dt;
       s.rot += s.vr * dt;
       s.life -= dt;
@@ -4044,11 +4101,128 @@ export class SpireEngine {
   /* -------------------------------------------------------------- render */
 
   private worldToScreen = (x: number, yBottom: number): { x: number; y: number } => {
+    if (this.plan.descent) {
+      // Built down: the world is mirrored, so higher means further down the
+      // screen. Offset by a slab so anything drawn up from its bottom edge
+      // (slabs, the mover, scraps) still covers its own floor.
+      return {
+        x: this.vw / 2 + (x - this.camX),
+        y: this.vh * DESCENT_SEAT - this.viewH * LEAD + SLAB_H + VISUAL_H + (yBottom - this.camY),
+      };
+    }
     return {
       x: this.vw / 2 + (x - this.camX),
       y: this.horizonY - (yBottom - this.camY),
     };
   };
+
+  /** Where the climbers' front is, in world height: as far past the tip as the Dark is below it. */
+  private climbersY(): number {
+    return 2 * this.crownY() - this.darkShown;
+  }
+
+  /** The painted shaft, falling past slowly as the spire goes down. */
+  private drawShaft(ctx: CanvasRenderingContext2D, view: BackdropView): void {
+    const img = (this.shaftArt ??= Object.assign(new Image(), { src: "art/bg-descent.jpg" }));
+    ctx.fillStyle = "rgb(8,5,12)";
+    ctx.fillRect(0, 0, view.w, view.h);
+    if (!img.complete || img.naturalWidth === 0) return;
+    const w = view.w * 1.15;
+    const h = w * (img.naturalHeight / img.naturalWidth);
+    // It slides up as you go down, a tenth of the pace: far walls.
+    const travel = Math.max(0, h - view.h);
+    const y = -Math.min(travel, this.camY * 0.12);
+    ctx.drawImage(img, (view.w - w) / 2 - (view.camX % 1) * 0, y, w, h);
+    // Held back so the slabs read first.
+    ctx.fillStyle = "rgba(6,3,10,0.38)";
+    ctx.fillRect(0, 0, view.w, view.h);
+  }
+
+  /**
+   * What climbs: a seething front of pale shapes coming up the shaft at the
+   * spire's tip, the deep black beneath them. Where the Dark would be.
+   */
+  private drawClimbers(ctx: CanvasRenderingContext2D): void {
+    const front = this.worldToScreen(0, this.climbersY()).y - VISUAL_H;
+    if (front > this.vh + 60) return;
+    const clock = this.reduceMotion ? 0 : this.clock;
+    // The deep: black rising under them.
+    const g = ctx.createLinearGradient(0, front - 10, 0, front + 160);
+    g.addColorStop(0, "rgba(6,3,10,0)");
+    g.addColorStop(0.35, "rgba(6,3,10,0.82)");
+    g.addColorStop(1, "rgba(4,2,8,0.97)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-120, front - 10, this.vw + 240, this.vh - front + 200);
+    // The climbers: pale, hunched, many-limbed, scrabbling up over each other.
+    ctx.save();
+    for (let i = 0; i < CLIMBERS; i++) {
+      const seed = i * 12.9898;
+      const r1 = (Math.sin(seed) * 43758.5453) % 1;
+      const r2 = (Math.sin(seed * 1.7 + 3) * 24634.6345) % 1;
+      const r3 = (Math.sin(seed * 2.3 + 7) * 13758.937) % 1;
+      const x = Math.abs(r1) * (this.vw + 40) - 20;
+      const depth = Math.abs(r2);
+      const y = front + 6 + depth * depth * 150 + Math.sin(clock * (2 + Math.abs(r3) * 3) + i) * 4;
+      const size = 7 + Math.abs(r3) * 6 - depth * 3;
+      const reach = Math.sin(clock * (5 + Math.abs(r1) * 4) + i * 1.3);
+      const shade = 0.75 - depth * 0.55;
+      ctx.fillStyle = `rgba(200,192,214,${shade})`;
+      ctx.strokeStyle = `rgba(200,192,214,${shade})`;
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = "round";
+      // Body and head.
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * 0.55, size, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y - size * 1.05, size * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      // Arms reaching up, legs pushing.
+      ctx.beginPath();
+      ctx.moveTo(x - size * 0.4, y - size * 0.5);
+      ctx.lineTo(x - size * 1.1, y - size * (1.6 + reach * 0.5));
+      ctx.moveTo(x + size * 0.4, y - size * 0.5);
+      ctx.lineTo(x + size * 1.1, y - size * (1.6 - reach * 0.5));
+      ctx.moveTo(x - size * 0.3, y + size * 0.7);
+      ctx.lineTo(x - size * 0.9, y + size * (1.4 - reach * 0.3));
+      ctx.moveTo(x + size * 0.3, y + size * 0.7);
+      ctx.lineTo(x + size * 0.9, y + size * (1.4 + reach * 0.3));
+      ctx.stroke();
+      // Two pin-prick eyes on the near ones.
+      if (depth < 0.35) {
+        ctx.fillStyle = "rgba(180,110,255,0.9)";
+        ctx.fillRect(x - size * 0.22, y - size * 1.1, 1.6, 1.6);
+        ctx.fillRect(x + size * 0.12, y - size * 1.1, 1.6, 1.6);
+      }
+    }
+    ctx.restore();
+    // The edge stays readable whatever they look like.
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(150,80,220,0.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = -40; x <= this.vw + 40; x += 12) {
+      const y = front + Math.sin(x * 0.021 + clock * 1.1) * 5;
+      if (x === -40) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** The ceiling the Descent hangs from: rock above the foundation. */
+  private drawCeiling(ctx: CanvasRenderingContext2D): void {
+    const y = this.worldToScreen(0, 0).y - VISUAL_H;
+    if (y < -80) return;
+    const g = ctx.createLinearGradient(0, y - 220, 0, y);
+    g.addColorStop(0, "rgb(10,6,8)");
+    g.addColorStop(1, "rgb(46,30,24)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-120, -40, this.vw + 240, y + 40);
+    ctx.fillStyle = "rgba(255,170,90,0.35)";
+    ctx.fillRect(-120, y - 3, this.vw + 240, 3);
+  }
 
   private render(): void {
     const ctx = this.ctx;
@@ -4101,7 +4275,8 @@ export class SpireEngine {
       ctx.translate(-vw / 2, -vh * 0.72);
     }
 
-    this.drawGround(ctx);
+    if (this.plan.descent) this.drawCeiling(ctx);
+    else this.drawGround(ctx);
     this.drawGhost(ctx);
     if (!this.escape) this.drawSummitLine(ctx);
     if (this.kit.sight && !this.mover.split) this.drawSight(ctx);
@@ -4117,7 +4292,10 @@ export class SpireEngine {
     if (this.phase === "play" && this.ghost) this.drawGhostLine(ctx);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
-    if (this.plan.darkRate > 0 && this.phase !== "menu" && !this.escape) this.drawDark(ctx);
+    if (this.plan.darkRate > 0 && this.phase !== "menu" && !this.escape) {
+      if (this.plan.descent) this.drawClimbers(ctx);
+      else this.drawDark(ctx);
+    }
     if (this.escape) this.drawEscape(ctx);
     if (this.shields > 0 && prev && this.phase !== "fall") {
       const dome = this.worldToScreen(prev.x + prev.w / 2, prev.y + VISUAL_H / 2);
@@ -4130,7 +4308,7 @@ export class SpireEngine {
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
 
-    this.backdrop.drawFront(ctx, view);
+    if (!this.plan.descent) this.backdrop.drawFront(ctx, view);
     this.drawFloaters(ctx);
 
     // Everything from here is laid over the lens, so it ignores the zoom.
@@ -4163,6 +4341,10 @@ export class SpireEngine {
   }
 
   private drawBackdrop(ctx: CanvasRenderingContext2D, view: BackdropView, zoom: number): void {
+    if (this.plan.descent) {
+      this.drawShaft(ctx, view);
+      return;
+    }
     const fading = this.fading;
     if (!fading || this.fade >= 1) {
       this.backdrop.draw(ctx, view);
@@ -4323,7 +4505,7 @@ export class SpireEngine {
     this.drawMarker(
       ctx,
       y,
-      "SUMMIT",
+      this.plan.descent ? "THE DEPTH" : "SUMMIT",
       rgbCss(this.theme.accent, 0.6 * beat),
       rgbCss(this.theme.accent, 0.95 * beat),
     );

@@ -53,6 +53,7 @@ const INITIAL: Hud = {
   house: "mason",
   coins: 0,
   darkGap: null,
+  descent: false,
   rescue: null,
   taken: false,
   ghostGap: null,

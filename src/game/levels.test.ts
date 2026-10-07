@@ -46,8 +46,9 @@ describe("levels", () => {
     }
   });
 
-  it("get harder in order", () => {
+  it("get harder in order within each world", () => {
     for (let i = 1; i < LEVELS.length; i++) {
+      if (LEVELS[i]!.tier === 0) continue;
       expect(levelPlan(LEVELS[i]!, i).difficulty).toBeGreaterThan(
         levelPlan(LEVELS[i - 1]!, i - 1).difficulty,
       );

@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 49 — Test sky: The Roots (internal)
+
+- **The Descent, first test.** Choose **The Descent** on the world select (testers can open it now). In **The Roots** you build _down_: the spire hangs from the ceiling of a vast shaft and grows a floor at a time beneath it.
+- **Things climb up.** A swarm of pale shapes comes up the shaft toward your lowest slab. Build steadily to stay ahead; stall and they reach you.
+- **Misses are weapons.** Whatever you cut off falls into the shaft and squashes them, knocking them back.
+- To feel out: does building down read clearly? Is the race tense? The climbers are placeholder drawings; painted ones come later.
+
 ## Build 48 — The boss, the story, the score
 
 - **The Dark is painted.** A slow, heaving sea of black ink and ash with an ember-lit surface. Smoke lifts off it, and faint violet light and sparks sink inside it. It swallows what falls. Its edge is still marked by the violet line, so you can judge how close it is.

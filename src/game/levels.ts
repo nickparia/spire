@@ -33,6 +33,10 @@ export type LevelDef = {
   parTime: number;
   /** Finish at or over this accuracy (0..1) for the precision star. */
   parAccuracy: number;
+  /** Place within its world, which sets the difficulty; defaults to the list position. */
+  tier?: number;
+  /** Built down from a ceiling: the Descent. */
+  descent?: boolean;
 };
 
 /** Every level opens with a few plain floors so the new rhythm is a reveal. */
@@ -168,6 +172,24 @@ export const LEVELS: LevelDef[] = [
     parTime: 96,
     parAccuracy: 0.9,
   },
+  // II · The Descent
+  {
+    id: "roots",
+    name: "The Roots",
+    blurb: "Build down. Something is climbing up.",
+    line: "Down here the stone is older than the tower. It was never asked.",
+    theme: "foundry",
+    floors: 20,
+    courses: ["slide"],
+    period: [0.95, 0.85],
+    keystones: false,
+    motes: false,
+    bombs: false,
+    parTime: 34,
+    parAccuracy: 0.85,
+    tier: 0,
+    descent: true,
+  },
 ];
 
 export function levelCourseAt(level: LevelDef, floors: number): CourseId {
@@ -200,8 +222,9 @@ export function levelFallAt(level: LevelDef, floors: number): Fall | null {
   };
 }
 
-export function levelPlan(level: LevelDef, index: number): Plan {
+export function levelPlan(level: LevelDef, listIndex: number): Plan {
   const [from, to] = level.period;
+  const index = level.tier ?? listIndex;
   return {
     goal: level.floors,
     courseAt: (floors) => levelCourseAt(level, floors),
@@ -214,7 +237,9 @@ export function levelPlan(level: LevelDef, index: number): Plan {
     sway: 0.1 + index * 0.025,
     // Slow enough to outbuild with steady play, never slow enough to ignore.
     darkRate: Math.min(20, 16 + index),
-    physics: true,
+    // Down here nothing topples: a slab sets or it falls.
+    physics: !level.descent,
+    descent: level.descent ?? false,
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
     themeAt: () => level.theme,

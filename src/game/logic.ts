@@ -140,6 +140,11 @@ export type Plan = {
   sway: number;
   /** Slabs are rigid bodies: they lean, slide and topple, and rubble can be built on. */
   physics: boolean;
+  /**
+   * The spire is built down from a ceiling (the Descent): drawn mirrored, the
+   * Dark becomes things climbing up from below, and what is cut off falls on them.
+   */
+  descent?: boolean;
   hazardsAt: (floors: number) => Hazards;
   /** Floors one sky lasts, which paces how its backdrop deepens. */
   span: number;

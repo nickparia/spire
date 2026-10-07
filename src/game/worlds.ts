@@ -41,16 +41,20 @@ export const WORLDS: WorldDef[] = [
       [0.78, 0.1],
     ],
   },
-];
-
-/** Worlds yet to be written sit on the map as dark patches. */
-export const WORLDS_TO_COME = [
   {
     id: "descent",
     name: "The Descent",
     blurb: "Build down. Something is climbing up.",
-    at: [0.82, 0.62],
+    concept: "The Spire's roots, hung down a shaft into stone older than the tower.",
+    // A test sky for now; the world's eight follow.
+    levelIds: ["roots"],
+    revelation: "They stopped. That is all. The builders stopped.",
+    stars: [[0.82, 0.62]],
   },
+];
+
+/** Worlds yet to be written sit on the map as dark patches. */
+export const WORLDS_TO_COME = [
   { id: "wheel", name: "The Wheel", blurb: "A world that turns.", at: [0.22, 0.22] },
 ] as const;
 
@@ -64,6 +68,8 @@ export function worldOf(levelId: string): WorldDef {
 
 export function isBoss(levelId: string): boolean {
   const w = worldOf(levelId);
+  // The Descent's boss is not built yet.
+  if (w.id === "descent") return false;
   return w.levelIds[w.levelIds.length - 1] === levelId;
 }
 
