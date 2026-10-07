@@ -1,5 +1,10 @@
 {
-  "build": 0,
-  "title": "",
-  "notes": []
+  "build": 43,
+  "title": "A living world select",
+  "notes": [
+    "Each world now plays its own painted scene full-screen behind its panel, crossfading as you swipe.",
+    "A weathered typeface for the title, world names and headings.",
+    "The story plays once, when you begin your very first game.",
+    "A richer bar for Options, Leaderboard, Achievements and Story."
+  ]
 }
