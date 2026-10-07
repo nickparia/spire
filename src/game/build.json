@@ -1,9 +1,10 @@
 {
-  "build": 42,
-  "title": "Painted",
+  "build": 43,
+  "title": "A living world select",
   "notes": [
-    "A painted title: the Spire rising out of the fires, its light breaking into the sky.",
-    "Painted world panels for Hearth, the Descent and the Wheel.",
-    "When a world is relit, a film: wind on the hill, and the stars coming back one by one until the galaxy fills the sky."
+    "Each world now plays its own painted scene full-screen behind its panel, crossfading as you swipe.",
+    "A weathered typeface for the title, world names and headings.",
+    "The story plays once, when you begin your very first game.",
+    "A richer bar for Options, Leaderboard, Achievements and Story."
   ]
 }

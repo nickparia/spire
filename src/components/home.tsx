@@ -123,6 +123,20 @@ export function WorldSelect({
   };
   return (
     <div className="worlds-home" data-ui>
+      {/* Each world's painted scene behind the panels; the focused one fades in. */}
+      <div className="world-bgs" aria-hidden="true">
+        {panels.map((panel, i) => {
+          const id = panel.kind === "world" ? WORLDS[panel.index]!.id : panel.id;
+          return (
+            <div key={id} className={"world-bg" + (i === current ? " world-bg-on" : "")}>
+              <ArtImage name={`bg-${id}.jpg`} />
+              {Math.abs(i - current) <= 1 ? (
+                <ArtLoop name={`bg-${id}.mp4`} poster={`bg-${id}.jpg`} />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
       <p className="worlds-head">The skies are waiting…</p>
       <p className="worlds-sub">choose your world</p>
       {notices}

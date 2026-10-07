@@ -15,6 +15,8 @@
   --color-line: #3a342c;
   --color-gold: #ffd24a;
   --font-sans: "Nunito Variable", -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  /* The weathered display face: the title, world and sky names, headings. */
+  --font-display: "IM Fell English SC", "Iowan Old Style", Georgia, serif;
   --radius-control: 14px;
   --radius-sheet: 22px;
 }
@@ -2131,8 +2133,48 @@
   flex-direction: column;
   padding: max(1.4rem, env(safe-area-inset-top)) 0 max(1rem, env(safe-area-inset-bottom));
   color: #f3e9dc;
-  background: linear-gradient(rgba(7, 6, 11, 0.6), rgba(7, 6, 11, 0.15) 30%, rgba(7, 6, 11, 0.7));
+  background: #07060b;
   animation: screen-in 0.6s ease-out both;
+}
+
+/* The worlds' painted scenes, full screen; the focused one crossfades in. */
+.world-bgs {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.world-bgs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    rgba(7, 6, 11, 0.7),
+    rgba(7, 6, 11, 0.1) 28%,
+    rgba(7, 6, 11, 0.15) 70%,
+    rgba(7, 6, 11, 0.8)
+  );
+}
+
+.world-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(1.06);
+  transition:
+    opacity 0.9s ease,
+    transform 1.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.world-bg-on {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.worlds-home > :not(.world-bgs) {
+  position: relative;
+  z-index: 1;
 }
 
 .worlds-head {
@@ -2339,24 +2381,70 @@
 .home-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  padding: 0 0.8rem;
+  gap: 8px;
+  margin: 0 0.9rem;
+  padding: 8px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(30, 20, 26, 0.72), rgba(10, 7, 12, 0.86));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 210, 160, 0.16),
+    inset 0 1px 0 rgba(255, 230, 200, 0.12);
 }
 
 .home-btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 0.6rem 0;
+  gap: 5px;
+  padding: 0.65rem 0 0.55rem;
   border: 0;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.07);
+  border-radius: 15px;
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    rgba(255, 170, 100, 0.12),
+    rgba(255, 255, 255, 0.02) 70%
+  );
   color: #f3e9dc;
   font: inherit;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition:
+    transform 0.15s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.home-btn svg {
+  color: #ffbf86;
+  filter: drop-shadow(0 0 6px rgba(255, 150, 80, 0.55));
+}
+
+.home-btn::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 180, 110, 0.65), transparent);
+  opacity: 0.5;
+}
+
+.home-btn:active {
+  transform: scale(0.94);
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    rgba(255, 170, 100, 0.32),
+    rgba(255, 255, 255, 0.04) 70%
+  );
+  box-shadow: 0 0 22px rgba(255, 150, 80, 0.35);
 }
 
 /* Achievements: the feats under the sky. */
@@ -3567,4 +3655,47 @@
 
 .icon-btn:disabled {
   opacity: 0.3;
+}
+
+/* The weathered display face for names and headings. */
+.splash-word,
+.splash-kicker,
+.worlds-head,
+.worlds-sub,
+.wpanel-num,
+.wpanel-name,
+.sheet-title,
+.story-kicker,
+.ready-kicker,
+.gifts-kicker,
+.gifts-title,
+.gift-name,
+.brief-kicker,
+.we-text .kicker,
+.journey-caption,
+.world-head,
+.level-name {
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+
+.splash-word {
+  font-size: 96px;
+  letter-spacing: 0;
+}
+
+.worlds-sub {
+  font-size: 32px;
+}
+
+.wpanel-name {
+  font-size: 30px;
+}
+
+.gifts-title {
+  font-size: 34px;
+}
+
+.gift-name {
+  font-size: 23px;
 }

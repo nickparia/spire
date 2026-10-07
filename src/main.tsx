@@ -1,4 +1,5 @@
 import "@fontsource-variable/nunito";
+import "@fontsource/im-fell-english-sc";
 import "./styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

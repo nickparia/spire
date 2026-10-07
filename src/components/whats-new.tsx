@@ -45,7 +45,8 @@ export function WhatsNew({ save, onSeen }: { save: Save; onSeen: (build: number)
       />
     );
   }
-  if (save.whatsNewSeen < BUILD && NOTES.length > 0) {
+  // Only after an update: someone who has never played has nothing to compare it with.
+  if (save.whatsNewSeen < BUILD && NOTES.length > 0 && save.storySeen) {
     return (
       <Sheet
         kicker={`What's new in build ${BUILD}`}

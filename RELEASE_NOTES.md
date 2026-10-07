@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 43 — A living world select
+
+- **Each world plays its own painted scene** full-screen behind its panel: Hearth's burning foundry city, the Descent's chasm, the Wheel turning in the void. Swiping crossfades between them.
+- **A weathered typeface** (IM Fell English) for the title, world and sky names and headings; Nunito stays for body text and buttons.
+- **The story plays once**, when you press Begin for your very first game, then the first sky starts. It no longer pops up on the menus.
+- **A richer bottom bar** for Options, Leaderboard, Achievements and Story.
+- A brand-new player is no longer shown "What's new".
+
 ## Build 42 — Painted
 
 - **A painted title**: the Spire rising out of the burning ruins, its light breaking into the black sky, embers drifting — a living loop behind the title.

@@ -107,11 +107,18 @@ export function SpireGame() {
   const state = useRef({ hud, save, menu, selected });
   state.current = { hud, save, menu, selected };
 
+  /** A sky waiting behind the story: the first game starts after it is told. */
+  const [storyThen, setStoryThen] = useState<number | null>(null);
   const play = useCallback((index: number) => {
     const engine = engineRef.current;
     if (!engine || !isUnlocked(state.current.save, index)) return;
     engine.click();
     setSelected(index);
+    // The very first game begins with the story, once.
+    if (!state.current.save.storySeen) {
+      setStoryThen(index);
+      return;
+    }
     engine.startLevel(index);
   }, []);
 
@@ -480,13 +487,20 @@ export function SpireGame() {
         ) : null}
       </div>
 
-      {hud.phase === "menu" && (story || (!save.storySeen && save.savedAt > 0)) ? (
+      {hud.phase === "menu" && (story || storyThen !== null) ? (
         <StoryCard
-          cta={save.storySeen ? "Close" : "Tap to begin"}
+          cta={storyThen !== null ? "Tap to begin" : "Close"}
           onDone={() => {
-            engineRef.current?.click();
+            const engine = engineRef.current;
+            engine?.click();
             setStory(false);
-            if (!save.storySeen) engineRef.current?.updateSave({ storySeen: true });
+            if (storyThen !== null) {
+              // A new player starts on this build: nothing to tell them is new.
+              engine?.updateSave({ storySeen: true, whatsNewSeen: BUILD });
+              const at = storyThen;
+              setStoryThen(null);
+              engine?.startLevel(at);
+            }
           }}
         />
       ) : null}

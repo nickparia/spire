@@ -33,6 +33,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 43 Full-screen per-world background loops on the world select (`bg-<world>.mp4/.jpg`, crossfade), IM Fell English SC as `--font-display`, story on the first Begin only, new bottom bar, no what's-new for new players.
 - 42 Painted art from Higgsfield: title loop, Hearth/Descent/Wheel panels, the world-end film (plays once, holds, then the line; tap skips), source reference. See ART.md.
 - 41 Escape bindings (`ESCAPE_BIND_EVERY/INTERVAL/TAPS`, stop chains, tear with taps), the cloud always in view, first-time briefing + 3-2-1 (`escape-brief.tsx`, tip key `escape`). Hearth: perfect tower escapes at 2.5 taps/s, sloppy (40% perfect, 40% heavy) needs 5.
 - 40 Tester Boss button on each world panel (`home.tsx` `onBoss` → `engine.startBoss`).
