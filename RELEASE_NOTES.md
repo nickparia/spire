@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 47 — A real score
+
+- **New music.** The repeating synth tune is gone. Hearth now has five composed pieces that play in a shuffled order and crossfade into each other, so you'll hear about 10 minutes before anything repeats. The title screen and the boss fight have their own pieces.
+- **The game still shapes the music.** It's muffled near the ground, opens up as you climb or the Dark gets close, sinks after a fall and rises on a landing. A retry doesn't restart the piece.
+
 ## Build 46 — Run and stop
 
 - **Clear signals in the boss fight.** A sign at the top tells you when to move:

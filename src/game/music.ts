@@ -89,6 +89,43 @@ type Section = "a" | "b" | "break";
 export type Climb = { progress: number; danger: number; streak: number; landings: number };
 const LOOKAHEAD = 0.14;
 
+/**
+ * The recorded score (public/music/<name>.m4a), composed pieces that the game
+ * filters and swells rather than writes. The synth below is the fallback when
+ * they cannot load. Climb tracks play in a shuffled rotation.
+ */
+const RECORDED = {
+  menu: ["menu"],
+  climb: ["hearth-1", "hearth-2", "hearth-3", "hearth-4", "hearth-5"],
+  boss: ["boss"],
+} as const;
+type Playlist = keyof typeof RECORDED;
+/** Seconds to cross from one piece to the next, and into the boss. */
+const XFADE = 4;
+const XFADE_FAST = 1.2;
+/** Returning to a playlist within this many seconds resumes where it left off. */
+const RESUME_WITHIN = 90;
+
+type Deck = { el: HTMLAudioElement; gain: GainNode; name: string };
+
+type Recorded = {
+  ctx: BaseAudioContext;
+  tone: BiquadFilterNode;
+  level: GainNode;
+  decks: Deck[];
+  active: number;
+  playlist: Playlist | null;
+};
+
+function shuffled<T>(list: readonly T[]): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
+
 function hz(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
@@ -185,6 +222,16 @@ export class Music {
   private swellBar = -1;
   /** Bars are counted from here so a fresh climb starts at the top of the form. */
   private formStart = 0;
+  private rec: Recorded | null = null;
+  /** Whether the recorded score plays; the synth takes over if it fails. */
+  private recState: "loading" | "ok" | "failed" = "loading";
+  private boss = false;
+  /** When the recorded score was first asked for; past a few seconds unheard, the synth fills in. */
+  private recSince = 0;
+  /** The order each playlist plays in, and where it is. */
+  private queue: Partial<Record<Playlist, { order: string[]; at: number }>> = {};
+  /** Where each playlist was left, to pick up again. */
+  private left: Partial<Record<Playlist, { name: string; pos: number; at: number }>> = {};
 
   constructor(rig: AudioRig, track: Track) {
     this.rig = rig;
@@ -201,6 +248,11 @@ export class Music {
       this.stop();
     }
     if (!this.graph) this.graph = buildGraph(ctx, musicBus);
+    if (this.rec && this.rec.ctx !== ctx) this.dropRecorded();
+    if (!this.rec && this.recState !== "failed" && typeof document !== "undefined") {
+      this.rec = this.buildRecorded(ctx, musicBus);
+      this.recSince ||= performance.now();
+    }
     if (this.timer !== null) return;
     this.nextTime = ctx.currentTime + 0.06;
     this.timer = setInterval(this.pump, 25);
@@ -209,6 +261,148 @@ export class Music {
   stop(): void {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
+    for (const d of this.rec?.decks ?? []) d.el.pause();
+  }
+
+  /** The escape is on: the boss piece takes over. */
+  setBoss(on: boolean): void {
+    this.boss = on;
+  }
+
+  private buildRecorded(ctx: BaseAudioContext, out: AudioNode): Recorded {
+    const level = ctx.createGain();
+    level.gain.value = 0;
+    level.connect(out);
+    const tone = ctx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.frequency.value = 20000;
+    tone.Q.value = 0.5;
+    tone.connect(level);
+    const decks = [0, 1].map(() => {
+      const el = new Audio();
+      el.preload = "auto";
+      el.setAttribute("playsinline", "");
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      const src = (ctx as AudioContext).createMediaElementSource(el);
+      src.connect(gain);
+      gain.connect(tone);
+      el.addEventListener("playing", () => {
+        this.recState = "ok";
+      });
+      el.addEventListener("error", () => {
+        // A missing file means no recorded score: the synth plays instead.
+        if (this.recState !== "ok") {
+          this.recState = "failed";
+          this.dropRecorded();
+        }
+      });
+      return { el, gain, name: "" };
+    });
+    return { ctx, tone, level, decks, active: 0, playlist: null };
+  }
+
+  private dropRecorded(): void {
+    for (const d of this.rec?.decks ?? []) {
+      d.el.pause();
+      d.el.removeAttribute("src");
+      d.gain.disconnect();
+    }
+    this.rec?.level.disconnect();
+    this.rec = null;
+  }
+
+  private nextName(list: Playlist): string {
+    const names = RECORDED[list];
+    let q = this.queue[list];
+    if (!q || q.at >= q.order.length) {
+      const last = q?.order[q.order.length - 1];
+      let order = shuffled(names);
+      // Never the same piece twice in a row across a reshuffle.
+      if (order.length > 1 && order[0] === last) order = [...order.slice(1), order[0]!];
+      q = this.queue[list] = { order, at: 0 };
+    }
+    return q.order[q.at++]!;
+  }
+
+  /** Crosses to `name` on the other deck, from `pos` seconds in. */
+  private cross(rec: Recorded, name: string, pos: number, fade: number): void {
+    const now = rec.ctx.currentTime;
+    const from = rec.decks[rec.active]!;
+    const to = rec.decks[1 - rec.active]!;
+    from.gain.gain.cancelScheduledValues(now);
+    from.gain.gain.setValueAtTime(from.gain.gain.value, now);
+    from.gain.gain.linearRampToValueAtTime(0, now + fade);
+    const old = from.el;
+    setTimeout(
+      () => {
+        if (rec.decks[rec.active] !== from) old.pause();
+      },
+      fade * 1000 + 100,
+    );
+    if (to.name !== name) {
+      to.el.src = `music/${name}.m4a`;
+      to.name = name;
+    }
+    try {
+      to.el.currentTime = pos;
+    } catch {
+      // Not seekable yet; it starts from the top.
+    }
+    to.gain.gain.cancelScheduledValues(now);
+    to.gain.gain.setValueAtTime(0, now);
+    to.gain.gain.linearRampToValueAtTime(1, now + fade);
+    void to.el.play().catch(() => undefined);
+    rec.active = 1 - rec.active;
+  }
+
+  /** Keeps the recorded score on the right piece; returns whether it is playing. */
+  private tendRecorded(t: number): boolean {
+    const rec = this.rec;
+    if (!rec || this.recState === "failed") return false;
+    const want: Playlist = this.boss ? "boss" : this.mood === "menu" ? "menu" : "climb";
+    const deck = rec.decks[rec.active]!;
+    const wall = performance.now() / 1000;
+    if (want !== rec.playlist) {
+      if (rec.playlist && deck.name) {
+        this.left[rec.playlist] = { name: deck.name, pos: deck.el.currentTime, at: wall };
+      }
+      const back = this.left[want];
+      const resume = back && wall - back.at < RESUME_WITHIN;
+      const leaving = rec.playlist;
+      rec.playlist = want;
+      this.cross(
+        rec,
+        resume ? back.name : this.nextName(want),
+        resume ? back.pos : 0,
+        want === "boss" || leaving === "boss" ? XFADE_FAST : XFADE,
+      );
+    } else if (deck.el.paused && deck.name && !deck.el.ended) {
+      // Back from the background: pick up again.
+      void deck.el.play().catch(() => undefined);
+    } else if (
+      (deck.el.duration > 0 && deck.el.duration - deck.el.currentTime < XFADE + 0.3) ||
+      deck.el.ended
+    ) {
+      this.cross(rec, this.nextName(want), 0, XFADE);
+    }
+    // The game still shapes it: muffled low down, open as the climb and the
+    // Dark close in, sunk after a fall.
+    const time = rec.ctx.currentTime;
+    const stripped =
+      this.mood === "play" && Math.floor(this.step / STEPS_PER_BAR) < this.stripUntil;
+    const cutoff =
+      this.boss || this.mood === "summit" || this.mood === "menu"
+        ? 20000
+        : this.mood === "fallen"
+          ? 650
+          : stripped
+            ? 900
+            : Math.min(20000, 2200 * Math.pow(9, t));
+    rec.tone.frequency.setTargetAtTime(cutoff, time, 0.25);
+    const level = this.mood === "fallen" ? 0.5 : this.mood === "menu" ? 0.85 : 1;
+    rec.level.gain.setTargetAtTime(level, time, 0.3);
+    return this.recState === "ok";
   }
 
   setTrack(track: Track): void {
@@ -275,9 +469,13 @@ export class Music {
 
   private pump = (): void => {
     const graph = this.graph;
-    if (!graph || !this.rig.musicEnabled) return;
+    const decks = this.rec?.decks ?? [];
+    if (!graph || !this.rig.musicEnabled || graph.ctx.state !== "running") {
+      // Silent or backgrounded: the recorded pieces wait where they are.
+      for (const d of decks) if (!d.el.paused) d.el.pause();
+      return;
+    }
     const now = graph.ctx.currentTime;
-    if (graph.ctx.state !== "running") return;
     // After a stall (backgrounded tab) skip ahead rather than machine-gun the backlog.
     if (this.nextTime < now - 0.2) this.nextTime = now + 0.05;
     while (this.nextTime < now + LOOKAHEAD) {
@@ -292,6 +490,8 @@ export class Music {
     this.tension += (goal - this.tension) * (goal > this.tension ? 0.22 : 0.1);
     const t = this.tension;
     const track = this.track;
+    // The recorded score, when it plays, stands in for everything but the swell.
+    const recorded = this.tendRecorded(t);
     const stepDur = 60 / (track.bpm * (1 + 0.38 * t)) / 4;
     const bar = Math.floor(step / STEPS_PER_BAR);
     const s = step % STEPS_PER_BAR;
@@ -313,13 +513,18 @@ export class Music {
     const level = this.mood === "fallen" ? 0.35 : this.mood === "menu" ? 0.7 : 0.95;
     graph.level.gain.setTargetAtTime(level, time, 0.25);
     graph.echo.delayTime.setTargetAtTime(Math.min(1.4, stepDur * 3), time, 0.05);
-    const strain = this.mood === "play" ? Math.pow(Math.max(0, (t - 0.5) / 0.5), 2) * 0.04 : 0;
+    const strain =
+      this.mood === "play" && !recorded ? Math.pow(Math.max(0, (t - 0.5) / 0.5), 2) * 0.04 : 0;
     graph.strain.gain.setTargetAtTime(strain, time, 0.2);
     graph.strainOscs[0]!.frequency.setTargetAtTime(hz(track.root + 25), time, 0.05);
     graph.strainOscs[1]!.frequency.setTargetAtTime(hz(track.root + 30), time, 0.05);
 
-    if (s === 0) this.pad(graph, time, chord, stepDur * STEPS_PER_BAR, t);
     if (bar === this.swellBar && s === 0) this.swell(graph, time, stepDur * STEPS_PER_BAR);
+    // While the recorded score loads, nothing: better a beat of quiet than a lurch.
+    const waiting =
+      this.rec !== null && this.recState === "loading" && performance.now() - this.recSince < 8000;
+    if (recorded || waiting) return stepDur;
+    if (s === 0) this.pad(graph, time, chord, stepDur * STEPS_PER_BAR, t);
     if (stripped) return stepDur;
     if (leadOn) this.lead(graph, time, s, chord, stepDur, t);
     if (this.mood !== "fallen") {

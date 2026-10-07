@@ -1,8 +1,8 @@
 {
-  "build": 46,
-  "title": "Run and stop",
+  "build": 47,
+  "title": "A real score",
   "notes": [
-    "In the boss fight, a clear signal at the top says when to move: RUN (gold), IT STIRS (amber, with a bar running down to the stare), and STOP (red, with the screen's edges glowing red). The pulse ring turns red while the eye watches.",
-    "Tapping the Hearth end scene now opens Chapter I instead of doing nothing."
+    "New music: Hearth has five composed pieces that play in a shuffled order and crossfade into each other, plus their own pieces for the title and the boss.",
+    "The game still shapes it: muffled near the ground, opening up as you climb or the Dark draws close."
   ]
 }

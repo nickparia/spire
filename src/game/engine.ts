@@ -3822,6 +3822,7 @@ export class SpireEngine {
     if (this.phase !== "won") this.settle(dt);
     if (this.escape && this.phase === "play") this.chase(dt);
     this.riseDark(dt);
+    this.music.setBoss(this.escape !== null);
     if (this.stage && this.phase === "play") {
       // The score follows the climb: height, the Dark's nearness, the streak.
       const goal = this.plan.goal > 0 ? this.plan.goal : 40;
