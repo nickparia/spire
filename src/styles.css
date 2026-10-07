@@ -2032,6 +2032,20 @@
   display: none;
 }
 
+/* With the film, the drawn stars give way to its sky; the line waits for its end. */
+.we-filmed svg {
+  display: none;
+}
+
+.we-filmed .we-text {
+  animation: none;
+  opacity: 0;
+}
+
+.we-film-done .we-text {
+  animation: rise 1.2s ease-out both;
+}
+
 .world-end svg {
   z-index: 1;
 }
@@ -2092,6 +2106,9 @@
 }
 
 .splash-cta {
+  background: rgba(8, 5, 12, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   animation-delay: 2.4s, 3.4s;
 }
 

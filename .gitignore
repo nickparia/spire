@@ -4,3 +4,8 @@ dist/
 *.log
 .env*
 .vercel/
+
+# Higgsfield companion skills (installed locally, not part of the game)
+.agents/
+.claude/skills/
+skills-lock.json

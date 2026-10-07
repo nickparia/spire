@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { rgbCss, THEMES } from "@/game/themes";
 import { levelsOf, type WorldDef } from "@/game/worlds";
-import { ArtImage } from "./art";
+import { ArtFilm, ArtImage } from "./art";
 
 /**
  * When a world's boss falls: far away, on a hill on Earth, a family looks up
@@ -27,15 +27,34 @@ export function WorldEnd({ world, onDone }: { world: WorldDef; onDone: () => voi
   const at = (p: [number, number]) => ({ x: 12 + p[0] * 76, y: 8 + p[1] * 72 });
   const lit = (i: number) => 1.6 + i * 0.55;
   const last = lit(levels.length - 1);
+  // The painted film, when there is one: it plays once, holds its last frame,
+  // and the line comes in as it ends. Until then, or without one, the drawn scene.
+  const [film, setFilm] = useState<"none" | "playing" | "done">("none");
+  // A tap during the film skips to its end; a tap after goes on.
+  const tap = () => {
+    if (film === "playing") setFilm("done");
+    else onDone();
+  };
   return (
     <div
-      className="world-end"
+      className={
+        "world-end" +
+        (film !== "none" ? " we-filmed" : "") +
+        (film === "done" ? " we-film-done" : "")
+      }
       role="dialog"
       aria-label={`${world.name} relit`}
       data-ui
-      onClick={onDone}
+      onClick={tap}
     >
       <ArtImage name={`end-${world.id}.jpg`} className="we-paint" />
+      <ArtFilm
+        name={`end-${world.id}.mp4`}
+        className="we-paint"
+        done={film === "done"}
+        onStart={() => setFilm("playing")}
+        onEnd={() => setFilm("done")}
+      />
       <svg viewBox="0 0 100 178" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
         <defs>
           <linearGradient id="we-sky" x1="0" y1="0" x2="0" y2="1">
@@ -102,7 +121,11 @@ export function WorldEnd({ world, onDone }: { world: WorldDef; onDone: () => voi
           <path d="M51.8 130.6 L55.4 123 L56.3 123.4 L52.6 131.2 Z" />
         </g>
       </svg>
-      <div className="we-text" style={{ animationDelay: `${last + 1.6}s` }}>
+      <div
+        className="we-text"
+        key={film === "done" ? "after-film" : "drawn"}
+        style={{ animationDelay: film === "done" ? "0.2s" : `${last + 1.6}s` }}
+      >
         <p className="kicker">{world.name} · relit</p>
         <p className="we-line-text">{world.revelation}</p>
         <p className="we-tap">Tap to go on</p>

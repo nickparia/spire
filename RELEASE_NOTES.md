@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 42 — Painted
+
+- **A painted title**: the Spire rising out of the burning ruins, its light breaking into the black sky, embers drifting — a living loop behind the title.
+- **Painted worlds**: Hearth's foundry city, the Descent's chasm and the Wheel on the world select, with Hearth's constellation over its painting.
+- **A world relit** is now a film: wind through the grass on the hill, the family watching, and the stars coming back one by one until a band of galaxy sweeps across the sky. Then the line. Tap to skip.
+
 ## Build 41 — Bound
 
 - **The thing above binds the tower.** Its dark fills the top of the sky and tentacles snake down to wrap slabs: some before you start, and new ones every few seconds just below the light. A bound slab **stops a chain** and takes **three taps** to tear free ("TEAR ×3"). A perfect tower is now a rhythm of cascades and hard stops, not one tap.

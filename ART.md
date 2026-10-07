@@ -36,6 +36,10 @@ Keep the same seed / style reference across a batch so the worlds feel like one 
 
 **7 · Escape sting** (optional) — _[the look]_ From the tip of a stone tower a column of golden light bursts into the sky; the sky above ripples, and a multitude of violet eyes open in the dark.
 
+## Status
+
+Made with the Higgsfield CLI (GPT Image 2.5 for stills, Seedance 2.5 for video, 1080p): `title.jpg`/`title.mp4` (loop made seamless by cross-fading its last 1.5 s into its start), `world-hearth.jpg`, `world-descent.jpg`, `world-wheel.jpg`, `end-hearth.mp4` (12 s film: wind, stars igniting, the galaxy; plays once and holds) with `end-hearth.jpg` its last frame, and `source-ref.jpg`. Still to make: `escape-sting.mp4`, panel loops. Videos are re-encoded to H.264 (Seedance returns HEVC, which some browsers can't play): `ffmpeg -i in.mp4 -an -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p -movflags +faststart out.mp4`.
+
 ## Order
 
 Make 1, 5 and 6 first (the title, the world-end scene, the source), then 2–4. If time allows, 7.

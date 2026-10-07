@@ -30,6 +30,7 @@ export function TitleSplash({ onEnter }: { onEnter: () => void }) {
       role="button"
       aria-label="Enter"
     >
+      <ArtImage name="title.jpg" className="splash-art" onLoad={() => setPainted(true)} />
       <ArtLoop
         name="title.mp4"
         poster="title.jpg"
