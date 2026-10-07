@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 54 — Carved in stone (internal)
+
+- **Every sky has its own stone.** The Foundry's ember stone; Tidewater's wet sea-stone with barnacles and weed; Pulse City's brass-bound slabs with a clockwork gear; Red Canyon's layered sandstone; Gale Ridge's wind-scoured granite with a red prayer cloth; the Glacier's blue ice-stone; Eclipse's obsidian with a gold seam; Apex's star-marble veined with violet. Fire, frost, charge and keystone gold still play over them.
+- **Every menu is carved stone.** Pause, the fall, the summit card, Options, What's new, the story list: all framed in painted carved stone with ember-lit inlays. The main button on each is a painted ember plaque; earned stars are painted; toggles glow ember; the leaderboard, achievements and skies list are stone strips (each sky's tile is a crop of its own living painting). Old leftovers (the weapon you "carried", the build line) are gone from the fall panel, and the ready card no longer spells out the sky's rules.
+- **The summit, painted.** Relighting a sky raises a painted pillar of light from the top of your tower, with painted starbursts above; the drawn rays and confetti are gone.
+- **Softer perfects.** An ordinary perfect is now a quick glint along the seam; the full burst of light is saved for keystones and every fifth perfect in a streak.
+
 ## Build 53 — No more signposts (internal)
 
 - **The world tells you, not labels.** The sky name and its rule line are gone from under the score, and so are the play-by-play words (Perfect, Fast, Close, Rubble, Braced, Keystone, Wind shifts, lean degrees). What's left:

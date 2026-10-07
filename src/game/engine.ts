@@ -177,6 +177,18 @@ const STORM_PUSH = 3;
 const BOLT_LIFE = 0.55;
 /** Seconds a perfect's painted flare plays. */
 const FLARE_LIFE = 0.55;
+/** The summit's painted starbursts: size in px at size 1, and seconds each plays. */
+const STARBURST_SIZE = 260;
+const STARBURST_LIFE = 1.6;
+/** Where in the pillar clip its foot is (share of height), and where its hold begins (s). */
+const BEACON_FOOT = 0.85;
+const BEACON_HOLD = 1.4;
+const BEACON_END = 3.2;
+/** An ordinary perfect's glint: shorter, and only the burst's opening frames. */
+const FLARE_GLINT = 0.3;
+const FLARE_GLINT_FRAMES = 4;
+/** Every this many perfects in a streak, the full burst. */
+const FLARE_BIG_EVERY = 5;
 /** Bedrock's buttress steps either side of the foundation. */
 const BEDROCK_STEPS = 3;
 type ClimberKind = "swarm" | "mite" | "brute" | "lantern";
@@ -209,6 +221,19 @@ const BLOOD_RGB: RGB = [150, 18, 24];
 const BLOOD_DEEP_RGB: RGB = [70, 6, 12];
 /** The painted slab's end caps and centre mark, as shares of its width. */
 const SLAB_CAP = 0.058;
+/** Skies with their own painted stone; any other uses the foundry's. */
+const SKY_STONES: readonly string[] = [
+  "foundry",
+  "tide",
+  "city",
+  "canyon",
+  "ridge",
+  "glacier",
+  "eclipse",
+  "apex",
+];
+/** Room cut above and below a sky's stone (tools/cutslab.mjs pads 12% of its height each side). */
+const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
   /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THEY REACH YOU|THE DARK QUICKENS|THEY QUICKEN|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
@@ -751,8 +776,8 @@ export class SpireEngine {
   private sprites = new Map<string, HTMLImageElement>();
   /** Climbers crushed, by index, with the clock when it happened. */
   private climberDead = new Map<number, number>();
-  /** The painted slab (public/art/slab-hearth.png), cut so it fits any width. */
-  private slabArt: HTMLImageElement | null = null;
+  /** Each sky's painted stone (public/art/slabs/<theme>.webp), cut so it fits any width. */
+  private slabArts = new Map<string, HTMLImageElement>();
   /** The Descent's painted shaft, behind everything when building down. */
   private shaftArt: HTMLImageElement | null = null;
   /** The painted Dark (public/art/dark-<world>.mp4), drawn beneath its edge once loaded. */
@@ -775,8 +800,20 @@ export class SpireEngine {
   private bedrock = -1;
   /** Seconds left of Rime's freeze on the Dark. */
   private rime = 0;
+  /** The summit's painted starbursts, each playing out. */
+  private bursts: { x: number; y: number; size: number; life: number }[] = [];
+  /** The pillar of light: its clip, and when it was set going (-1 to start it). */
+  private beaconVideo: HTMLVideoElement | null = null;
+  private beaconFrom = 0;
   /** Perfect hits' painted bursts, each playing out. */
-  private flares: { x: number; y: number; w: number; life: number }[] = [];
+  private flares: {
+    x: number;
+    y: number;
+    w: number;
+    life: number;
+    max: number;
+    big: boolean;
+  }[] = [];
   /** Starfall's lightning, each strike fading. */
   private bolts: { x: number; life: number; seed: number }[] = [];
   /** This run's trace: the second each floor was first reached. */
@@ -1307,6 +1344,7 @@ export class SpireEngine {
     this.rime = 0;
     this.bolts = [];
     this.flares = [];
+    this.bursts = [];
     this.trace = [0];
     this.ghost = null;
     this.ghostName = "BEST";
@@ -1369,7 +1407,7 @@ export class SpireEngine {
       this.shellsLeft -= 1;
       this.nextShell += 0.4 + Math.random() * 0.4;
       const palette: RGB[] = [this.theme.accent, BONE, this.theme.slab[1]];
-      this.fx.firework(
+      this.starburst(
         this.camX + (Math.random() - 0.5) * this.vw * 0.7,
         top.y + 80 + Math.random() * 140,
         palette[this.shellsLeft % palette.length]!,
@@ -2855,6 +2893,10 @@ export class SpireEngine {
     this.breather = Math.max(0, this.breather - dt);
     this.rime = Math.max(0, this.rime - dt);
     if (this.bedrock >= 0 && this.bedrock < 1) this.bedrock = Math.min(1, this.bedrock + dt * 1.4);
+    for (let i = this.bursts.length - 1; i >= 0; i--) {
+      this.bursts[i]!.life -= dt;
+      if (this.bursts[i]!.life <= 0) this.bursts.splice(i, 1);
+    }
     for (let i = this.flares.length - 1; i >= 0; i--) {
       this.flares[i]!.life -= dt;
       if (this.flares[i]!.life <= 0) this.flares.splice(i, 1);
@@ -3586,7 +3628,10 @@ export class SpireEngine {
     this.fx.burst(cx, slab.y + VISUAL_H / 2, slab.rgb, forged ? 28 : 16, 160);
     this.fx.seam(cx, seam, slab.w * (1.3 + heat * 0.7), mix(accent, BONE, 0.5));
     // The painted burst out of the groove: what says "perfect" now.
-    this.flares.push({ x: cx, y: seam, w: slab.w * (1.7 + heat * 0.6), life: FLARE_LIFE });
+    // A glint along the seam for most; the full burst only now and then, or it blinds.
+    const big = keystone || (streak > 0 && streak % FLARE_BIG_EVERY === 0);
+    const life = big ? FLARE_LIFE : FLARE_GLINT;
+    this.flares.push({ x: cx, y: seam, w: slab.w * (big ? 1.5 : 1.15), life, max: life, big });
     this.fx.sparkle(cx, seam + 2, slab.w, mix(accent, BONE, 0.55), 8 + Math.round(heat * 14));
     this.pulse = Math.min(1, 0.35 + heat * 0.4);
     this.flash = forged ? 0.45 : 0.22;
@@ -3876,10 +3921,9 @@ export class SpireEngine {
     this.fitZoom = Math.max(0.28, Math.min(1, (this.summitHorizon() - 44) / (crown + 60)));
 
     const accent = this.theme.accent;
-    this.fx.rayBurst(cx, crown, accent, 280, 20);
-    this.fx.ring(cx, crown, BONE, 220, 6);
+    // The painted pillar takes it from here (drawBeacon); a burst of sparks at its foot.
+    this.beaconFrom = -1;
     this.fx.sparkle(cx, crown, top.w, mix(accent, BONE, 0.5), 40);
-    this.fx.confettiRain(this.viewW, [accent, BONE, ...this.theme.slab], 110);
     for (let i = 0; i < this.stack.length; i++) this.stack[i]!.ripple = i * 0.035;
     this.float("SUMMIT", cx, crown + 44, true, 30);
     this.pulse = 1;
@@ -4265,7 +4309,7 @@ export class SpireEngine {
       this.nextShell += 0.26 + Math.random() * 0.34;
       const palette: RGB[] = [this.theme.accent, BONE, this.theme.slab[1], this.theme.slab[2]];
       const crown = top.y + VISUAL_H;
-      this.fx.firework(
+      this.starburst(
         this.camX + (Math.random() - 0.5) * this.vw * 0.8,
         crown * (0.45 + Math.random() * 0.5) + 60 + Math.random() * 120,
         palette[this.shellsLeft % palette.length]!,
@@ -4677,6 +4721,7 @@ export class SpireEngine {
     this.fx.draw(ctx, this.worldToScreen);
     this.drawBolts(ctx);
     this.drawFlares(ctx);
+    this.drawBursts(ctx);
     ctx.restore();
 
     if (this.paintedSky()) this.drawSkyFront(ctx, view);
@@ -4932,6 +4977,17 @@ export class SpireEngine {
     const top = this.peak();
     if (!top) return;
     const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H);
+    const clip = this.beacon();
+    if (clip) {
+      // The painted pillar, its foot on the crown, rising out of the top of the view.
+      const h = Math.max(this.vh * 1.1, s.y * 1.25);
+      const w = h * (clip.videoWidth / Math.max(1, clip.videoHeight) || 9 / 16);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.drawImage(clip, s.x - w / 2, s.y - h * BEACON_FOOT, w, h);
+      ctx.restore();
+      return;
+    }
     const flicker = this.reduceMotion ? 1 : 0.8 + 0.2 * Math.sin(this.clock * 5.5);
     const age = this.phase === "menu" ? this.demoAge : this.wonAge;
     const a = Math.min(1, age / 0.45) * flicker;
@@ -5089,6 +5145,68 @@ export class SpireEngine {
     ctx.restore();
   }
 
+  /** A painted starburst in the sky (the summit's fireworks); colour comes from the painting. */
+  private starburst(x: number, y: number, _rgb: RGB, size: number): void {
+    this.bursts.push({ x, y, size: STARBURST_SIZE * size, life: STARBURST_LIFE });
+  }
+
+  private drawBursts(ctx: CanvasRenderingContext2D): void {
+    if (this.bursts.length === 0) return;
+    const sheet = this.sprite("starburst");
+    if (!sheet) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const b of this.bursts) {
+      const t = 1 - b.life / STARBURST_LIFE;
+      const frame = Math.min(sheet.frames - 1, Math.floor(t * sheet.frames));
+      const c = this.worldToScreen(b.x, b.y);
+      ctx.globalAlpha = Math.min(1, (1 - t) * 3);
+      ctx.drawImage(
+        sheet.img,
+        frame * sheet.cell,
+        0,
+        sheet.cell,
+        sheet.cell,
+        c.x - b.size / 2,
+        c.y - b.size / 2,
+        b.size,
+        b.size,
+      );
+    }
+    ctx.restore();
+  }
+
+  /** The pillar's clip: erupts once, then its shimmering hold loops. */
+  private beacon(): HTMLVideoElement | null {
+    if (typeof document === "undefined") return null;
+    let v = this.beaconVideo;
+    if (!v) {
+      v = document.createElement("video");
+      v.src = "art/fx/beacon.mp4";
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      v.setAttribute("playsinline", "");
+      v.style.cssText =
+        "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+      v.addEventListener("ended", () => {
+        v!.currentTime = BEACON_HOLD;
+        void v!.play().catch(() => undefined);
+      });
+      document.body.appendChild(v);
+      v.load();
+      this.beaconVideo = v;
+    }
+    if (this.beaconFrom < 0) {
+      this.beaconFrom = 0;
+      v.currentTime = 0;
+    }
+    // Hold on the pillar's bright middle; its clip fades out after.
+    if (v.currentTime > BEACON_END) v.currentTime = BEACON_HOLD;
+    if (v.paused) void v.play().catch(() => undefined);
+    return v.readyState >= 2 ? v : null;
+  }
+
   /** The perfect bursts: a painted flare out of the groove, added as light. */
   private drawFlares(ctx: CanvasRenderingContext2D): void {
     if (this.flares.length === 0) return;
@@ -5097,21 +5215,24 @@ export class SpireEngine {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const f of this.flares) {
-      const t = 1 - f.life / FLARE_LIFE;
-      const frame = Math.min(sheet.frames - 1, Math.floor(t * sheet.frames));
+      const t = 1 - f.life / f.max;
+      // A glint plays only the seam's first brightening, flattened; a burst plays it all.
+      const frames = f.big ? sheet.frames : FLARE_GLINT_FRAMES;
+      const frame = Math.min(frames - 1, Math.floor(t * frames));
       const c = this.worldToScreen(f.x, f.y);
-      const size = f.w;
-      ctx.globalAlpha = Math.min(1, (1 - t) * 2.2);
+      const w = f.w;
+      const h = f.big ? w : w * 0.5;
+      ctx.globalAlpha = Math.min(f.big ? 0.75 : 0.55, (1 - t) * 2);
       ctx.drawImage(
         sheet.img,
         frame * sheet.cell,
         0,
         sheet.cell,
         sheet.cell,
-        c.x - size / 2,
-        c.y - size / 2,
-        size,
-        size,
+        c.x - w / 2,
+        c.y - h / 2,
+        w,
+        h,
       );
     }
     ctx.restore();
@@ -5505,7 +5626,12 @@ export class SpireEngine {
   ): void {
     if (w < 0.5 || h < 0.5) return;
     const sy = Number.isFinite(scaleY) ? Math.max(0.2, scaleY) : 1;
-    const art = (this.slabArt ??= Object.assign(new Image(), { src: "art/slab-hearth.png" }));
+    const stone = SKY_STONES.includes(this.theme.id) ? this.theme.id : "foundry";
+    let art = this.slabArts.get(stone);
+    if (!art) {
+      art = Object.assign(new Image(), { src: `art/slabs/${stone}.webp` });
+      this.slabArts.set(stone, art);
+    }
     ctx.save();
     ctx.translate(sx + w / 2, syBottom);
     if (rot) ctx.rotate(rot);
@@ -5524,7 +5650,16 @@ export class SpireEngine {
       return;
     }
     if (art.complete && art.naturalWidth > 0) {
-      this.drawSlabArt(ctx, art, w, h, rgb, hotGroove);
+      // The foundry stone is cut tight; the others keep room for what hangs off them.
+      const pad = stone === "foundry" ? 0 : STONE_PAD;
+      this.drawSlabArt(ctx, art, w, h, rgb, hotGroove, {
+        sx: 0,
+        sw: art.naturalWidth,
+        l: 0,
+        r: 1,
+        top: pad,
+        bot: 1 - pad,
+      });
       ctx.restore();
       return;
     }
@@ -5607,7 +5742,7 @@ export class SpireEngine {
     }
     ctx.save();
     ctx.globalCompositeOperation = "soft-light";
-    ctx.fillStyle = rgbCss(rgb, 0.65);
+    ctx.fillStyle = rgbCss(rgb, 0.35);
     ctx.fillRect(left + 1, -dh + dh * 0.12, w - 2, dh * 0.84);
     ctx.restore();
     if (hotGroove) {

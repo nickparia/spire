@@ -4313,3 +4313,264 @@
     transform: scaleX(0);
   }
 }
+
+/* ================================================================
+   The painted layer (build 54): every card framed in carved stone,
+   every main button an ember plaque, one warm palette across menus.
+   The images come in as variables set in main.tsx.
+   ================================================================ */
+
+.sheet,
+.panel,
+.whats-new,
+.chapters {
+  --color-ember: #e8843c;
+  --on-ember: #fff1df;
+  border: 22px solid transparent;
+  border-image: var(--ui-panel) 50 fill / 22px / 0 stretch;
+  border-radius: 0;
+  background: none;
+  box-shadow: 0 30px 70px -24px rgba(0, 0, 0, 0.85);
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+  color: #f1e6d6;
+}
+
+.scrim,
+.sheet-wrap {
+  background: radial-gradient(90% 70% at 50% 45%, rgba(30, 16, 10, 0.55), rgba(5, 3, 7, 0.82));
+}
+
+.sheet .kicker,
+.panel .kicker,
+.whats-new .kicker {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  color: #e7a06b;
+}
+
+.sheet-title {
+  color: #fbeedc;
+  text-shadow: 0 0 22px rgba(255, 150, 70, 0.35);
+}
+
+/* The main action: a carved plaque with a molten border. */
+.btn-primary {
+  border: 12px solid transparent;
+  border-image: var(--ui-button) 30 64 fill / 12px 26px / 0 stretch;
+  border-radius: 0;
+  background: none;
+  box-shadow: 0 14px 30px -14px rgba(255, 110, 40, 0.55);
+  color: #ffe9cf;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-shadow:
+    0 1px 2px #000,
+    0 0 12px rgba(255, 140, 60, 0.6);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Every other button: dark stone with an ember edge. */
+.btn:not(.btn-primary) {
+  border-radius: 6px;
+  background: linear-gradient(rgba(42, 30, 24, 0.92), rgba(20, 14, 11, 0.95));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 160, 90, 0.28),
+    inset 0 1px 0 rgba(255, 210, 160, 0.12),
+    0 8px 18px -10px rgba(0, 0, 0, 0.8);
+  color: #f1e3cf;
+}
+
+/* Toggles: a groove of stone, lit with ember when on. */
+.switch-row input[type="checkbox"] {
+  background: rgba(20, 14, 11, 0.95);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 160, 90, 0.25),
+    inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.switch-row input[type="checkbox"]::after {
+  background: radial-gradient(circle at 35% 30%, #fff3e2, #c9a98a 70%);
+}
+
+.switch-row input[type="checkbox"]:checked {
+  background: linear-gradient(90deg, #a8401a, #f08a3c);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 200, 140, 0.4),
+    0 0 14px rgba(255, 120, 40, 0.45);
+}
+
+.sheet input[type="text"],
+.panel input[type="text"] {
+  border-radius: 6px;
+  background: rgba(12, 8, 7, 0.9);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 160, 90, 0.25),
+    inset 0 2px 5px rgba(0, 0, 0, 0.7);
+  color: #f6ead8;
+}
+
+.settings-section > .kicker,
+.sheet h3 {
+  font-family: var(--font-display);
+  color: #e7a06b;
+}
+
+/* The fall and the summit: the big numbers glow; they stay in the clean face (the
+   weathered one's old-style figures make 0 read as O). */
+.panel .score,
+.record-num {
+  color: #fbeedc;
+  text-shadow: 0 0 26px rgba(255, 140, 60, 0.35);
+}
+
+.new-best {
+  color: #ffc27a;
+}
+
+/* Systems we cut: the weapon you carried and the build you climbed as. */
+.carrying,
+.style-line {
+  display: none;
+}
+
+/* Painted stars. */
+.star-art {
+  display: inline-block;
+  background: var(--ui-star) center / contain no-repeat;
+  filter: drop-shadow(0 0 8px rgba(255, 150, 60, 0.6));
+}
+
+/* The run's top bar: numbers lifted off any sky. */
+.hud .score,
+.hud .stat-num {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.btn-primary:focus-visible {
+  outline: none;
+  filter: brightness(1.2);
+}
+
+/* Small actions (save a name, post a run, challenge): ember-edged stone, not cyan. */
+.post-btn,
+.board-cta,
+.post-input + .btn,
+.name-row .btn {
+  background: linear-gradient(#b4521f, #7a2d10);
+  color: #ffeedd;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 190, 130, 0.45),
+    0 0 12px rgba(255, 110, 40, 0.3);
+}
+
+.board-racing {
+  background: linear-gradient(#e0a24e, #9a5c1c);
+}
+
+.post-input {
+  border-radius: 6px;
+  border-color: rgba(255, 160, 90, 0.28);
+  background: rgba(12, 8, 7, 0.9);
+}
+
+/* The leaderboard: rows as dark stone strips with an ember seam, yours lit. */
+.board-row {
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(36, 25, 20, 0.92), rgba(20, 14, 11, 0.92));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 160, 90, 0.18),
+    inset 3px 0 0 rgba(255, 130, 50, 0.5);
+}
+
+.board-me {
+  background: linear-gradient(90deg, rgba(90, 44, 18, 0.95), rgba(40, 20, 10, 0.92));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 190, 120, 0.5),
+    inset 3px 0 0 #ffb066;
+}
+
+.board-rank {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: #e7a06b;
+  opacity: 1;
+}
+
+/* Sky rows: dark stone, a thumbnail of the sky's own painting, ember when open. */
+.level {
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(36, 25, 20, 0.9), rgba(16, 11, 9, 0.9));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 160, 90, 0.2),
+    0 10px 24px -14px rgba(0, 0, 0, 0.9);
+}
+
+.level-active {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 180, 110, 0.65),
+    0 0 26px -6px rgba(255, 120, 40, 0.5);
+}
+
+.level-swatch {
+  border-radius: 4px;
+  background-size: cover !important;
+  background-position: center 70% !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 190, 130, 0.45),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+  color: #fff3e2 !important;
+  font-family: var(--font-display);
+  font-size: 20px;
+  text-shadow:
+    0 1px 3px #000,
+    0 0 8px #000;
+}
+
+/* Feats: stone strips, a gold seal when earned. */
+.feat-row,
+.feat {
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(36, 25, 20, 0.9), rgba(16, 11, 9, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(255, 160, 90, 0.16);
+}
+
+.feat-row-on,
+.feat {
+  background: linear-gradient(90deg, rgba(92, 52, 20, 0.95), rgba(30, 18, 10, 0.92));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 200, 130, 0.45),
+    inset 3px 0 0 #ffb066;
+}
+
+.feat-medal {
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ffe6a8, #c7862f 70%, #6b3a12);
+  color: #2a1406;
+  box-shadow: 0 0 10px rgba(255, 170, 70, 0.45);
+}
+
+.feat-row:not(.feat-row-on) .feat-medal {
+  background: rgba(60, 44, 34, 0.9);
+  color: rgba(255, 220, 180, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 160, 90, 0.2);
+}
+
+.link {
+  color: #f0a066;
+  text-decoration-color: rgba(240, 160, 102, 0.5);
+}
+
+/* Round icon buttons (back, pause, sound): ember-edged stone discs. */
+.icon-btn {
+  background: radial-gradient(circle at 40% 30%, rgba(60, 42, 32, 0.95), rgba(18, 12, 10, 0.95));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 170, 100, 0.35),
+    0 6px 14px -6px rgba(0, 0, 0, 0.9);
+  color: #f6e2c8;
+}

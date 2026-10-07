@@ -52,11 +52,12 @@ export function SoundToggles({
   );
 }
 
+/** A sky's tile: a crop of its living painting, falling back to its colours. */
 function swatch(level: LevelDef): CSSProperties {
   const theme = THEMES[level.theme];
   const [top, mid, low] = theme.skyLow;
   return {
-    background: `linear-gradient(to bottom, ${rgbCss(top)}, ${rgbCss(mid)} 55%, ${rgbCss(low)})`,
+    background: `url("art/sky/${level.theme}.jpg"), linear-gradient(to bottom, ${rgbCss(top)}, ${rgbCss(mid)} 55%, ${rgbCss(low)})`,
     color: rgbCss(theme.accent),
   };
 }

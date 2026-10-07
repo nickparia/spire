@@ -16,6 +16,16 @@ export function StarIcon({
   className?: string;
   style?: CSSProperties;
 }) {
+  // An earned star is the painted one; an empty slot stays a dim outline.
+  if (on) {
+    return (
+      <span
+        className={"star star-on star-art" + (className ? ` ${className}` : "")}
+        style={{ width: size, height: size, ...style }}
+        aria-hidden="true"
+      />
+    );
+  }
   return (
     <svg
       width={size}
