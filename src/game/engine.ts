@@ -288,6 +288,8 @@ export type Hud = {
     briefing: boolean;
     sting: boolean;
     gaze: "shut" | "stir" | "watch";
+    /** Seconds the eye stirs before it opens. */
+    stirFor: number;
     count: number;
     bound: number;
   } | null;
@@ -2010,7 +2012,6 @@ export class SpireEngine {
     // The great eye: shut, then it stirs, then it watches.
     esc.gazeT -= dt;
     if (esc.gazeT <= 0) {
-      const top = this.stack[this.stack.length - 1]!;
       if (esc.gaze === "shut") {
         esc.gaze = "stir";
         esc.gazeT = esc.gazeStir;
@@ -2019,12 +2020,11 @@ export class SpireEngine {
       } else if (esc.gaze === "stir") {
         esc.gaze = "watch";
         esc.gazeT = esc.gazeWatch;
-        this.float("BE STILL", top.x + top.w / 2, top.y + 130, false, 26);
         haptics.heavy();
       } else {
         esc.gaze = "shut";
         esc.gazeT = esc.gazeShut * (0.75 + Math.random() * 0.5);
-        this.float("RUN", top.x + top.w / 2, top.y + 130, true, 26);
+        haptics.light();
       }
       this.emit();
     }
@@ -2264,11 +2264,14 @@ export class SpireEngine {
       ctx.fillRect(c.x - r * 2.4, c.y - r * 2.4, r * 4.8, r * 4.8);
       ctx.restore();
       // The pulse: a ring closing on the light; tap as it lands.
-      if (esc.gaze !== "watch") {
+      {
         const p = esc.beatT / ESCAPE_BEAT;
+        const watching = esc.gaze === "watch";
         const ring = 24 + (1 - p) * 70;
         ctx.save();
-        ctx.strokeStyle = `rgba(255,225,170,${0.25 + p * 0.6})`;
+        ctx.strokeStyle = watching
+          ? `rgba(255,70,80,${0.35 + p * 0.4})`
+          : `rgba(255,225,170,${0.25 + p * 0.6})`;
         ctx.lineWidth = 2 + p * 2;
         ctx.beginPath();
         ctx.arc(c.x, c.y, ring, 0, Math.PI * 2);
@@ -3737,6 +3740,7 @@ export class SpireEngine {
             briefing: this.escape.briefing,
             sting: this.escape.sting,
             gaze: this.escape.gaze,
+            stirFor: this.escape.gazeStir,
             count: this.escape.count,
             bound: (() => {
               const top = this.stack[this.stack.length - 1];

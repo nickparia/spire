@@ -225,13 +225,9 @@ export function RunHud({
         <p className="stat-num">{started ? formatPercent(hud.accuracy) : "—"}</p>
         {hud.escape && hud.escape.count === 0 ? (
           <p className={"boss-hud" + (hud.escape.gaze === "watch" ? " boss-watch" : "")}>
-            {hud.escape.gaze === "watch"
-              ? "It is watching · be still"
-              : hud.escape.gaze === "stir"
-                ? "It stirs…"
-                : hud.escape.bound > 0
-                  ? `Bound · tear ×${Math.ceil(hud.escape.bound)}`
-                  : "Tap on the pulse"}
+            {hud.escape.bound > 0
+              ? `Bound · tear ×${Math.ceil(hud.escape.bound)}`
+              : "Tap on the pulse"}
           </p>
         ) : null}
         {hud.darkGap !== null && started ? (

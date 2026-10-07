@@ -1,9 +1,8 @@
 {
-  "build": 45,
-  "title": "Be still",
+  "build": 46,
+  "title": "Run and stop",
   "notes": [
-    "The boss is a new fight: tap as the ring closes on the light, and when its great eye opens, be still. If it sees you move, it lunges.",
-    "The story is now told in chapters, each paragraph over its own living painting: a prologue before your first game, and Chapter I when Hearth is relit.",
-    "The painted source now appears on iPhone."
+    "In the boss fight, a clear signal at the top says when to move: RUN (gold), IT STIRS (amber, with a bar running down to the stare), and STOP (red, with the screen's edges glowing red). The pulse ring turns red while the eye watches.",
+    "Tapping the Hearth end scene now opens Chapter I instead of doing nothing."
   ]
 }

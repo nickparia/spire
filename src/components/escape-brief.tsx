@@ -6,7 +6,8 @@ import type { Hud } from "@/game/engine";
  */
 export function EscapeBrief({ hud }: { hud: Hud }) {
   const esc = hud.escape;
-  if (!esc || esc.count === 0) return null;
+  if (esc && esc.count === 0) return <GazeCue gaze={esc.gaze} stirFor={esc.stirFor} />;
+  if (!esc) return null;
   if (esc.sting) {
     return (
       <div className="sting" aria-hidden="true">
@@ -40,5 +41,25 @@ export function EscapeBrief({ hud }: { hud: Hud }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** The eye's state as a traffic light: run, it stirs (stop soon), stop. */
+function GazeCue({ gaze, stirFor }: { gaze: "shut" | "stir" | "watch"; stirFor: number }) {
+  return (
+    <>
+      {gaze !== "shut" ? <div className={`cue-edges cue-edges-${gaze}`} /> : null}
+      <div key={gaze} className={`cue cue-${gaze === "shut" ? "run" : gaze}`} aria-live="assertive">
+        <span className="cue-pill">
+          {gaze === "watch" ? <Eye size={30} strokeWidth={2.6} /> : null}
+          {gaze === "shut" ? "Run" : gaze === "stir" ? "It stirs" : "Stop"}
+        </span>
+        {gaze === "stir" ? (
+          <span className="cue-bar">
+            <i style={{ animationDuration: `${stirFor}s` }} />
+          </span>
+        ) : null}
+      </div>
+    </>
   );
 }

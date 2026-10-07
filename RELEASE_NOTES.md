@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 46 — Run and stop
+
+- **Clear signals in the boss fight.** A sign at the top tells you when to move:
+  - **RUN** (gold): tap on the pulse.
+  - **IT STIRS** (amber): a bar runs down to when the eye opens. Get ready to stop.
+  - **STOP** (red, with an eye): the screen's edges glow red and the pulse ring turns red. Don't tap until it says RUN again.
+- **Fixed:** tapping the Hearth end scene did nothing. Chapter I had opened behind it; now it opens on top.
+
 ## Build 45 — Be still
 
 - **A new boss fight.** Spamming no longer works:
