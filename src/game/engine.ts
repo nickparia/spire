@@ -151,8 +151,51 @@ const ESCAPE_LUNGE = 6;
 const DARK_ART_SURFACE = 0.2;
 /** Down the screen the Descent's tip sits, as a share of the view. */
 const DESCENT_SEAT = 0.42;
+type SlabLook = "fire" | "ice" | "charge";
+/** Each living slab's box inside its sheet's frames, as shares of the frame. */
+const SLAB_LOOKS: Record<SlabLook, { l: number; r: number; top: number; bot: number }> = {
+  fire: { l: 0.016, r: 0.983, top: 0.367, bot: 0.929 },
+  ice: { l: 0.012, r: 0.989, top: 0.058, bot: 0.692 },
+  charge: { l: 0.013, r: 0.988, top: 0.122, bot: 0.85 },
+};
+const SLAB_LOOK_FRAMES = 12;
+const SLAB_LOOK_FPS = 10;
+/** A perfect streak this long sets the top slab alight; each perfect after spreads it a floor, to this many. */
+const FIRE_STREAK = 4;
+const FIRE_MAX = 5;
+type ClimberKind = "swarm" | "mite" | "brute" | "lantern";
+/** Size, in px, of each kind of climber at the front. */
+const CLIMBER_SIZE: Record<ClimberKind, number> = { swarm: 84, mite: 50, brute: 116, lantern: 86 };
+/** Frames per second of each kind's crawl. */
+const CLIMBER_FPS: Record<ClimberKind, number> = { swarm: 9, mite: 15, brute: 6, lantern: 11 };
+/** Seconds a crushed climber stays flattened, and before another takes its place. */
+const CLIMBER_SQUASH = 0.45;
+const CLIMBER_RESPAWN = 3;
+
+/** One climber in the swarm, fixed by its index: where it is, what it is. */
+function climber(i: number): {
+  kind: ClimberKind;
+  x: number;
+  depth: number;
+  r: number;
+  flip: boolean;
+} {
+  const h = (n: number) => {
+    const v = Math.sin(i * 12.9898 + n * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  const kind: ClimberKind =
+    i % 13 === 12 ? "lantern" : i % 9 === 8 ? "brute" : i % 5 === 3 ? "mite" : "swarm";
+  return { kind, x: h(1), depth: h(2), r: h(3), flip: h(4) < 0.5 };
+}
+/** What spills when a climber is crushed. */
+const BLOOD_RGB: RGB = [150, 18, 24];
+const BLOOD_DEEP_RGB: RGB = [70, 6, 12];
+/** The painted slab's end caps and centre mark, as shares of its width. */
+const SLAB_CAP = 0.058;
+const SLAB_MID = 0.07;
 /** Climbers drawn at the front. */
-const CLIMBERS = 34;
+const CLIMBERS = 20;
 /** Floors behind the tip the climbers are held within, however fast you build. */
 const DESCENT_REACH = 7;
 /** Floors a cut-off piece knocks the climbers back, plus more for a wide one. */
@@ -665,6 +708,14 @@ export class SpireEngine {
   private sourceArt: HTMLVideoElement | null = null;
   private sourceArtReady = false;
   private sourceMask: HTMLCanvasElement | null = null;
+  /** How the slab being painted looks: alight, frozen, charged, or plain. */
+  private slabLookNow: SlabLook | null = null;
+  /** Sprite sheets (public/art/sprites/<name>.webp), one row of square frames. */
+  private sprites = new Map<string, HTMLImageElement>();
+  /** Climbers crushed, by index, with the clock when it happened. */
+  private climberDead = new Map<number, number>();
+  /** The painted slab (public/art/slab-hearth.png), cut so it fits any width. */
+  private slabArt: HTMLImageElement | null = null;
   /** The Descent's painted shaft, behind everything when building down. */
   private shaftArt: HTMLImageElement | null = null;
   /** The painted Dark (public/art/dark-<world>.mp4), drawn beneath its edge once loaded. */
@@ -2680,12 +2731,31 @@ export class SpireEngine {
     const push = SLAB_H * (SQUASH_PUSH + SQUASH_PER_WIDTH * Math.min(1, w / this.startW));
     this.dark = Math.max(DARK_START, this.dark - push);
     const at = this.climbersY();
-    this.fx.burst(x, at, [200, 192, 214], 16, 220);
-    this.fx.ring(x, at, [150, 80, 220], 90 + w * 0.6, 4);
-    this.float("SQUASHED", x, at - 30, true, 20);
+    // Those under it die: the near ones within the slab's reach.
+    const sx = x - this.camX + this.vw / 2;
+    for (let i = 0; i < CLIMBERS; i++) {
+      const c = climber(i);
+      const cx = c.x * (this.vw + 40) - 20;
+      if (c.depth < 0.45 && Math.abs(cx - sx) < w / 2 + 18 && !this.climberDead.has(i)) {
+        this.climberDead.set(i, this.clock);
+      }
+    }
+    // The crunch: blood flung out and down, pale chips of them, a stain, a
+    // beat of hit-stop and a shove of the camera.
+    this.fx.blood(x, at, BLOOD_RGB, 80, 340);
+    this.fx.blood(x, at, BLOOD_DEEP_RGB, 18, 180);
+    this.fx.burst(x, at, [200, 192, 214], 12, 240);
+    this.float(
+      "SQUASHED",
+      Math.max(60, Math.min(this.vw - 60, x - this.camX + this.vw / 2)) + this.camX - this.vw / 2,
+      at - 30,
+      true,
+      22,
+    );
     this.sfx.drop();
-    this.trauma = Math.min(1, this.trauma + 0.2);
-    haptics.medium();
+    this.freeze = Math.max(this.freeze, this.reduceMotion ? 0.02 : 0.07);
+    this.trauma = Math.min(1, this.trauma + 0.32);
+    haptics.heavy();
   }
 
   /** Light pushes the Dark down, never below where it started. */
@@ -4153,49 +4223,50 @@ export class SpireEngine {
     g.addColorStop(1, "rgba(4,2,8,0.97)");
     ctx.fillStyle = g;
     ctx.fillRect(-120, front - 10, this.vw + 240, this.vh - front + 200);
-    // The climbers: pale, hunched, many-limbed, scrabbling up over each other.
-    ctx.save();
-    for (let i = 0; i < CLIMBERS; i++) {
-      const seed = i * 12.9898;
-      const r1 = (Math.sin(seed) * 43758.5453) % 1;
-      const r2 = (Math.sin(seed * 1.7 + 3) * 24634.6345) % 1;
-      const r3 = (Math.sin(seed * 2.3 + 7) * 13758.937) % 1;
-      const x = Math.abs(r1) * (this.vw + 40) - 20;
-      const depth = Math.abs(r2);
-      const y = front + 6 + depth * depth * 150 + Math.sin(clock * (2 + Math.abs(r3) * 3) + i) * 4;
-      const size = 7 + Math.abs(r3) * 6 - depth * 3;
-      const reach = Math.sin(clock * (5 + Math.abs(r1) * 4) + i * 1.3);
-      const shade = 0.75 - depth * 0.55;
-      ctx.fillStyle = `rgba(200,192,214,${shade})`;
-      ctx.strokeStyle = `rgba(200,192,214,${shade})`;
-      ctx.lineWidth = 1.6;
-      ctx.lineCap = "round";
-      // Body and head.
-      ctx.beginPath();
-      ctx.ellipse(x, y, size * 0.55, size, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(x, y - size * 1.05, size * 0.45, 0, Math.PI * 2);
-      ctx.fill();
-      // Arms reaching up, legs pushing.
-      ctx.beginPath();
-      ctx.moveTo(x - size * 0.4, y - size * 0.5);
-      ctx.lineTo(x - size * 1.1, y - size * (1.6 + reach * 0.5));
-      ctx.moveTo(x + size * 0.4, y - size * 0.5);
-      ctx.lineTo(x + size * 1.1, y - size * (1.6 - reach * 0.5));
-      ctx.moveTo(x - size * 0.3, y + size * 0.7);
-      ctx.lineTo(x - size * 0.9, y + size * (1.4 - reach * 0.3));
-      ctx.moveTo(x + size * 0.3, y + size * 0.7);
-      ctx.lineTo(x + size * 0.9, y + size * (1.4 + reach * 0.3));
-      ctx.stroke();
-      // Two pin-prick eyes on the near ones.
-      if (depth < 0.35) {
-        ctx.fillStyle = "rgba(180,110,255,0.9)";
-        ctx.fillRect(x - size * 0.22, y - size * 1.1, 1.6, 1.6);
-        ctx.fillRect(x + size * 0.12, y - size * 1.1, 1.6, 1.6);
+    // The climbers: painted things crawling up the shaft, far ones fading into the black.
+    const order = [...Array(CLIMBERS).keys()].sort((a, b) => climber(b).depth - climber(a).depth);
+    for (const i of order) {
+      const c = climber(i);
+      const sheet = this.sprite(c.kind);
+      if (!sheet) continue;
+      const dead = this.climberDead.get(i);
+      let squash = 1;
+      let alpha = 1 - c.depth * 0.45;
+      if (dead) {
+        const age = this.clock - dead;
+        if (age < CLIMBER_SQUASH) {
+          // Crushed flat against the slab, then gone.
+          squash = 0.25 + 0.75 * (1 - age / CLIMBER_SQUASH) ** 3;
+          alpha *= 1 - age / CLIMBER_SQUASH;
+        } else if (age < CLIMBER_RESPAWN) continue;
+        else if (age < CLIMBER_RESPAWN + 1) alpha *= age - CLIMBER_RESPAWN;
+        else this.climberDead.delete(i);
       }
+      const x = c.x * (this.vw + 40) - 20;
+      const size = CLIMBER_SIZE[c.kind] * (1 - c.depth * 0.4);
+      const y =
+        front + 8 + size * 0.4 + c.depth ** 1.4 * 170 + Math.sin(clock * (3 + c.r * 3) + i) * 3;
+      const fps = CLIMBER_FPS[c.kind];
+      const frame = Math.floor(clock * fps + c.r * sheet.frames) % sheet.frames;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.translate(x, y);
+      // Side-on crawlers turned a quarter: they scale the shaft head first.
+      ctx.rotate(Math.PI / 2 + (c.r - 0.5) * 0.35);
+      ctx.scale(squash, c.flip ? -1 : 1);
+      ctx.drawImage(
+        sheet.img,
+        frame * sheet.cell,
+        0,
+        sheet.cell,
+        sheet.cell,
+        -size / 2,
+        -size / 2,
+        size,
+        size,
+      );
+      ctx.restore();
     }
-    ctx.restore();
     // The edge stays readable whatever they look like.
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -4209,6 +4280,43 @@ export class SpireEngine {
     }
     ctx.stroke();
     ctx.restore();
+  }
+
+  /** Slabs from the top that burn: a streak of four sets the top alight, and it spreads. */
+  private burning(): number {
+    if (this.phase !== "play" && this.phase !== "ready") return 0;
+    return this.streak >= FIRE_STREAK ? Math.min(FIRE_MAX, this.streak - FIRE_STREAK + 1) : 0;
+  }
+
+  /** The living look of a slab (or of the mover, for null): fire, frost, charge, or none. */
+  private slabLook(slab: Slab | null, hot: boolean): SlabLook | null {
+    if (slab && this.escape?.charged.has(slab)) return "charge";
+    if (this.theme.id === "glacier") return "ice";
+    if (hot) return "fire";
+    return null;
+  }
+
+  /** A living slab's sheet once loaded. */
+  private lookSheet(look: SlabLook): HTMLImageElement | null {
+    const name = `slab-${look}`;
+    let img = this.sprites.get(name);
+    if (!img) {
+      img = Object.assign(new Image(), { src: `art/sprites/${name}.webp` });
+      this.sprites.set(name, img);
+    }
+    return img.complete && img.naturalWidth > 0 ? img : null;
+  }
+
+  /** A sprite sheet once loaded: frames are square, side by side. */
+  private sprite(name: string): { img: HTMLImageElement; cell: number; frames: number } | null {
+    let img = this.sprites.get(name);
+    if (!img) {
+      img = Object.assign(new Image(), { src: `art/sprites/${name}.webp` });
+      this.sprites.set(name, img);
+    }
+    if (!img.complete || img.naturalHeight === 0) return null;
+    const cell = img.naturalHeight;
+    return { img, cell, frames: Math.max(1, Math.round(img.naturalWidth / cell)) };
   }
 
   /** The ceiling the Descent hangs from: rock above the foundation. */
@@ -4275,6 +4383,7 @@ export class SpireEngine {
       ctx.translate(-vw / 2, -vh * 0.72);
     }
 
+    this.fx.down = this.plan.descent ? -1 : 1;
     if (this.plan.descent) this.drawCeiling(ctx);
     else this.drawGround(ctx);
     this.drawGhost(ctx);
@@ -4287,7 +4396,13 @@ export class SpireEngine {
     const prev = this.peak();
     const inZone = aiming && this.phase !== "menu" && this.cued() && this.lined(prev);
 
-    for (const slab of this.stack) this.drawSlab(ctx, slab, inZone && slab === prev);
+    const burning = this.burning();
+    for (let i = 0; i < this.stack.length; i++) {
+      const slab = this.stack[i]!;
+      this.slabLookNow = this.slabLook(slab, this.stack.length - 1 - i < burning);
+      this.drawSlab(ctx, slab, inZone && slab === prev);
+    }
+    this.slabLookNow = null;
     if (this.stage && aiming && this.phase !== "menu") this.drawPlumb(ctx, prev);
     if (this.phase === "play" && this.ghost) this.drawGhostLine(ctx);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
@@ -4303,7 +4418,11 @@ export class SpireEngine {
     }
     if (live && !this.escape) this.drawCourseCues(ctx);
     if (live && this.bomb) this.drawBomb(ctx);
-    if (live && !this.escape) this.drawMover(ctx, inZone);
+    if (live && !this.escape) {
+      this.slabLookNow = this.slabLook(null, burning > 0);
+      this.drawMover(ctx, inZone);
+      this.slabLookNow = null;
+    }
     if (live && this.mote) this.drawMote(ctx);
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
@@ -4986,10 +5105,29 @@ export class SpireEngine {
   ): void {
     if (w < 0.5 || h < 0.5) return;
     const sy = Number.isFinite(scaleY) ? Math.max(0.2, scaleY) : 1;
+    const art = (this.slabArt ??= Object.assign(new Image(), { src: "art/slab-hearth.png" }));
     ctx.save();
     ctx.translate(sx + w / 2, syBottom);
     if (rot) ctx.rotate(rot);
     ctx.scale(1 / sy, sy);
+    const look = this.slabLookNow ? this.lookSheet(this.slabLookNow) : null;
+    if (look) {
+      const meta = SLAB_LOOKS[this.slabLookNow!];
+      const frame =
+        Math.floor((this.reduceMotion ? 0 : this.clock) * SLAB_LOOK_FPS) % SLAB_LOOK_FRAMES;
+      this.drawSlabArt(ctx, look, w, h, rgb, hotGroove, {
+        sx: (frame * look.naturalWidth) / SLAB_LOOK_FRAMES,
+        sw: look.naturalWidth / SLAB_LOOK_FRAMES,
+        ...meta,
+      });
+      ctx.restore();
+      return;
+    }
+    if (art.complete && art.naturalWidth > 0) {
+      this.drawSlabArt(ctx, art, w, h, rgb, hotGroove);
+      ctx.restore();
+      return;
+    }
     ctx.fillStyle = rgbCss(rgb);
     ctx.fillRect(-w / 2, -h, w, h);
     ctx.fillStyle = rgbCss(shade(rgb, 0.24));
@@ -5004,6 +5142,81 @@ export class SpireEngine {
     const grooveW = hotGroove ? 3 : 2;
     ctx.fillRect(-grooveW / 2, -h + 5, grooveW, h - 9);
     ctx.restore();
+  }
+
+  /**
+   * The painted slab, centred on the origin with its bottom at y = 0: end caps
+   * and the centre mark kept true, the runs between them stretched. The sky's
+   * colour is laid softly over it, so a white flash or a drained rubble still reads.
+   */
+  private drawSlabArt(
+    ctx: CanvasRenderingContext2D,
+    art: HTMLImageElement,
+    w: number,
+    h: number,
+    rgb: RGB,
+    hotGroove: boolean,
+    /**
+     * Where the slab sits in the source: a frame of a sheet (sx, sw), and the
+     * slab's own box inside it, as shares (flames above, icicles below spill out).
+     */
+    src: { sx: number; sw: number; l: number; r: number; top: number; bot: number } = {
+      sx: 0,
+      sw: art.naturalWidth,
+      l: 0,
+      r: 1,
+      top: 0,
+      bot: 1,
+    },
+  ): void {
+    const ah = art.naturalHeight;
+    // The slab's own box in the source, and the rows above and below it.
+    const aw = src.sw * (src.r - src.l);
+    const ax = src.sx + src.sw * src.l;
+    const slabH = ah * (src.bot - src.top);
+    // The painting is a little taller than the slab: its rough top edge stands proud.
+    const dh = h * 1.12;
+    const k = dh / slabH;
+    const cap = SLAB_CAP * aw;
+    const mid = SLAB_MID * aw;
+    const capW = cap * k;
+    const midW = mid * k;
+    // Drawn whole height, so what spills above and below the slab comes too.
+    const top = -dh - ah * src.top * k;
+    const fullH = ah * k;
+    const left = -w / 2;
+    if (w < capW * 2 + midW + 4) {
+      ctx.drawImage(art, ax, 0, aw, ah, left, top, w, fullH);
+    } else {
+      const run = (w - capW * 2 - midW) / 2;
+      const srcRun = (aw - cap * 2 - mid) / 2;
+      let sx = ax;
+      let dx = left;
+      for (const [sw, dw] of [
+        [cap, capW],
+        [srcRun, run],
+        [mid, midW],
+        [srcRun, run],
+        [cap, capW],
+      ] as const) {
+        // A hair of overlap so no seam opens between the pieces.
+        ctx.drawImage(art, sx, 0, sw, ah, dx - 0.3, top, dw + 0.6, fullH);
+        sx += sw;
+        dx += dw;
+      }
+    }
+    ctx.save();
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.fillStyle = rgbCss(rgb, 0.65);
+    ctx.fillRect(left + 1, -dh + dh * 0.12, w - 2, dh * 0.84);
+    ctx.restore();
+    if (hotGroove) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgbCss(this.theme.accent, 0.85);
+      ctx.fillRect(-1.5, -dh + dh * 0.15, 3, dh * 0.75);
+      ctx.restore();
+    }
   }
 
   private drawVignette(ctx: CanvasRenderingContext2D): void {

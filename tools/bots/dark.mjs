@@ -73,8 +73,10 @@ await page.evaluate(() => {
     }
   }, 5);
 });
-await wait(450);
-await page.screenshot({ path: `${out}/dark-m.png` });
+for (const t of [350, 250, 250, 300]) {
+  await wait(t);
+  await page.screenshot({ path: `${out}/dark-m${t}-${Date.now() % 1000}.png` });
+}
 await wait(9000);
 await page.screenshot({ path: `${out}/dark-a.png` });
 await page.evaluate(() => {

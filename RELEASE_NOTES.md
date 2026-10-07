@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 50 — Painted stone, living slabs (internal)
+
+- **Painted slabs.** Every slab is now carved dark stone with runes and a molten groove; the centre mark is the perfect mark.
+- **They come alive.** A streak of four perfects sets the top slab alight, and the fire spreads down with every perfect after. On the Glacier the whole tower is frozen, rimed and dripping icicles. In the escape the charged slabs pour starlight.
+- **The Descent's creatures.** The stick figures are gone: the climbers are painted things that crawl up the shaft (the starved builders in their rags, bone-white mites, root-armed brutes, and a few with a violet glow in their chests). When a cut-off piece lands on them they are crushed flat and burst in blood.
+
 ## Build 49 — Test sky: The Roots (internal)
 
 - **The Descent, first test.** Choose **The Descent** on the world select (testers can open it now). In **The Roots** you build _down_: the spire hangs from the ceiling of a vast shaft and grows a floor at a time beneath it.

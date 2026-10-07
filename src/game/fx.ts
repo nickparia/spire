@@ -56,6 +56,9 @@ type Confetto = {
   phase: number;
 };
 
+/** A stain left where something burst. */
+type Splat = { x: number; y: number; r: number; rgb: RGB; life: number; max: number };
+
 const MAX_SPARKS = 420;
 const TAU = Math.PI * 2;
 
@@ -68,6 +71,9 @@ export class Fx {
   private confetti: Confetto[] = [];
   /** Scales particle counts down for prefers-reduced-motion. */
   calm = false;
+  /** -1 when the world is drawn mirrored (the Descent), so things still fall down the screen. */
+  down = 1;
+  private splats: Splat[] = [];
 
   clear(): void {
     this.sparks.length = 0;
@@ -75,6 +81,44 @@ export class Fx {
     this.seams.length = 0;
     this.rays.length = 0;
     this.confetti.length = 0;
+    this.splats.length = 0;
+  }
+
+  /**
+   * Something crushed: dark blood sprayed out under gravity, a few heavy
+   * gobbets, and a stain that lingers where it burst.
+   */
+  blood(x: number, y: number, rgb: RGB, n: number, speed: number): void {
+    for (let i = this.count(n); i > 0; i--) {
+      const a = Math.random() * TAU;
+      const s = speed * (0.3 + Math.random() * 0.9);
+      const heavy = Math.random() < 0.18;
+      const life = 0.7 + Math.random() * 0.7;
+      this.push({
+        x,
+        y,
+        vx: Math.cos(a) * s,
+        vy: Math.abs(Math.sin(a)) * s * 0.9 + 60,
+        life,
+        max: life,
+        size: heavy ? 3.5 + Math.random() * 2.5 : 1.4 + Math.random() * 1.8,
+        rgb,
+        gravity: 900,
+        drag: 0.6,
+        glow: false,
+      });
+    }
+    const blobs = this.calm ? 3 : 7;
+    for (let i = 0; i < blobs; i++) {
+      this.splats.push({
+        x: x + (Math.random() - 0.5) * 34,
+        y: y + (Math.random() - 0.5) * 16,
+        r: 4 + Math.random() * 9,
+        rgb,
+        life: 2.4,
+        max: 2.4,
+      });
+    }
   }
 
   private count(n: number): number {
@@ -190,7 +234,7 @@ export class Fx {
       const p = this.sparks[i]!;
       const damp = Math.max(0, 1 - p.drag * dt);
       p.vx *= damp;
-      p.vy = p.vy * damp - p.gravity * dt;
+      p.vy = p.vy * damp - p.gravity * this.down * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.life -= dt;
@@ -200,6 +244,11 @@ export class Fx {
       const r = this.rings[i]!;
       r.life -= dt;
       if (r.life <= 0) this.rings.splice(i, 1);
+    }
+    for (let i = this.splats.length - 1; i >= 0; i--) {
+      const sp = this.splats[i]!;
+      sp.life -= dt;
+      if (sp.life <= 0) this.splats.splice(i, 1);
     }
     for (let i = this.seams.length - 1; i >= 0; i--) {
       const f = this.seams[i]!;
@@ -223,6 +272,14 @@ export class Fx {
 
   /** World-space effects. Call inside the camera transform. */
   draw(ctx: CanvasRenderingContext2D, project: Project): void {
+    for (const sp of this.splats) {
+      const s = project(sp.x, sp.y);
+      const a = Math.min(1, (sp.life / sp.max) * 1.6) * 0.85;
+      ctx.fillStyle = rgbCss(sp.rgb, a);
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, sp.r * 1.3, sp.r * 0.75, 0, 0, TAU);
+      ctx.fill();
+    }
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const r of this.rays) {
