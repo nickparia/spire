@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 55 — A clean summit (internal)
+
+- **Fixed: the summit's background.** When the camera pulled back to show your tower, a flat band of old ground rose across the painted sky, the pillar of light laid a grey box over everything, and the ruins slid back in front. Now it is one painted scene: the pillar rises over the sky, the ruins step aside.
+- **No more fireworks.** They looked cheap; the pillar of light is the moment.
+- **Why the slabs go red.** Four perfects in a row set the top slab alight, and the fire spreads down with each perfect after. Now, when the streak breaks, the fire goes out where you can see it: the slabs hiss and give off steam and smoke.
+
 ## Build 54 — Carved in stone (internal)
 
 - **Every sky has its own stone.** The Foundry's ember stone; Tidewater's wet sea-stone with barnacles and weed; Pulse City's brass-bound slabs with a clockwork gear; Red Canyon's layered sandstone; Gale Ridge's wind-scoured granite with a red prayer cloth; the Glacier's blue ice-stone; Eclipse's obsidian with a gold seam; Apex's star-marble veined with violet. Fire, frost, charge and keystone gold still play over them.

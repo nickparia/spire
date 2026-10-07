@@ -1399,20 +1399,8 @@ export class SpireEngine {
       this.fx.sparkle(cx, crown, top.w, mix(this.theme.accent, BONE, 0.5), 30);
       for (let i = 0; i < this.stack.length; i++) this.stack[i]!.ripple = i * 0.035;
       this.pulse = 1;
-      this.shellsLeft = this.reduceMotion ? 1 : 5;
       this.nextShell = 0.5;
       return;
-    }
-    if (this.shellsLeft > 0 && this.demoAge >= this.nextShell) {
-      this.shellsLeft -= 1;
-      this.nextShell += 0.4 + Math.random() * 0.4;
-      const palette: RGB[] = [this.theme.accent, BONE, this.theme.slab[1]];
-      this.starburst(
-        this.camX + (Math.random() - 0.5) * this.vw * 0.7,
-        top.y + 80 + Math.random() * 140,
-        palette[this.shellsLeft % palette.length]!,
-        0.7 + Math.random() * 0.4,
-      );
     }
     if (this.demoAge > 6) {
       // Begin again: the camera eases back down to a fresh foundation.
@@ -2839,6 +2827,19 @@ export class SpireEngine {
     return 1 + QUICKEN_RATE * over;
   }
 
+  /** The streak's fire goes out: each burning slab hisses, steams and smokes. */
+  private quench(count: number): void {
+    const n = this.stack.length;
+    for (let i = Math.max(0, n - count); i < n; i++) {
+      const s = this.stack[i]!;
+      const cx = s.x + s.w / 2;
+      const top = s.y + VISUAL_H;
+      this.fx.sparkle(cx, top, s.w, [210, 205, 200], 12);
+      this.fx.burst(cx, top, [120, 112, 108], 10, 90);
+    }
+    this.sfx.hiss();
+  }
+
   /** A cut-off piece lands on the climbers: they are knocked back down the shaft. */
   private squash(x: number, w: number): void {
     const push = SLAB_H * (SQUASH_PUSH + SQUASH_PER_WIDTH * Math.min(1, w / this.startW));
@@ -3339,7 +3340,10 @@ export class SpireEngine {
     }
     this.floors = floor;
     this.score += points;
+    // A broken streak puts the fire out where you can see it: steam and smoke off the slabs.
+    const burnt = this.burning();
     this.streak = result.streak;
+    if (burnt > 0 && this.streak === 0) this.quench(burnt);
     this.bestStreak = Math.max(this.bestStreak, this.streak);
     if (result.perfect) this.perfects += 1;
     this.hint = false;
@@ -3929,7 +3933,6 @@ export class SpireEngine {
     this.pulse = 1;
     this.flash = 0.5;
     this.trauma = Math.min(1, this.trauma + 0.5);
-    this.shellsLeft = this.reduceMotion ? 3 : 10;
     this.nextShell = 0.3;
     const stars = Number(goals.clear) + Number(goals.precise) + Number(goals.swift);
     this.starCues = [1.05, 1.4, 1.75].slice(0, stars);
@@ -4304,20 +4307,6 @@ export class SpireEngine {
       }
     }
     const top = this.peak()!;
-    if (this.shellsLeft > 0 && this.wonAge >= this.nextShell) {
-      this.shellsLeft -= 1;
-      this.nextShell += 0.26 + Math.random() * 0.34;
-      const palette: RGB[] = [this.theme.accent, BONE, this.theme.slab[1], this.theme.slab[2]];
-      const crown = top.y + VISUAL_H;
-      this.starburst(
-        this.camX + (Math.random() - 0.5) * this.vw * 0.8,
-        crown * (0.45 + Math.random() * 0.5) + 60 + Math.random() * 120,
-        palette[this.shellsLeft % palette.length]!,
-        0.8 + Math.random() * 0.6,
-      );
-      this.sfx.firework();
-      this.pulse = Math.max(this.pulse, 0.5);
-    }
     const t = this.reduceMotion ? 1 : clamp01((this.wonAge - 0.55) / 1.9);
     this.pull = easeInOut(t);
     this.camY = this.camAtWin * (1 - this.pull);
@@ -4526,17 +4515,37 @@ export class SpireEngine {
     this.drawEmbers(ctx, view, 0.25, 26, 1.2, 0.5);
   }
 
+  /**
+   * Under a painted sky the ground is the painting's own: only a soft shadow
+   * for the tower's foot, never a flat band (it rose across the sky at the summit).
+   */
+  private drawPaintedGround(ctx: CanvasRenderingContext2D): void {
+    const y = this.worldToScreen(0, 0).y;
+    if (y > this.vh + 80) return;
+    const g = ctx.createLinearGradient(0, y - 6, 0, y + 90);
+    g.addColorStop(0, "rgba(8,5,6,0)");
+    g.addColorStop(0.25, "rgba(8,5,6,0.55)");
+    g.addColorStop(1, "rgba(8,5,6,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-120, y - 6, this.vw + 240, 96);
+  }
+
   /** In front of the tower: near embers, quick, and the ruins you rise out of. */
   private drawSkyFront(ctx: CanvasRenderingContext2D, view: BackdropView): void {
     this.drawEmbers(ctx, view, 1.4, 14, 2.4, 0.9);
     const fg = this.paintedSky()!.fg;
     if (!fg.complete || fg.naturalWidth === 0) return;
+    // As the summit pulls back, the near ruins step aside for the tower.
+    if (this.pull >= 0.99) return;
     const w = view.w * 1.1;
     const h = w * (fg.naturalHeight / fg.naturalWidth);
     // Closer than the tower: it falls away faster than the climb.
     const y = view.h - h * 0.92 + (view.camY - this.anchor) * 1.35;
     if (y > view.h) return;
+    ctx.save();
+    ctx.globalAlpha = 1 - this.pull;
     ctx.drawImage(fg, (view.w - w) / 2 - view.camX * 0.25, y, w, h);
+    ctx.restore();
   }
 
   /** Embers rising through a layer: depth sets their parallax, size and pace. */
@@ -4671,6 +4680,7 @@ export class SpireEngine {
 
     this.fx.down = this.plan.descent ? -1 : 1;
     if (this.plan.descent) this.drawCeiling(ctx);
+    else if (this.paintedSky()) this.drawPaintedGround(ctx);
     else this.drawGround(ctx);
     this.drawGhost(ctx);
     if (!this.escape) this.drawSummitLine(ctx);

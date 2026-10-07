@@ -67,7 +67,8 @@ await page.evaluate((level) => {
 await wait(7000);
 await page.screenshot({ path: `${out}/sm-play.png` });
 await page.evaluate(() => window.__spire.win());
-for (const t of [700, 900, 1400]) {
+await page.addStyleTag({ content: ".panel-won { opacity: 0.08 !important; }" });
+for (const t of [700, 900, 1400, 2500]) {
   await wait(t);
   await page.screenshot({ path: `${out}/sm-${t}.png` });
 }
