@@ -9,7 +9,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 ## Next, in order
 
 - **Unlocks from stars and feats** (agreed Oct 7, replaces the forge): e.g. three stars on a sky unlocks a stone finish for your slabs, finishing a world a beacon style, a feat a slab trail; chosen under Achievements.
-- **Painted art (Higgsfield)**: brief and prompts in `ART.md`; slots are built (`src/components/art.tsx`), files go in `public/art/` by name and replace the procedural version when present. Claude drives it via the Higgsfield CLI (`higgsfield generate create …`, workspace selected; Ultra plan). Still to do: the optional `escape-sting.mp4`, panel loops, and matching the in-game source to `source-ref.jpg`.
+- **Painted art (Higgsfield)**: brief and prompts in `ART.md`; slots are built (`src/components/art.tsx`), files go in `public/art/` by name and replace the procedural version when present. Claude drives it via the Higgsfield CLI (`higgsfield generate create …`, workspace selected; Ultra plan). Still to do: panel loops; a caught sting and a victory sting.
 - **Pixel-art side test**: decide the in-game style (toggle in Options) before generating art in volume.
 - **Tidy the dead systems**: coins, ranks (`gear.ts` tracks), the forge offers, rescue and Endless are hidden but still in the engine and save; remove them once unlocks replace them.
 - **Motif per world** (music idea 3): a short theme for Hearth that each sky varies, the Hollow breaks and the world-end scene resolves; world two arrives with its own.
@@ -33,6 +33,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 44 Painted boss: `source.mp4` drawn into the chase (`drawSourceArt`, grows as it nears, eyes kept in view), `escape-sting.mp4` on the first lighting (`ESCAPE_STING`), binding tendrils restyled to match. Pattern for later worlds: Higgsfield for watched beats (stings) and living layers (the mass), code for anything that reacts to taps.
 - 43 Full-screen per-world background loops on the world select (`bg-<world>.mp4/.jpg`, crossfade), IM Fell English SC as `--font-display`, story on the first Begin only, new bottom bar, no what's-new for new players.
 - 42 Painted art from Higgsfield: title loop, Hearth/Descent/Wheel panels, the world-end film (plays once, holds, then the line; tap skips), source reference. See ART.md.
 - 41 Escape bindings (`ESCAPE_BIND_EVERY/INTERVAL/TAPS`, stop chains, tear with taps), the cloud always in view, first-time briefing + 3-2-1 (`escape-brief.tsx`, tip key `escape`). Hearth: perfect tower escapes at 2.5 taps/s, sloppy (40% perfect, 40% heavy) needs 5.

@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 44 — It comes for the light
+
+- **The sky is lit** — the first time you reach Apex's summit, a painted scene: the beam flares, the black sky ripples and tears open, and the source descends with its eyes opening. Retries go straight to the countdown.
+- **The source is painted and alive** during the escape: a churning mass of eyes and tentacles that grows as it closes in, its great eye bearing down on the light. Its tentacles bind your tower, heavier and darker than before.
+
 ## Build 43 — A living world select
 
 - **Each world plays its own painted scene** full-screen behind its panel: Hearth's burning foundry city, the Descent's chasm, the Wheel turning in the void. Swiping crossfades between them.

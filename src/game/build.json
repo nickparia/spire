@@ -1,10 +1,8 @@
 {
-  "build": 43,
-  "title": "A living world select",
+  "build": 44,
+  "title": "It comes for the light",
   "notes": [
-    "Each world now plays its own painted scene full-screen behind its panel, crossfading as you swipe.",
-    "A weathered typeface for the title, world names and headings.",
-    "The story plays once, when you begin your very first game.",
-    "A richer bar for Options, Leaderboard, Achievements and Story."
+    "The sky being lit is now a painted scene: the beam flares, the sky tears open and the source descends.",
+    "During the escape the source is painted and alive, its great eye bearing down as it closes in, its tentacles binding your tower."
   ]
 }

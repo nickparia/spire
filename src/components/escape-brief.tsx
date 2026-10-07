@@ -7,6 +7,13 @@ import type { Hud } from "@/game/engine";
 export function EscapeBrief({ hud }: { hud: Hud }) {
   const esc = hud.escape;
   if (!esc || esc.count === 0) return null;
+  if (esc.sting) {
+    return (
+      <div className="sting" aria-hidden="true">
+        <video src="art/escape-sting.mp4" autoPlay muted playsInline />
+      </div>
+    );
+  }
   return (
     <div className="brief" aria-live="assertive">
       {esc.briefing ? (

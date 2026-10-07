@@ -137,6 +137,8 @@ const ESCAPE_BIND_EVERY = 7;
 const ESCAPE_BIND_INTERVAL = 2.8;
 const ESCAPE_BIND_TAPS = 3;
 const ESCAPE_BRIEF = 4;
+/** Seconds the summit sting plays, when it is there. */
+const ESCAPE_STING = 5;
 /** Seconds between slabs in a chain of perfects going off. */
 const ESCAPE_CHAIN_STEP = 0.07;
 /** Floors below the top that light can drive the Dark, and no further. */
@@ -271,7 +273,14 @@ export type Hud = {
   /** The fight at the top of a boss sky: which surge, of how many. */
   boss: { surge: number; of: number } | null;
   /** The escape: floors left to the ground, and the combo toward a surge. */
-  escape: { left: number; combo: number; briefing: boolean; count: number; bound: number } | null;
+  escape: {
+    left: number;
+    combo: number;
+    briefing: boolean;
+    sting: boolean;
+    count: number;
+    bound: number;
+  } | null;
   /** A landing to choose from. */
   landing: { floor: number; offers: LandingId[] } | null;
 };
@@ -606,9 +615,17 @@ export class SpireEngine {
     bindEvery: number;
     /** The briefing is showing (first time only); then the countdown. */
     briefing: boolean;
+    /** The painted sting is playing. */
+    sting: boolean;
     /** Whole seconds left on the countdown, or 0 once running. */
     count: number;
   } | null = null;
+  /** The painted source (public/art/source.mp4), drawn into the chase when it has loaded. */
+  private sourceArt: HTMLVideoElement | null = null;
+  private sourceArtReady = false;
+  private sourceMask: HTMLCanvasElement | null = null;
+  /** The summit sting (public/art/escape-sting.mp4) is there to play. */
+  private stingReady = false;
   /** The tower as it stood at the summit, kept so a failed escape can be retried from there. */
   private escapeTower: EscapeSlab[] | null = null;
   /** The landing being chosen from, if the climb is stopped at one. */
@@ -642,6 +659,7 @@ export class SpireEngine {
     this.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.fx.calm = this.reduceMotion;
     this.save = loadSave();
+    this.loadSourceArt();
     this.rig.setMusic(this.save.music);
     this.rig.setSfx(this.save.sfx);
     this.music = new Music(this.rig, this.theme.track);
@@ -790,7 +808,7 @@ export class SpireEngine {
       const unranked = this.unranked;
       this.startLevel(this.levelIndex);
       this.unranked = unranked;
-      this.beginEscape(tower);
+      this.beginEscape(tower, false);
     } else this.startLevel(this.levelIndex);
   }
 
@@ -1724,11 +1742,11 @@ export class SpireEngine {
     }
     tower.sort((a, b) => a.y - b.y);
     this.escapeTower = tower;
-    this.beginEscape(tower);
+    this.beginEscape(tower, true);
   }
 
   /** Lays the tower out frozen and sets the source above it. */
-  private beginEscape(tower: EscapeSlab[]): void {
+  private beginEscape(tower: EscapeSlab[], fresh: boolean): void {
     const base = this.stack[0]!;
     base.body = null;
     // The physics stops here: nothing falls during the escape.
@@ -1765,6 +1783,7 @@ export class SpireEngine {
       bindT: 0,
       bindEvery: Math.max(0.9, ESCAPE_BIND_INTERVAL - world * 0.25),
       briefing: false,
+      sting: false,
       count: 3,
     };
     const esc = this.escape;
@@ -1779,7 +1798,10 @@ export class SpireEngine {
       this.save.tips["escape"] = 1;
       storeSave(this.save);
     }
-    esc.hold = (esc.briefing ? ESCAPE_BRIEF : 0) + 3;
+    // The first time the sky is lit, the painted sting plays before anything else.
+    esc.sting = fresh && this.stingReady;
+    esc.hold = (esc.sting ? ESCAPE_STING : 0) + (esc.briefing ? ESCAPE_BRIEF : 0) + 3;
+    if (this.sourceArtReady) void this.sourceArt?.play().catch(() => undefined);
     this.tip = "";
     // The slab that was coming next is put away: the light is what moves now.
     this.mover.fallT = -1;
@@ -1906,6 +1928,10 @@ export class SpireEngine {
     if (esc.hold > 0) {
       esc.hold -= dt;
       const count = esc.hold > 3 ? 3 : Math.max(0, Math.ceil(esc.hold));
+      if (esc.sting && esc.hold <= (esc.briefing ? ESCAPE_BRIEF : 0) + 3) {
+        esc.sting = false;
+        this.emit();
+      }
       if (esc.hold <= 3 && esc.briefing) {
         esc.briefing = false;
         this.emit();
@@ -1986,6 +2012,7 @@ export class SpireEngine {
 
   /** The light reaches the ground with you: the sky stays lit. */
   private escaped(): void {
+    this.sourceArt?.pause();
     const base = this.stack[0]!;
     this.float("THE LIGHT ESCAPES", base.x + base.w / 2, base.y + 120, true, 28);
     this.escape = null;
@@ -2013,7 +2040,9 @@ export class SpireEngine {
     v.addColorStop(1, `rgba(8,3,16,${0.35 + near * 0.5})`);
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, this.vw, this.vh);
-    if (edge > -120) {
+    if (this.sourceArtReady && this.sourceArt) {
+      this.drawSourceArt(ctx, edge, near);
+    } else if (edge > -120) {
       const g = ctx.createLinearGradient(0, edge - 320, 0, edge + 30);
       g.addColorStop(0, "rgba(4,2,10,1)");
       g.addColorStop(0.75, "rgba(16,6,30,0.97)");
@@ -2109,7 +2138,7 @@ export class SpireEngine {
         len,
         (c.x + side * slab.w * 0.42 - root) * grow,
         clock + slab.floor,
-        11,
+        17,
       );
       if (grow < 1) continue;
       // Coils round the stone.
@@ -2117,9 +2146,9 @@ export class SpireEngine {
       ctx.save();
       for (const k of [-0.28, 0.28]) {
         const x = c.x + halfW * k * 2;
-        ctx.fillStyle = "rgba(28,10,46,0.95)";
+        ctx.fillStyle = "rgba(34,14,28,0.96)";
         ctx.beginPath();
-        ctx.ellipse(x, c.y, 9, VISUAL_H * 0.75, 0.25 * side, 0, Math.PI * 2);
+        ctx.ellipse(x, c.y, 11, VISUAL_H * 0.8, 0.25 * side, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = "rgba(170,90,255,0.55)";
         for (let j = -1; j <= 1; j++) {
@@ -2162,6 +2191,74 @@ export class SpireEngine {
     }
   }
 
+  /** Loads the painted source and the sting quietly; the drawn versions stand in until then. */
+  private loadSourceArt(): void {
+    if (typeof document === "undefined") return;
+    const v = document.createElement("video");
+    v.src = "art/source.mp4";
+    v.muted = true;
+    v.loop = true;
+    v.playsInline = true;
+    v.preload = "auto";
+    v.setAttribute("playsinline", "");
+    // In the page but invisible: iOS will not decode frames for a detached video.
+    v.style.cssText =
+      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+    v.addEventListener("loadeddata", () => {
+      this.sourceArtReady = true;
+    });
+    v.addEventListener("error", () => {
+      this.sourceArtReady = false;
+    });
+    document.body.appendChild(v);
+    this.sourceArt = v;
+    // The sting is only played by the page; here we only learn whether it exists.
+    fetch("art/escape-sting.mp4", { method: "HEAD" })
+      .then((r) => {
+        this.stingReady = r.ok;
+      })
+      .catch(() => undefined);
+  }
+
+  /**
+   * The painted mass, its lower edge at the source's edge, fading out below
+   * so it melts into the sky rather than ending in a hard line.
+   */
+  private drawSourceArt(ctx: CanvasRenderingContext2D, edge: number, near: number): void {
+    const v = this.sourceArt!;
+    // It grows as it nears; its tentacle tips (three quarters down the
+    // painting) hang at the source's edge, so its eyes stay in view above.
+    const w = this.vw * (0.8 + near * 0.3);
+    const h = w * (v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9);
+    const top = edge + 10 - h * 0.75;
+    const bottom = top + h;
+    if (bottom < -40) return;
+    const mask = (this.sourceMask ??= document.createElement("canvas"));
+    const mw = Math.ceil(w);
+    const mh = Math.ceil(h);
+    if (mask.width !== mw || mask.height !== mh) {
+      mask.width = mw;
+      mask.height = mh;
+    }
+    const m = mask.getContext("2d")!;
+    m.globalCompositeOperation = "source-over";
+    m.clearRect(0, 0, mw, mh);
+    m.drawImage(v, 0, 0, mw, mh);
+    m.globalCompositeOperation = "destination-in";
+    const fade = m.createLinearGradient(0, 0, 0, mh);
+    fade.addColorStop(0, "rgba(0,0,0,1)");
+    fade.addColorStop(0.66, "rgba(0,0,0,1)");
+    fade.addColorStop(1, "rgba(0,0,0,0)");
+    m.fillStyle = fade;
+    m.fillRect(0, 0, mw, mh);
+    ctx.drawImage(mask, (this.vw - w) / 2, top);
+    // Above the painting, the same dark: the mass is endless.
+    if (top > 0) {
+      ctx.fillStyle = "rgb(6,3,12)";
+      ctx.fillRect(0, 0, this.vw, top + 2);
+    }
+  }
+
   /** One tentacle: a tapering curve from its root, swaying, its tip curling. */
   private drawTentacle(
     ctx: CanvasRenderingContext2D,
@@ -2192,12 +2289,21 @@ export class SpireEngine {
     for (let k = right.length - 1; k >= 0; k--) ctx.lineTo(right[k]![0], right[k]![1]);
     ctx.closePath();
     const g = ctx.createLinearGradient(x, y, x, y + len);
-    g.addColorStop(0, "rgba(16,6,30,0.98)");
-    g.addColorStop(1, "rgba(40,14,60,0.95)");
+    // Shaded like the painted ones: near-black plum, lit warm along one side.
+    g.addColorStop(0, "rgba(20,8,22,0.98)");
+    g.addColorStop(1, "rgba(52,24,40,0.96)");
     ctx.fillStyle = g;
     ctx.fill();
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,150,80,0.3)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(right[0]![0], right[0]![1]);
+    for (const p of right) ctx.lineTo(p[0], p[1]);
+    ctx.stroke();
+    ctx.restore();
     // Suckers along the underside, faintly lit.
-    ctx.fillStyle = "rgba(170,90,255,0.35)";
+    ctx.fillStyle = "rgba(255,170,110,0.4)";
     for (let k = 3; k < steps; k += 2) {
       const a = left[k]!;
       const b = right[k]!;
@@ -3466,6 +3572,7 @@ export class SpireEngine {
             left: Math.max(0, this.stack.length - 1),
             combo: this.escape.combo,
             briefing: this.escape.briefing,
+            sting: this.escape.sting,
             count: this.escape.count,
             bound: (() => {
               const top = this.stack[this.stack.length - 1];
