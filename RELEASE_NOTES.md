@@ -3,6 +3,19 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 53 — No more signposts (internal)
+
+- **The world tells you, not labels.** The sky name and its rule line are gone from under the score, and so are the play-by-play words (Perfect, Fast, Close, Rubble, Braced, Keystone, Wind shifts, lean degrees). What's left:
+  - **Wind** blows streaks of dust past the slab, and a falling slab casts its **shadow** on the stack where the wind will set it down (no more outline or streamer).
+  - **The beat** pulses in the groove.
+  - **Breath**: frost blooms on the slab while it holds at the wall.
+  - **Perfects** burst with a painted flare of light out of the groove; the streak is only called out every ten.
+  - **Keystones** gleam with gold inlay.
+  - **The bomb** is a painted iron charge with a sizzling fuse; a ring of fire burning down around it is the fuse left. No "WAIT" or "DON'T TAP".
+- **No more text lessons.** The first time you meet a new kind of sky, time slows and the slab turns ghostly and makes the move by itself, once.
+- **No more pickups** on the climb (the brace and slow orbs): gifts come from the landings.
+- Story moments still speak: the sky lit, taken by the Dark, the Dark quickening, new best, summit.
+
 ## Build 52 — Living skies, elemental gifts (internal)
 
 - **All eight Hearth skies are living paintings.** Tidewater's swells break on a drowned colossus; Pulse City's clocks tick; dust blows through Red Canyon; flags whip on Gale Ridge; the aurora ripples over the Glacier; the corona flares round the Eclipse; and at Apex the stars die out one by one while something watches. Each has ruins sliding past in front as you climb.

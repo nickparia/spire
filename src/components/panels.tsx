@@ -208,10 +208,9 @@ export function RunHud({
             {hud.score}
           </p>
         )}
-        {hud.escape ? null : <p className="kicker mt-2">{hud.course}</p>}
-        {hud.blurb && !hud.escape ? <p className="blurb">{hud.blurb}</p> : null}
+
         {hud.relic ? <p className="relic">{hud.relic}</p> : null}
-        {hud.hold ? <p className="relic">Wait</p> : null}
+
         {started || hud.heat > 0 ? <Heat hud={hud} /> : null}
         <Build ranks={hud.ranks} families={hud.families} />
       </div>

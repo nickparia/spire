@@ -66,7 +66,6 @@ import {
   resolveDrop,
   shade,
   shouldSpawnBomb,
-  shouldSpawnMote,
   starCount,
   swayOffset,
   tensionFor,
@@ -81,14 +80,8 @@ import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landin
 import {
   BOMB_RGB,
   drawBomb,
-  drawLandingGhost,
   drawPickup,
-  drawRushLane,
   drawShieldDome,
-  drawSlowBadge,
-  drawStreamer,
-  drawWalls,
-  drawWindLane,
   LULL_RGB,
   pickupRgb,
   SHIELD_RGB,
@@ -162,12 +155,13 @@ const PAINTED_SKIES: readonly string[] = [
   "eclipse",
   "apex",
 ];
-type SlabLook = "fire" | "ice" | "charge";
+type SlabLook = "fire" | "ice" | "charge" | "key";
 /** Each living slab's box inside its sheet's frames, as shares of the frame. */
 const SLAB_LOOKS: Record<SlabLook, { l: number; r: number; top: number; bot: number }> = {
   fire: { l: 0.016, r: 0.983, top: 0.367, bot: 0.929 },
   ice: { l: 0.012, r: 0.989, top: 0.058, bot: 0.692 },
   charge: { l: 0.013, r: 0.988, top: 0.122, bot: 0.85 },
+  key: { l: 0.016, r: 0.983, top: 0.158, bot: 0.833 },
 };
 const SLAB_LOOK_FRAMES = 12;
 const SLAB_LOOK_FPS = 10;
@@ -181,6 +175,8 @@ const RIME_SECONDS = 10;
 /** Floors Starfall's lightning blasts the Dark down, and how long a bolt flickers. */
 const STORM_PUSH = 3;
 const BOLT_LIFE = 0.55;
+/** Seconds a perfect's painted flare plays. */
+const FLARE_LIFE = 0.55;
 /** Bedrock's buttress steps either side of the foundation. */
 const BEDROCK_STEPS = 3;
 type ClimberKind = "swarm" | "mite" | "brute" | "lantern";
@@ -213,6 +209,13 @@ const BLOOD_RGB: RGB = [150, 18, 24];
 const BLOOD_DEEP_RGB: RGB = [70, 6, 12];
 /** The painted slab's end caps and centre mark, as shares of its width. */
 const SLAB_CAP = 0.058;
+/** Call-outs the game still speaks: the story's moments, not the play-by-play. */
+const SPOKEN =
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THEY REACH YOU|THE DARK QUICKENS|THEY QUICKEN|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+/** A streak is only called out at these milestones. */
+const STREAK_SPOKEN = 10;
+/** How fast time runs while a new course shows itself. */
+const DEMO_TIME = 0.5;
 const SLAB_MID = 0.07;
 /** Climbers drawn at the front. */
 const CLIMBERS = 20;
@@ -735,6 +738,13 @@ export class SpireEngine {
     string,
     { video: HTMLVideoElement; fg: HTMLImageElement; ready: boolean }
   >();
+  /**
+   * A course met for the first time is shown once: time slows, the slab goes
+   * ghostly, and it drops itself perfectly. Taps wait until it has.
+   */
+  private demo = false;
+  /** Set while the demo makes its own drop, so the tap gets through. */
+  private demoing = false;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
   private slabLookNow: SlabLook | null = null;
   /** Sprite sheets (public/art/sprites/<name>.webp), one row of square frames. */
@@ -765,6 +775,8 @@ export class SpireEngine {
   private bedrock = -1;
   /** Seconds left of Rime's freeze on the Dark. */
   private rime = 0;
+  /** Perfect hits' painted bursts, each playing out. */
+  private flares: { x: number; y: number; w: number; life: number }[] = [];
   /** Starfall's lightning, each strike fading. */
   private bolts: { x: number; life: number; seed: number }[] = [];
   /** This run's trace: the second each floor was first reached. */
@@ -879,6 +891,7 @@ export class SpireEngine {
       return;
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
+    if (this.demo && !this.demoing) return;
     if (this.bomb && this.bomb.fuse > 0) {
       this.detonate();
       return;
@@ -1293,6 +1306,7 @@ export class SpireEngine {
     this.bedrock = -1;
     this.rime = 0;
     this.bolts = [];
+    this.flares = [];
     this.trace = [0];
     this.ghost = null;
     this.ghostName = "BEST";
@@ -1489,7 +1503,8 @@ export class SpireEngine {
     }
     // Gifts come only from the landings now, as cards: no embers on the climb.
     const ember = false;
-    if (ember || shouldSpawnMote(this.plan, this.floors)) {
+    // Pickups are gone: gifts come from the landings, and the world says the rest.
+    if (ember) {
       // Just outside the perfect window: taking it costs a sliver of slab,
       // and the outline on the stack shows exactly which sliver.
       const nudge = Math.min(halfSpan * 0.5, Math.max(this.tol + 26, w * 0.22));
@@ -1521,6 +1536,17 @@ export class SpireEngine {
     }
     if (course !== this.courseSeen) {
       this.courseSeen = course;
+      const seen = `demo-${course}`;
+      if (
+        course !== "slide" &&
+        this.mode === "level" &&
+        this.phase !== "menu" &&
+        !this.save.tips[seen]
+      ) {
+        this.save.tips[seen] = 1;
+        storeSave(this.save);
+        this.demo = true;
+      }
       if (this.mode === "endless") {
         // A new course brings a new sky, anchored where the camera is now.
         this.setTheme(THEMES[endlessTheme(course)], this.camY, true);
@@ -1540,6 +1566,8 @@ export class SpireEngine {
 
   /** Shows a one-line tip the first few times a pickup or hazard turns up. */
   private explain(kind: keyof typeof TIPS): void {
+    // No text lessons: a new course is shown once by its ghost (see `demo`).
+    if (kind) return;
     if (this.phase === "menu") return;
     const shown = this.save.tips[kind] ?? 0;
     if (shown >= TIP_SHOWS) return;
@@ -2827,6 +2855,10 @@ export class SpireEngine {
     this.breather = Math.max(0, this.breather - dt);
     this.rime = Math.max(0, this.rime - dt);
     if (this.bedrock >= 0 && this.bedrock < 1) this.bedrock = Math.min(1, this.bedrock + dt * 1.4);
+    for (let i = this.flares.length - 1; i >= 0; i--) {
+      this.flares[i]!.life -= dt;
+      if (this.flares[i]!.life <= 0) this.flares.splice(i, 1);
+    }
     for (let i = this.bolts.length - 1; i >= 0; i--) {
       this.bolts[i]!.life -= dt;
       if (this.bolts[i]!.life <= 0) this.bolts.splice(i, 1);
@@ -3553,6 +3585,8 @@ export class SpireEngine {
     const keystone = this.mover.keystone;
     this.fx.burst(cx, slab.y + VISUAL_H / 2, slab.rgb, forged ? 28 : 16, 160);
     this.fx.seam(cx, seam, slab.w * (1.3 + heat * 0.7), mix(accent, BONE, 0.5));
+    // The painted burst out of the groove: what says "perfect" now.
+    this.flares.push({ x: cx, y: seam, w: slab.w * (1.7 + heat * 0.6), life: FLARE_LIFE });
     this.fx.sparkle(cx, seam + 2, slab.w, mix(accent, BONE, 0.55), 8 + Math.round(heat * 14));
     this.pulse = Math.min(1, 0.35 + heat * 0.4);
     this.flash = forged ? 0.45 : 0.22;
@@ -3578,7 +3612,7 @@ export class SpireEngine {
     } else {
       this.sfx.perfect(streak);
       this.float(
-        streak >= 2 ? `PERFECT ×${streak}` : "PERFECT",
+        streak > 0 && streak % STREAK_SPOKEN === 0 ? `PERFECT ×${streak}` : "PERFECT",
         cx,
         slab.y + 36,
         true,
@@ -3927,6 +3961,8 @@ export class SpireEngine {
   }
 
   private float(text: string, x: number, y: number, hot: boolean, size = 20): void {
+    // The world shows what happened; words are kept for the moments of the story.
+    if (!SPOKEN.test(text)) return;
     // A fast chain would stack call-outs into a smear; the newest one wins.
     const kind = text.split(" ")[0];
     this.floaters = this.floaters.filter((f) => f.text.split(" ")[0] !== kind);
@@ -4028,7 +4064,8 @@ export class SpireEngine {
       this.acc += dt;
       let steps = 0;
       while (this.acc >= STEP && steps < 5) {
-        this.step(STEP);
+        // The demo runs in slow time, so the move can be watched.
+        this.step(this.demo ? STEP * DEMO_TIME : STEP);
         this.acc -= STEP;
         steps++;
       }
@@ -4087,6 +4124,7 @@ export class SpireEngine {
     if (this.phase === "play" && this.freeze <= 0) this.runTime += dt;
     if (this.phase !== "won") this.settle(dt);
     if (this.escape && this.phase === "play") this.chase(dt);
+    if (this.demo) this.runDemo();
     this.riseDark(dt);
     this.music.setBoss(this.escape !== null);
     if (this.stage && this.phase === "play") {
@@ -4368,6 +4406,7 @@ export class SpireEngine {
   private slabLook(slab: Slab | null, hot: boolean): SlabLook | null {
     if (slab && this.escape?.charged.has(slab)) return "charge";
     if (slab?.element) return slab.element;
+    if (slab ? slab.key : this.mover.keystone) return "key";
     if (this.theme.id === "glacier") return "ice";
     if (hot) return "fire";
     return null;
@@ -4496,6 +4535,20 @@ export class SpireEngine {
     return img.complete && img.naturalWidth > 0 ? img : null;
   }
 
+  /** The demo's own drop: once the slab sits true over the groove, it lets go. */
+  private runDemo(): void {
+    if (this.phase !== "play" && this.phase !== "ready") {
+      if (this.phase !== "pick") this.demo = false;
+      return;
+    }
+    const p = this.probe();
+    if (p.blocked || Math.abs(p.offset) > p.tol * 0.3) return;
+    this.demoing = true;
+    this.tap();
+    this.demoing = false;
+    this.demo = false;
+  }
+
   /** A sprite sheet once loaded: frames are square, side by side. */
   private sprite(name: string): { img: HTMLImageElement; cell: number; frames: number } | null {
     let img = this.sprites.get(name);
@@ -4590,7 +4643,8 @@ export class SpireEngine {
     for (let i = 0; i < this.stack.length; i++) {
       const slab = this.stack[i]!;
       this.slabLookNow = this.slabLook(slab, this.stack.length - 1 - i < burning);
-      this.drawSlab(ctx, slab, inZone && slab === prev);
+      const beat = this.mover.course === "beat" && this.beatOn;
+      this.drawSlab(ctx, slab, (inZone || beat) && slab === prev);
     }
     this.slabLookNow = null;
     if (this.stage && aiming && this.phase !== "menu") this.drawPlumb(ctx, prev);
@@ -4609,13 +4663,20 @@ export class SpireEngine {
     if (live && !this.escape) this.drawCourseCues(ctx);
     if (live && this.bomb) this.drawBomb(ctx);
     if (live && !this.escape) {
-      this.slabLookNow = this.slabLook(null, burning > 0);
+      const atWall = this.mover.course === "breath" && Math.abs(this.mover.u) > 0.78;
+      this.slabLookNow = atWall ? "ice" : this.slabLook(null, burning > 0);
+      if (this.demo) {
+        ctx.save();
+        ctx.globalAlpha = 0.45 + 0.15 * Math.sin(this.clock * 8);
+      }
       this.drawMover(ctx, inZone);
+      if (this.demo) ctx.restore();
       this.slabLookNow = null;
     }
     if (live && this.mote) this.drawMote(ctx);
     this.fx.draw(ctx, this.worldToScreen);
     this.drawBolts(ctx);
+    this.drawFlares(ctx);
     ctx.restore();
 
     if (this.paintedSky()) this.drawSkyFront(ctx, view);
@@ -4995,14 +5056,7 @@ export class SpireEngine {
     ctx.moveTo(c.x, c.y);
     ctx.lineTo(c.x, Math.min(foot.y, this.vh + 10));
     ctx.stroke();
-    if (deg >= 1.5) {
-      ctx.setLineDash([]);
-      ctx.font = '700 13px "Nunito Variable", system-ui, -apple-system, sans-serif';
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = `rgba(255,${Math.round(200 - tilt * 120)},${Math.round(170 - tilt * 110)},0.95)`;
-      ctx.fillText(`${deg.toFixed(0)}° lean`, c.x + top.w / 2 + 10, c.y);
-    }
+
     ctx.restore();
   }
 
@@ -5031,6 +5085,34 @@ export class SpireEngine {
       const tw = 0.5 + 0.5 * Math.sin(this.clock * 6 + i * 1.7);
       ctx.fillStyle = `rgba(230,250,255,${tw * a})`;
       ctx.fillRect(x, surface - 3 + (i % 3) * 3, 2, 2);
+    }
+    ctx.restore();
+  }
+
+  /** The perfect bursts: a painted flare out of the groove, added as light. */
+  private drawFlares(ctx: CanvasRenderingContext2D): void {
+    if (this.flares.length === 0) return;
+    const sheet = this.sprite("flare");
+    if (!sheet) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const f of this.flares) {
+      const t = 1 - f.life / FLARE_LIFE;
+      const frame = Math.min(sheet.frames - 1, Math.floor(t * sheet.frames));
+      const c = this.worldToScreen(f.x, f.y);
+      const size = f.w;
+      ctx.globalAlpha = Math.min(1, (1 - t) * 2.2);
+      ctx.drawImage(
+        sheet.img,
+        frame * sheet.cell,
+        0,
+        sheet.cell,
+        sheet.cell,
+        c.x - size / 2,
+        c.y - size / 2,
+        size,
+        size,
+      );
     }
     ctx.restore();
   }
@@ -5143,10 +5225,6 @@ export class SpireEngine {
       return;
     }
     this.paintSlab(ctx, s.x, s.y, slab.w, VISUAL_H, body, scaleY, slab.rot, hotGroove);
-    if (slab.key && !slab.falling) {
-      ctx.fillStyle = "rgba(246,241,232,0.9)";
-      ctx.fillRect(s.x + 8, s.y - VISUAL_H + 6, Math.max(8, slab.w - 16), 3);
-    }
   }
 
   private drawMover(ctx: CanvasRenderingContext2D, inZone: boolean): void {
@@ -5191,27 +5269,14 @@ export class SpireEngine {
     const s = this.worldToScreen(m.x, m.y);
     if (m.hover > 0 && !falling) {
       const seat = this.worldToScreen(this.landingX(), m.y - m.hover);
-      if ((m.guide || this.kit.mark) && m.drift > 0) {
-        drawLandingGhost(
-          ctx,
-          seat.x,
-          seat.y,
-          m.w,
-          VISUAL_H,
-          accent,
-          this.reduceMotion ? 0 : this.clock,
-        );
-      }
-      drawStreamer(
-        ctx,
-        s.x + m.w / 2,
-        s.y,
-        seat.y - 6,
-        m.wind * m.drift,
-        this.clock,
-        accent,
-        this.reduceMotion,
-      );
+      // Its shadow on the stack, where the wind will set it down.
+      const shadow = ctx.createLinearGradient(seat.x, 0, seat.x + m.w, 0);
+      shadow.addColorStop(0, "rgba(0,0,0,0)");
+      shadow.addColorStop(0.15, "rgba(0,0,0,0.42)");
+      shadow.addColorStop(0.85, "rgba(0,0,0,0.42)");
+      shadow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = shadow;
+      ctx.fillRect(seat.x, seat.y - VISUAL_H - 5, m.w, 7);
     }
     if (m.split) {
       // Two halves, each with the ghost of its own home on the stack.
@@ -5294,7 +5359,7 @@ export class SpireEngine {
       ctx.lineWidth = 2;
       ctx.strokeRect(s.x + 1, s.y - VISUAL_H + 1, m.w - 2, VISUAL_H - 2);
     }
-    if (m.slowed) drawSlowBadge(ctx, s.x + m.w / 2, s.y - VISUAL_H - 16, this.clock);
+
     if (m.course === "beat") {
       const fill = phase < 0.58 ? phase / 0.58 : 0;
       const bar = this.worldToScreen(m.x + m.w / 2, m.y + VISUAL_H + 14);
@@ -5320,14 +5385,26 @@ export class SpireEngine {
     const left = Math.max(30, lane.x - m.halfSpan - m.w / 2);
     const right = Math.min(this.vw - 30, lane.x + m.halfSpan + m.w / 2);
     const clock = this.reduceMotion ? 0.3 : this.clock;
-    if (m.course === "gust" && this.floors - this.windTurnedAt < 2) {
-      // Shown just after a shift: the streamer carries the reading after that.
-      drawWindLane(ctx, left, right, lane.y + m.hover * 0.6, m.wind, clock, accent);
-    } else if (m.course === "breath") {
-      const held = Math.abs(m.u) > 0.78 ? Math.sign(m.u) : 0;
-      drawWalls(ctx, left, right, lane.y, VISUAL_H, held, clock, accent);
-    } else if (m.course === "rush") {
-      drawRushLane(ctx, lane.x, m.halfSpan * 0.62, lane.y, VISUAL_H, m.dir, clock, accent);
+    // The courses read from the world now: wind in the dust, the beat in the
+    // groove, frost at the walls. Only the wind's dust is drawn here.
+    if (m.course === "gust" && !this.reduceMotion) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 26; i++) {
+        const h = Math.sin(i * 51.3) * 43758.5453;
+        const r = h - Math.floor(h);
+        const span = right - left + 160;
+        const x =
+          left - 80 + ((((r * span + clock * m.wind * (160 + r * 120)) % span) + span) % span);
+        const y = lane.y - 30 + r * (m.hover + 60) + Math.sin(clock * 3 + i) * 4;
+        ctx.strokeStyle = rgbCss(accent, 0.18 + r * 0.25);
+        ctx.lineWidth = 1 + r;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - m.wind * (10 + r * 18), y);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 
@@ -5336,6 +5413,45 @@ export class SpireEngine {
     const top = this.peak();
     if (!bomb || !top) return;
     const s = this.worldToScreen(bomb.x, bomb.y);
+    const sheet = this.sprite("bomb");
+    if (sheet) {
+      const size = 80 * (1 + bomb.flash * 0.25);
+      const frame = Math.floor(this.clock * 12) % sheet.frames;
+      // A red glow under it, so it reads against any sky.
+      const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, size * 0.75);
+      glow.addColorStop(0, "rgba(255,60,30,0.45)");
+      glow.addColorStop(1, "rgba(255,60,30,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(s.x - size, s.y - size, size * 2, size * 2);
+      ctx.drawImage(
+        sheet.img,
+        frame * sheet.cell,
+        0,
+        sheet.cell,
+        sheet.cell,
+        s.x - size / 2,
+        s.y - size / 2,
+        size,
+        size,
+      );
+      // The fuse left, as a ring of fire burning down around it.
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(255,150,60,0.85)";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(
+        s.x,
+        s.y,
+        size * 0.62,
+        -Math.PI / 2,
+        -Math.PI / 2 + Math.PI * 2 * (bomb.fuse / bomb.max),
+      );
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     drawBomb(ctx, {
       x: s.x,
       y: s.y,
