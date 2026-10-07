@@ -1,9 +1,8 @@
 {
-  "build": 57,
-  "title": "The way back up",
+  "build": 58,
+  "title": "Sound, for real",
   "notes": [
-    "The Descent's boss: at the Floor of the World the door bursts open, and you race back up the shaft while a blind thing rises after you. Perfects vault you clear.",
-    "Real sound effects for everything: stone thuds and cracks, a singing chime for perfects, wet crunches, thunder, ice, a summit swell. Falling slabs splash into the Dark or crumble on the ground.",
-    "The music plays your composed tracks again (fixed on iPhone), and the side scenery is smaller and keeps to the corners."
+    "Fixed: on iPhone the new sound effects and your composed music never loaded, so you heard the old synth. Both work now.",
+    "Fixed: the Hearth boss's opening scene never played on iPhone."
   ]
 }

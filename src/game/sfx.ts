@@ -47,7 +47,9 @@ export class Sfx {
     this.loading = true;
     for (const name of SAMPLES) {
       fetch(`sfx/${name}.m4a`)
-        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+        .then((r) =>
+          okResponse(r) ? r.arrayBuffer() : Promise.reject(new Error(String(r.status))),
+        )
         .then(
           (data) =>
             new Promise<AudioBuffer>((resolve, reject) => {
@@ -375,4 +377,12 @@ export class Sfx {
     if (this.play("tap", 0.6, this.vary(0.1))) return;
     this.tone(660, 0.05, "sine", 0.06);
   }
+}
+
+/**
+ * Whether a fetch of a bundled file worked. The iOS app serves its files with
+ * status 0 (not 200) even when the bytes arrive, so 0 counts as fine there.
+ */
+function okResponse(r: Response): boolean {
+  return r.ok || r.status === 0;
 }

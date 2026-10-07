@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 58 — Sound, for real (internal)
+
+- **Fixed: no new sound on iPhone.** The app serves its own files in a way the loader read as "failed", so the new sound effects never loaded and the music fell back to the old synth. Both work now: the composed tracks and every effect from build 57 (checked on an iPhone 17 Pro Max simulator: all 22 effects load).
+- **Fixed: the Hearth boss's opening scene** (the sky tearing and the source descending) never played on iPhone, for the same reason.
+
 ## Build 57 — The way back up (internal)
 
 - **The Descent's boss.** Reach the Floor of the World and the sealed door bursts open: something blind and enormous, all mouths and reaching arms, comes up out of it. Now you build _up_, fast, back up the shaft, with it rising behind you. It never falls far behind; every perfect vaults you clear of it (further on a streak). Reach the top and you're **out of the deep**. Testers: the Descent's last sky has a Boss button that goes straight to it.

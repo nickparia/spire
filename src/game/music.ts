@@ -359,7 +359,7 @@ export class Music {
       return have;
     }
     const made = fetch(`music/${name}.m4a`)
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((r) => (okResponse(r) ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
       // Kept as decoded, full stereo: shrinking it (an offline render at a lower
       // rate) failed on iPhone and left the synth playing instead.
       .then((data) => decode(ctx, data))
@@ -875,4 +875,12 @@ export class Music {
     }
     return ctx.startRendering();
   }
+}
+
+/**
+ * Whether a fetch of a bundled file worked. The iOS app serves its files with
+ * status 0 (not 200) even when the bytes arrive, so 0 counts as fine there.
+ */
+function okResponse(r: Response): boolean {
+  return r.ok || r.status === 0;
 }

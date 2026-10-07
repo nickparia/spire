@@ -2648,7 +2648,8 @@ export class SpireEngine {
     // The sting is only played by the page; here we only learn whether it exists.
     fetch("art/escape-sting.mp4", { method: "HEAD" })
       .then((r) => {
-        this.stingReady = r.ok;
+        // The iOS app serves its own files with status 0, bytes and all.
+        this.stingReady = r.ok || r.status === 0;
       })
       .catch(() => undefined);
   }
