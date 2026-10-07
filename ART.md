@@ -44,6 +44,10 @@ Made with the Higgsfield CLI (GPT Image 2.5 for stills, Seedance 2.5 for video, 
 
 `dark-hearth.mp4`: the rising Dark for Hearth, a 9:16 seamless 720p loop (GPT Image 2.5 still, then Seedance with a locked-off camera, then `loopenc.sh`). Its surface sits a fifth of the way down the frame (`DARK_ART_SURFACE`). Not the source: no eyes or creatures, an indifferent sea of ink and ash. Each world can get its own.
 
+## Skies and cards (built)
+
+`public/art/sky/<theme>.mp4` (+ `.jpg` poster, `-fg.webp` foreground): 8 s Seedance loops from a 9:16 plate, start = end image, locked camera; foregrounds painted on chroma green and keyed (`tools/keyfg.mjs`). All eight Hearth skies done. `public/art/cards/<id>.jpg` and `<id>-ignite.mp4`: the five elemental cards (GPT Image 3:4) and their 5 s ignite clips. Living slabs and climbers are sprite sheets from clips on black (`tools/sprites.mjs`).
+
 ## Music
 
 `public/music/*.m4a`, made with Higgsfield's `sonilo_music` (120 s, about 7.5 credits each): `menu`, `hearth-1`…`hearth-5` (the climb, played in a shuffled rotation with 4 s crossfades) and `boss` (beatless dread for the escape, so it never fights the tap pulse). Prompts name the world, the instruments, a tempo and key, and "no vocals". Check each for dead air (`ffmpeg -af silencedetect=n=-45dB:d=0.6`) and cut it, then encode: `ffmpeg -i in -af "silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-50dB,loudnorm=I=-20:TP=-2:LRA=11" -ar 44100 -ac 2 -c:a aac -b:a 128k -movflags +faststart out.m4a`. A new world adds its own climb set and a line in `RECORDED` (`music.ts`).

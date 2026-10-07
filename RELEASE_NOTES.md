@@ -3,6 +3,18 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 52 — Living skies, elemental gifts (internal)
+
+- **All eight Hearth skies are living paintings.** Tidewater's swells break on a drowned colossus; Pulse City's clocks tick; dust blows through Red Canyon; flags whip on Gale Ridge; the aurora ripples over the Glacier; the corona flares round the Eclipse; and at Apex the stars die out one by one while something watches. Each has ruins sliding past in front as you climb.
+- **New gifts, and fewer of them.** A landing now comes once a sky (twice on the long ones) and deals two painted cards from five elements. Each one changes the world:
+  - **Forge-fire**: your next six slabs blaze, and each one burns the Dark back a floor.
+  - **Rime**: the Dark freezes over for ten seconds and your next five slabs freeze to whatever they land on.
+  - **Starfall**: your next three perfects call down lightning that blasts the Dark three floors down.
+  - **Bedrock**: buttresses rise to brace the tower's foot; the sway is halved and your next four slabs are broad.
+  - **Stillness**: time thickens, and the world (sky included) slows for six slabs.
+- **The card you take wakes in its element**: fire engulfs it, frost seals and shatters it, lightning strikes it, stone sets it, shadow dissolves it. Then it flies into the tower, and the other crumbles away. Gifts you've had come round less often.
+- Embers no longer appear on the climb; brace and slow pickups stay.
+
 ## Build 51 — A living sky, a title that wakes (internal)
 
 - **The Foundry's sky is alive.** A painted foundry city burning under an ember sky: smoke rolls from the chimneys, furnace windows flicker, violet lightning crawls through the clouds. It slides from the city up into the night as you climb, ruins and hanging chains pass in front of you, and embers drift at two depths. (The other skies follow once this one is approved.)

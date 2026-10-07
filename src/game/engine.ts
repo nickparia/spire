@@ -152,7 +152,16 @@ const DARK_ART_SURFACE = 0.2;
 /** Down the screen the Descent's tip sits, as a share of the view. */
 const DESCENT_SEAT = 0.42;
 /** Skies with a living painted plate in public/art/sky/; the rest are drawn. */
-const PAINTED_SKIES: readonly string[] = ["foundry"];
+const PAINTED_SKIES: readonly string[] = [
+  "foundry",
+  "tide",
+  "city",
+  "canyon",
+  "ridge",
+  "glacier",
+  "eclipse",
+  "apex",
+];
 type SlabLook = "fire" | "ice" | "charge";
 /** Each living slab's box inside its sheet's frames, as shares of the frame. */
 const SLAB_LOOKS: Record<SlabLook, { l: number; r: number; top: number; bot: number }> = {
@@ -165,6 +174,15 @@ const SLAB_LOOK_FPS = 10;
 /** A perfect streak this long sets the top slab alight; each perfect after spreads it a floor, to this many. */
 const FIRE_STREAK = 4;
 const FIRE_MAX = 5;
+/** Floors Forge-fire burns the Dark back for each blazing slab. */
+const FIRE_BURN = 1;
+/** Rime holds the Dark still this long. */
+const RIME_SECONDS = 10;
+/** Floors Starfall's lightning blasts the Dark down, and how long a bolt flickers. */
+const STORM_PUSH = 3;
+const BOLT_LIFE = 0.55;
+/** Bedrock's buttress steps either side of the foundation. */
+const BEDROCK_STEPS = 3;
 type ClimberKind = "swarm" | "mite" | "brute" | "lantern";
 /** Size, in px, of each kind of climber at the front. */
 const CLIMBER_SIZE: Record<ClimberKind, number> = { swarm: 84, mite: 50, brute: 116, lantern: 86 };
@@ -399,6 +417,8 @@ type Slab = {
   loose: boolean;
   /** On the stage: landed close enough to the groove to be a floor. Anything else is rubble. */
   counts: boolean;
+  /** Laid under a gift: it keeps that element's living look. */
+  element?: SlabLook;
 };
 
 type Piece = { x: number; w: number };
@@ -738,7 +758,15 @@ export class SpireEngine {
   /** Landings already taken this run, by floor. */
   private landed = new Set<number>();
   /** Gifts in effect: slabs left that set wherever they land, wide, or slow. */
-  private gift = { set: 0, broad: 0, slow: 0 };
+  private gift = { set: 0, broad: 0, slow: 0, fire: 0, frost: 0, storm: 0 };
+  /** Gifts taken this run, so the next landing offers new ones first. */
+  private giftsTaken: LandingId[] = [];
+  /** Bedrock's buttresses: how far grown (0..1), or -1 when there are none. */
+  private bedrock = -1;
+  /** Seconds left of Rime's freeze on the Dark. */
+  private rime = 0;
+  /** Starfall's lightning, each strike fading. */
+  private bolts: { x: number; life: number; seed: number }[] = [];
   /** This run's trace: the second each floor was first reached. */
   private trace: number[] = [0];
   /** The run to race on this level, your own best or a rival's; null the first time. */
@@ -1260,7 +1288,11 @@ export class SpireEngine {
     this.escape = null;
     this.landing = null;
     this.landed.clear();
-    this.gift = { set: 0, broad: 0, slow: 0 };
+    this.gift = { set: 0, broad: 0, slow: 0, fire: 0, frost: 0, storm: 0 };
+    this.giftsTaken = [];
+    this.bedrock = -1;
+    this.rime = 0;
+    this.bolts = [];
     this.trace = [0];
     this.ghost = null;
     this.ghostName = "BEST";
@@ -1455,7 +1487,8 @@ export class SpireEngine {
         this.float("WIND SHIFTS", center, prev.y + SLAB_H + fall.hover + 62, false, 18);
       }
     }
-    const ember = this.plan.pickAt(this.floors) && this.phase !== "menu";
+    // Gifts come only from the landings now, as cards: no embers on the climb.
+    const ember = false;
     if (ember || shouldSpawnMote(this.plan, this.floors)) {
       // Just outside the perfect window: taking it costs a sliver of slab,
       // and the outline on the stack shows exactly which sliver.
@@ -1762,7 +1795,7 @@ export class SpireEngine {
     this.phase = "pick";
     this.landing = {
       floor,
-      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.plan.sway > 0),
+      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken),
     };
     this.offers = [];
     this.mote = null;
@@ -1796,37 +1829,37 @@ export class SpireEngine {
   private applyGift(id: LandingId): void {
     const cx = this.seat.x;
     const y = this.seat.y + 60;
+    this.giftsTaken.push(id);
     switch (id) {
-      case "setstone":
-        this.gift.set = 5;
+      case "fire":
+        this.gift.fire = 6;
+        this.sfx.fire();
         break;
-      case "lantern":
-        this.breather = Math.max(this.breather, 12);
+      case "frost":
+        this.gift.frost = 5;
+        this.gift.set = Math.max(this.gift.set, 5);
+        this.rime = RIME_SECONDS;
+        this.breather = Math.max(this.breather, RIME_SECONDS);
+        this.fx.sparkle(cx, this.dark, this.vw, LANDING_BY_ID.frost.rgb, 40);
         break;
-      case "broad":
-        this.gift.broad = 3;
+      case "storm":
+        this.gift.storm = 3;
+        this.sfx.boom();
         break;
-      case "braces":
-        this.shields = Math.min(MAX_SHIELDS, this.shields + 2);
-        this.shieldAge = 0;
-        this.sfx.shieldUp();
-        break;
-      case "ember":
-        this.heat = 1;
-        break;
-      case "slow":
-        this.gift.slow = 6;
-        break;
-      case "keel":
+      case "stone":
+        this.gift.broad = Math.max(this.gift.broad, 4);
         if (this.stage) this.stage.sway *= 0.5;
+        this.bedrock = 0;
+        this.sfx.boom();
+        this.trauma = Math.min(1, this.trauma + 0.4);
         break;
-      case "push":
-        this.pushDark(SLAB_H * 6);
-        this.fx.rayBurst(cx, this.dark, [150, 80, 220], 160, 10);
+      case "shadow":
+        this.gift.slow = 6;
+        this.sfx.slow();
         break;
     }
     this.float(LANDING_BY_ID[id].name.toUpperCase(), cx, y, true, 24);
-    const rgb: RGB = LANDING_BY_ID[id].family === "stone" ? [255, 190, 120] : [190, 160, 255];
+    const rgb: RGB = LANDING_BY_ID[id].rgb;
     this.fx.rayBurst(cx, this.seat.y, rgb, 220, 18);
     this.fx.sparkle(cx, this.seat.y, 160, rgb, 30);
     for (let i = 0; i < this.stack.length; i++)
@@ -2792,6 +2825,12 @@ export class SpireEngine {
    */
   private riseDark(dt: number): void {
     this.breather = Math.max(0, this.breather - dt);
+    this.rime = Math.max(0, this.rime - dt);
+    if (this.bedrock >= 0 && this.bedrock < 1) this.bedrock = Math.min(1, this.bedrock + dt * 1.4);
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      this.bolts[i]!.life -= dt;
+      if (this.bolts[i]!.life <= 0) this.bolts.splice(i, 1);
+    }
     const practice =
       (this.save.practice && this.mode === "level" && !this.boss) || this.escape !== null;
     if (
@@ -3284,6 +3323,29 @@ export class SpireEngine {
       }
     }
     this.pushDark(push);
+    // The gifts at work.
+    if (this.gift.fire > 0) {
+      this.gift.fire -= 1;
+      slab.element = "fire";
+      // It burns the Dark back: flames lick down its edge.
+      this.pushDark(SLAB_H * FIRE_BURN);
+      this.fx.burst(cx, this.dark, LANDING_BY_ID.fire.rgb, 26, 260);
+      this.fx.sparkle(cx, this.dark, this.vw * 0.8, [255, 200, 120], 22);
+    } else if (this.gift.frost > 0) {
+      this.gift.frost -= 1;
+      slab.element = "ice";
+    }
+    if (this.gift.storm > 0 && result.perfect) {
+      this.gift.storm -= 1;
+      slab.element = "charge";
+      this.pushDark(SLAB_H * STORM_PUSH);
+      this.bolts.push({ x: cx, life: BOLT_LIFE, seed: Math.random() * 1000 });
+      this.fx.burst(cx, this.dark, LANDING_BY_ID.storm.rgb, 40, 380);
+      this.flash = Math.max(this.flash, 0.85);
+      this.trauma = Math.min(1, this.trauma + 0.5);
+      this.sfx.boom();
+      haptics.heavy();
+    }
     const heatBefore = this.heat;
     this.heat = clamp01(this.heat + (gain > 0 ? gain * this.kit.charge : gain));
     const struck = this.charged && result.perfect;
@@ -3377,7 +3439,7 @@ export class SpireEngine {
     storeSave(this.save);
     if (grabbed === "ember") {
       // An ember is a gift taken on the move: one of the landing's, at once.
-      const [id] = landingOffer(Math.random, this.plan.darkRate > 0, this.plan.sway > 0);
+      const [id] = landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken);
       this.applyGift(id!);
     }
     this.spawnMover();
@@ -4305,6 +4367,7 @@ export class SpireEngine {
   /** The living look of a slab (or of the mover, for null): fire, frost, charge, or none. */
   private slabLook(slab: Slab | null, hot: boolean): SlabLook | null {
     if (slab && this.escape?.charged.has(slab)) return "charge";
+    if (slab?.element) return slab.element;
     if (this.theme.id === "glacier") return "ice";
     if (hot) return "fire";
     return null;
@@ -4359,6 +4422,9 @@ export class SpireEngine {
    */
   private drawSky(ctx: CanvasRenderingContext2D, view: BackdropView): void {
     const v = this.paintedSky()!.video;
+    // Stillness: the painted world slows with you.
+    const rate = 1 - this.slow * 0.75;
+    if (Math.abs(v.playbackRate - rate) > 0.05) v.playbackRate = rate;
     const ratio = v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9;
     const w = Math.max(view.w * 1.06, (view.h * 1.22) / ratio);
     const h = w * ratio;
@@ -4513,6 +4579,7 @@ export class SpireEngine {
     if (!this.escape) this.drawSummitLine(ctx);
     if (this.kit.sight && !this.mover.split) this.drawSight(ctx);
     this.drawPlinth(ctx);
+    this.drawBedrock(ctx);
     if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
     this.drawAura(ctx);
 
@@ -4548,6 +4615,7 @@ export class SpireEngine {
     }
     if (live && this.mote) this.drawMote(ctx);
     this.fx.draw(ctx, this.worldToScreen);
+    this.drawBolts(ctx);
     ctx.restore();
 
     if (this.paintedSky()) this.drawSkyFront(ctx, view);
@@ -4685,6 +4753,7 @@ export class SpireEngine {
     }
     ctx.restore();
     if (this.boss) this.drawEyes(ctx, surface);
+    if (this.rime > 0) this.drawRime(ctx, surface);
     // Motes drifting up off it when it is close to the top.
     if (!this.reduceMotion && this.darkGap() < 4 && Math.random() < 0.3) {
       this.fx.sparkle(
@@ -4935,6 +5004,93 @@ export class SpireEngine {
       ctx.fillText(`${deg.toFixed(0)}° lean`, c.x + top.w / 2 + 10, c.y);
     }
     ctx.restore();
+  }
+
+  /** Rime: the Dark's surface frozen over, glittering, thawing at the end. */
+  private drawRime(ctx: CanvasRenderingContext2D, surface: number): void {
+    const a = Math.min(1, this.rime / 1.5);
+    ctx.save();
+    const g = ctx.createLinearGradient(0, surface - 18, 0, surface + 40);
+    g.addColorStop(0, `rgba(160,230,255,0)`);
+    g.addColorStop(0.35, `rgba(170,235,255,${0.55 * a})`);
+    g.addColorStop(1, `rgba(60,120,170,${0.35 * a})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(-120, surface - 18, this.vw + 240, 58);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(200,245,255,${0.8 * a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = -20; x <= this.vw + 20; x += 9) {
+      const y = surface - 2 + Math.abs(Math.sin(x * 0.37)) * 6;
+      if (x === -20) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    for (let i = 0; i < 18; i++) {
+      const x = ((i * 97.3) % 1) * 0 + (i / 18) * this.vw + Math.sin(this.clock * 2 + i) * 4;
+      const tw = 0.5 + 0.5 * Math.sin(this.clock * 6 + i * 1.7);
+      ctx.fillStyle = `rgba(230,250,255,${tw * a})`;
+      ctx.fillRect(x, surface - 3 + (i % 3) * 3, 2, 2);
+    }
+    ctx.restore();
+  }
+
+  /** Starfall: a jagged bolt from the top of the sky down to the Dark, flickering out. */
+  private drawBolts(ctx: CanvasRenderingContext2D): void {
+    if (this.bolts.length === 0) return;
+    const end = Math.min(this.vh + 20, this.worldToScreen(0, this.darkShown).y);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineJoin = "round";
+    for (const b of this.bolts) {
+      const t = b.life / BOLT_LIFE;
+      const flick = this.reduceMotion ? 1 : 0.6 + 0.4 * Math.sin(this.clock * 60 + b.seed);
+      const x0 = this.worldToScreen(b.x, 0).x;
+      const pts: [number, number][] = [];
+      let x = x0 + Math.sin(b.seed) * 40;
+      const steps = 14;
+      for (let i = 0; i <= steps; i++) {
+        const y = -20 + ((end + 20) * i) / steps;
+        const jitter = Math.sin(b.seed * (i + 1) * 3.7 + Math.floor(this.clock * 20)) * 22;
+        x += (x0 - x) * 0.25 + jitter * 0.5;
+        pts.push([x, y]);
+      }
+      for (const [width, alpha] of [
+        [14, 0.18],
+        [6, 0.45],
+        [2.2, 1],
+      ] as const) {
+        ctx.strokeStyle = `rgba(255,240,200,${alpha * t * flick})`;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        pts.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Bedrock: carved buttresses stepped up either side of the foundation,
+   * grown up out of the ground when taken.
+   */
+  private drawBedrock(ctx: CanvasRenderingContext2D): void {
+    if (this.bedrock < 0) return;
+    const base = this.stack[0];
+    if (!base) return;
+    const grow = this.reduceMotion ? 1 : easeOutBack(Math.min(1, this.bedrock));
+    for (const side of [-1, 1] as const) {
+      for (let step = 0; step < BEDROCK_STEPS; step++) {
+        const w = base.w * (0.42 - step * 0.1);
+        const x =
+          side < 0
+            ? base.x - w * 0.75 + step * w * 0.35
+            : base.x + base.w - w * 0.25 - step * w * 0.35;
+        const y = SLAB_H * (step + 1) * grow - SLAB_H;
+        const s = this.worldToScreen(x, y);
+        this.paintSlab(ctx, s.x, s.y, w, VISUAL_H, [200, 170, 130], 1, 0, false);
+      }
+    }
   }
 
   private drawSlab(ctx: CanvasRenderingContext2D, slab: Slab, hotGroove: boolean): void {
