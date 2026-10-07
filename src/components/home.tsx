@@ -19,32 +19,83 @@ import { ArtImage, ArtLoop } from "./art";
  * The title: the Spire building itself out of the dark behind (the engine's
  * attract scene), a column of light released into the sky, and one tap.
  */
-export function TitleSplash({ onEnter }: { onEnter: () => void }) {
+/** Embers for the title, each its own drift: [left %, delay s, duration s, size px]. */
+const TITLE_EMBERS = Array.from({ length: 22 }, (_, i) => {
+  const r = (n: number) => {
+    const v = Math.sin(i * 12.9898 + n * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  return [r(1) * 100, r(2) * 6, 5 + r(3) * 5, 1.5 + r(4) * 2.5] as const;
+});
+
+/** Seconds the tap's flare and push-in last before the worlds open. */
+const TITLE_LEAVE = 1.7;
+
+/**
+ * The title: out of the dark the painted Spire fades up, the name forms out
+ * of embers, then the way in. A tap wakes it: the sting, the score swelling,
+ * a flare and a push into the light, then the worlds.
+ */
+export function TitleSplash({ onEnter, onAwaken }: { onEnter: () => void; onAwaken?: () => void }) {
   // When the painted title loop is there, it replaces the drawn beam and tower.
   const [painted, setPainted] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const enter = () => {
+    if (leaving) return;
+    setLeaving(true);
+    onAwaken?.();
+    window.setTimeout(onEnter, TITLE_LEAVE * 1000);
+  };
   return (
     <div
-      className={"splash" + (painted ? " splash-painted" : "")}
+      className={"splash" + (painted ? " splash-painted" : "") + (leaving ? " splash-leaving" : "")}
       data-ui
-      onClick={onEnter}
+      onClick={enter}
       role="button"
       aria-label="Enter"
     >
-      <ArtImage name="title.jpg" className="splash-art" onLoad={() => setPainted(true)} />
-      <ArtLoop
-        name="title.mp4"
-        poster="title.jpg"
-        className="splash-art"
-        onReady={() => setPainted(true)}
-      />
+      <div className="splash-stage">
+        <ArtImage name="title.jpg" className="splash-art" onLoad={() => setPainted(true)} />
+        <ArtLoop
+          name="title.mp4"
+          poster="title.jpg"
+          className="splash-art"
+          onReady={() => setPainted(true)}
+        />
+      </div>
       {painted ? null : <span className="splash-beam" />}
+      <div className="splash-embers" aria-hidden="true">
+        {TITLE_EMBERS.map(([left, delay, dur, size], i) => (
+          <span
+            key={i}
+            style={
+              {
+                left: `${left}%`,
+                width: size,
+                height: size,
+                animationDelay: `${delay}s`,
+                animationDuration: `${dur}s`,
+              } as CSSProperties
+            }
+          />
+        ))}
+      </div>
       <div className="splash-text">
         <p className="splash-kicker">Relight the sky</p>
         <h1 className="splash-word">Spire</h1>
       </div>
-      <button type="button" className="story-cta splash-cta" onClick={onEnter}>
+      <button
+        type="button"
+        className="story-cta splash-cta"
+        onClick={(e) => {
+          e.stopPropagation();
+          enter();
+        }}
+      >
         Tap to begin
       </button>
+      <span className="splash-flare" aria-hidden="true" />
+      <span className="splash-veil" aria-hidden="true" />
     </div>
   );
 }

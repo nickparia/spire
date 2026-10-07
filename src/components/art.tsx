@@ -42,9 +42,29 @@ export function ArtLoop({
   onReady?: () => void;
 }) {
   const [ok, setOk] = useState(true);
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    // iOS only autoplays a video it knows is muted before it loads; React sets
+    // `muted` too late for that, so set it here and ask it to play outright,
+    // and again on the first touch in case it was refused.
+    const v = ref.current;
+    if (!v) return;
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("muted", "");
+    const play = () => void v.play().catch(() => undefined);
+    play();
+    v.addEventListener("canplay", play);
+    document.addEventListener("pointerdown", play, { once: true });
+    return () => {
+      v.removeEventListener("canplay", play);
+      document.removeEventListener("pointerdown", play);
+    };
+  }, [name]);
   if (!ok) return null;
   return (
     <video
+      ref={ref}
       className={"art " + (className ?? "")}
       src={`art/${name}`}
       poster={poster ? `art/${poster}` : undefined}

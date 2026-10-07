@@ -226,6 +226,8 @@ export class Music {
   /** Whether the recorded score plays; the synth takes over if it fails. */
   private recState: "loading" | "ok" | "failed" = "loading";
   private boss = false;
+  /** Until this time (seconds, performance clock) the score rises slowly: the title's swell. */
+  private swellUntil = 0;
   /** When the recorded score was first asked for; past a few seconds unheard, the synth fills in. */
   private recSince = 0;
   /** The order each playlist plays in, and where it is. */
@@ -262,6 +264,12 @@ export class Music {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
     for (const d of this.rec?.decks ?? []) d.el.pause();
+  }
+
+  /** A slow swell up to full: the title being woken. */
+  swellIn(seconds = 4): void {
+    this.swellUntil = performance.now() / 1000 + seconds;
+    if (this.rec) this.rec.level.gain.cancelScheduledValues(this.rec.ctx.currentTime);
   }
 
   /** The escape is on: the boss piece takes over. */
@@ -401,7 +409,11 @@ export class Music {
             : Math.min(20000, 2200 * Math.pow(9, t));
     rec.tone.frequency.setTargetAtTime(cutoff, time, 0.25);
     const level = this.mood === "fallen" ? 0.5 : this.mood === "menu" ? 0.85 : 1;
-    rec.level.gain.setTargetAtTime(level, time, 0.3);
+    rec.level.gain.setTargetAtTime(
+      level,
+      time,
+      performance.now() / 1000 < this.swellUntil ? 1.2 : 0.3,
+    );
     return this.recState === "ok";
   }
 

@@ -151,6 +151,8 @@ const ESCAPE_LUNGE = 6;
 const DARK_ART_SURFACE = 0.2;
 /** Down the screen the Descent's tip sits, as a share of the view. */
 const DESCENT_SEAT = 0.42;
+/** Skies with a living painted plate in public/art/sky/; the rest are drawn. */
+const PAINTED_SKIES: readonly string[] = ["foundry"];
 type SlabLook = "fire" | "ice" | "charge";
 /** Each living slab's box inside its sheet's frames, as shares of the frame. */
 const SLAB_LOOKS: Record<SlabLook, { l: number; r: number; top: number; bot: number }> = {
@@ -708,6 +710,11 @@ export class SpireEngine {
   private sourceArt: HTMLVideoElement | null = null;
   private sourceArtReady = false;
   private sourceMask: HTMLCanvasElement | null = null;
+  /** Living painted skies by theme: the plate's loop, and its near ruins. */
+  private skies = new Map<
+    string,
+    { video: HTMLVideoElement; fg: HTMLImageElement; ready: boolean }
+  >();
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
   private slabLookNow: SlabLook | null = null;
   /** Sprite sheets (public/art/sprites/<name>.webp), one row of square frames. */
@@ -818,6 +825,13 @@ export class SpireEngine {
   /** Call from any user gesture so the audio can start. */
   wake(): void {
     if (this.rig.unlock()) this.music.start();
+  }
+
+  /** The title is tapped: the sting, and the score swells in. */
+  awaken(): void {
+    this.wake();
+    this.music.swellIn();
+    this.sfx.awaken();
   }
 
   tap(): void {
@@ -4296,6 +4310,115 @@ export class SpireEngine {
     return null;
   }
 
+  /**
+   * The current sky's painted plate, once its loop can be drawn; null keeps
+   * the drawn backdrop (and while it loads).
+   */
+  private paintedSky(): { video: HTMLVideoElement; fg: HTMLImageElement } | null {
+    const id = this.theme.id;
+    if (!PAINTED_SKIES.includes(id) || this.plan.descent || typeof document === "undefined") {
+      return null;
+    }
+    let sky = this.skies.get(id);
+    if (!sky) {
+      const video = document.createElement("video");
+      video.src = `art/sky/${id}.mp4`;
+      video.poster = `art/sky/${id}.jpg`;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "auto";
+      video.setAttribute("playsinline", "");
+      video.style.cssText =
+        "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+      const made = {
+        video,
+        fg: Object.assign(new Image(), { src: `art/sky/${id}-fg.webp` }),
+        ready: false,
+      };
+      const ready = () => {
+        if (video.readyState >= 2) made.ready = true;
+      };
+      video.addEventListener("loadeddata", ready);
+      video.addEventListener("playing", ready);
+      video.addEventListener("timeupdate", ready);
+      document.body.appendChild(video);
+      video.load();
+      this.skies.set(id, made);
+      sky = made;
+    }
+    // Only the sky in view plays.
+    for (const [other, s] of this.skies) if (other !== id && !s.video.paused) s.video.pause();
+    if (sky.video.paused) void sky.video.play().catch(() => undefined);
+    return sky.ready ? sky : null;
+  }
+
+  /**
+   * The painted sky: the plate covers the view and slides from its ground to
+   * its night as the climb goes up; embers drift at two depths over it.
+   */
+  private drawSky(ctx: CanvasRenderingContext2D, view: BackdropView): void {
+    const v = this.paintedSky()!.video;
+    const ratio = v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9;
+    const w = Math.max(view.w * 1.06, (view.h * 1.22) / ratio);
+    const h = w * ratio;
+    const climb = clamp01(view.altitude);
+    const y = (view.h - h) * (1 - climb);
+    const x = (view.w - w) / 2 - view.camX * 0.04;
+    ctx.drawImage(v, x, y, w, h);
+    // Held back, darkest down the middle, so the tower reads first.
+    const shade = ctx.createLinearGradient(0, 0, view.w, 0);
+    shade.addColorStop(0, "rgba(8,5,10,0.22)");
+    shade.addColorStop(0.5, "rgba(8,5,10,0.5)");
+    shade.addColorStop(1, "rgba(8,5,10,0.22)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, view.w, view.h);
+    // The far embers, slow.
+    this.drawEmbers(ctx, view, 0.25, 26, 1.2, 0.5);
+  }
+
+  /** In front of the tower: near embers, quick, and the ruins you rise out of. */
+  private drawSkyFront(ctx: CanvasRenderingContext2D, view: BackdropView): void {
+    this.drawEmbers(ctx, view, 1.4, 14, 2.4, 0.9);
+    const fg = this.paintedSky()!.fg;
+    if (!fg.complete || fg.naturalWidth === 0) return;
+    const w = view.w * 1.1;
+    const h = w * (fg.naturalHeight / fg.naturalWidth);
+    // Closer than the tower: it falls away faster than the climb.
+    const y = view.h - h * 0.92 + (view.camY - this.anchor) * 1.35;
+    if (y > view.h) return;
+    ctx.drawImage(fg, (view.w - w) / 2 - view.camX * 0.25, y, w, h);
+  }
+
+  /** Embers rising through a layer: depth sets their parallax, size and pace. */
+  private drawEmbers(
+    ctx: CanvasRenderingContext2D,
+    view: BackdropView,
+    depth: number,
+    count: number,
+    size: number,
+    alpha: number,
+  ): void {
+    if (this.reduceMotion) return;
+    const accent = this.theme.accent;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < count; i++) {
+      const hx = Math.sin(i * 91.7 + depth * 13) * 43758.5453;
+      const hy = Math.sin(i * 47.3 + depth * 7) * 24634.6345;
+      const rx = hx - Math.floor(hx);
+      const ry = hy - Math.floor(hy);
+      const span = view.h + 40;
+      const rise = this.clock * (14 + rx * 22) * depth;
+      const y = ((((ry * span - rise + view.camY * depth * 0.6) % span) + span) % span) - 20;
+      const x = rx * view.w + Math.sin(this.clock * (0.6 + ry) + i) * 10 * depth;
+      const flick = 0.55 + 0.45 * Math.sin(this.clock * (3 + rx * 4) + i);
+      ctx.fillStyle = rgbCss(accent, alpha * flick);
+      ctx.fillRect(x, y, size * (0.6 + ry), size * (0.6 + ry));
+    }
+    ctx.restore();
+  }
+
   /** A living slab's sheet once loaded. */
   private lookSheet(look: SlabLook): HTMLImageElement | null {
     const name = `slab-${look}`;
@@ -4427,7 +4550,8 @@ export class SpireEngine {
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
 
-    if (!this.plan.descent) this.backdrop.drawFront(ctx, view);
+    if (this.paintedSky()) this.drawSkyFront(ctx, view);
+    else if (!this.plan.descent) this.backdrop.drawFront(ctx, view);
     this.drawFloaters(ctx);
 
     // Everything from here is laid over the lens, so it ignores the zoom.
@@ -4462,6 +4586,10 @@ export class SpireEngine {
   private drawBackdrop(ctx: CanvasRenderingContext2D, view: BackdropView, zoom: number): void {
     if (this.plan.descent) {
       this.drawShaft(ctx, view);
+      return;
+    }
+    if (this.paintedSky()) {
+      this.drawSky(ctx, view);
       return;
     }
     const fading = this.fading;

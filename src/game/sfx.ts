@@ -216,6 +216,20 @@ export class Sfx {
     this.tone(1175, 0.12, "sine", 0.08, undefined, 0.06);
   }
 
+  /** The title wakes: a sub boom, a rush rising out of it, and a high chord over the top. */
+  awaken(): void {
+    this.tone(72, 2.8, "sine", 0.4, 34);
+    this.tone(144, 1.6, "triangle", 0.08, 70);
+    this.noise(1.8, 0.12, 600);
+    for (const [f, d] of [
+      [1318.5, 0.18],
+      [1760, 0.3],
+      [2637, 0.42],
+    ] as const) {
+      this.tone(f, 2.4, "sine", 0.035, undefined, d);
+    }
+  }
+
   ui(): void {
     this.tone(660, 0.05, "sine", 0.06);
   }

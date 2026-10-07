@@ -2134,6 +2134,180 @@
   animation-delay: 2.4s, 3.4s;
 }
 
+/* The reveal: out of black, the painting breathes in, the name forms from embers. */
+.splash-stage {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.splash-stage .splash-art {
+  animation: title-drift 9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.splash-veil {
+  position: absolute;
+  inset: 0;
+  background: #050307;
+  pointer-events: none;
+  animation: title-unveil 2.6s ease-out 0.2s both;
+}
+
+.splash-embers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.splash-embers span {
+  position: absolute;
+  bottom: -10px;
+  border-radius: 50%;
+  background: #ffb26b;
+  box-shadow: 0 0 6px 2px rgba(255, 140, 60, 0.7);
+  opacity: 0;
+  animation-name: ember-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.splash .splash-word {
+  animation: title-form 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) 1.5s both;
+}
+
+.splash .splash-kicker {
+  animation: veil-in 1.4s ease-out 3.2s both;
+}
+
+.splash .splash-cta {
+  animation-delay: 4.3s, 5.3s;
+}
+
+.splash-flare {
+  position: absolute;
+  left: 50%;
+  bottom: 30%;
+  width: 140vmax;
+  height: 140vmax;
+  translate: -50% 50%;
+  border-radius: 50%;
+  background: radial-gradient(
+    rgba(255, 236, 200, 0.95),
+    rgba(255, 170, 90, 0.55) 18%,
+    rgba(255, 120, 60, 0) 55%
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The tap: the light flares, the view pushes into it, the words burn away. */
+.splash-leaving {
+  cursor: default;
+}
+
+.splash-leaving .splash-stage .splash-art {
+  animation: title-push 1.7s cubic-bezier(0.55, 0, 0.75, 0.2) both;
+}
+
+.splash-leaving .splash-flare {
+  animation: title-flare 1.7s ease-in both;
+}
+
+.splash-leaving .splash-text,
+.splash-leaving .splash-cta {
+  animation: title-burn 0.9s ease-in both;
+}
+
+@keyframes title-unveil {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes title-drift {
+  from {
+    transform: scale(1.12);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes title-form {
+  0% {
+    opacity: 0;
+    filter: blur(18px);
+    letter-spacing: 0.45em;
+    text-shadow: 0 0 60px rgba(255, 150, 70, 0.9);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(1px);
+    text-shadow: 0 0 50px rgba(255, 170, 100, 0.8);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    letter-spacing: 0;
+    text-shadow: 0 0 40px rgba(255, 170, 100, 0.35);
+  }
+}
+
+@keyframes ember-rise {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(30px, -95vh);
+    opacity: 0;
+  }
+}
+
+@keyframes title-push {
+  from {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  to {
+    transform: scale(1.35);
+    filter: brightness(1.8);
+  }
+}
+
+@keyframes title-flare {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  55% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes title-burn {
+  to {
+    opacity: 0;
+    filter: blur(10px);
+    transform: scale(1.15);
+  }
+}
+
 @keyframes beam {
   from {
     transform: scaleY(0);

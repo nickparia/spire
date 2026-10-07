@@ -314,7 +314,9 @@ export function SpireGame() {
       <canvas ref={canvasRef} className="game-canvas" aria-hidden="true" />
 
       <div className={"hud hud-safe" + (hud.phase === "menu" ? " hud-menu" : "")}>
-        {hud.phase === "menu" && menu === "title" ? <TitleSplash onEnter={openWorlds} /> : null}
+        {hud.phase === "menu" && menu === "title" ? (
+          <TitleSplash onEnter={openWorlds} onAwaken={() => engineRef.current?.awaken()} />
+        ) : null}
 
         {hud.phase === "menu" && menu === "worlds" ? (
           <WorldSelect

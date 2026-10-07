@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 51 — A living sky, a title that wakes (internal)
+
+- **The Foundry's sky is alive.** A painted foundry city burning under an ember sky: smoke rolls from the chimneys, furnace windows flicker, violet lightning crawls through the clouds. It slides from the city up into the night as you climb, ruins and hanging chains pass in front of you, and embers drift at two depths. (The other skies follow once this one is approved.)
+- **The title wakes.** It rises out of black: the painting fades up, the name forms out of embers, then "Tap to begin". Tapping plays a deep sting, the music swells in, and the view pushes into the light before the worlds open.
+- **Fixed:** the title's animation (and other painted loops) didn't play on iPhone.
+
 ## Build 50 — Painted stone, living slabs (internal)
 
 - **Painted slabs.** Every slab is now carved dark stone with runes and a molten groove; the centre mark is the perfect mark.
