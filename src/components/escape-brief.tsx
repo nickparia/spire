@@ -1,4 +1,4 @@
-import { Flame, Hand, Link2 } from "lucide-react";
+import { Eye, Flame, Hand, Link2 } from "lucide-react";
 import type { Hud } from "@/game/engine";
 
 /**
@@ -20,7 +20,12 @@ export function EscapeBrief({ hud }: { hud: Hud }) {
         <div className="brief-card">
           <p className="brief-kicker">The sky is lit · now run</p>
           <p className="brief-rule">
-            <Hand size={18} strokeWidth={2.4} /> Tap anywhere to break the slab the light is in.
+            <Hand size={18} strokeWidth={2.4} /> Tap as the ring closes on the light to break the
+            slab it is in.
+          </p>
+          <p className="brief-rule">
+            <Eye size={18} strokeWidth={2.4} /> When the great eye opens, be still. If it sees you
+            move, it lunges.
           </p>
           <p className="brief-rule">
             <Flame size={18} strokeWidth={2.4} /> Perfects laid in a row go off together.

@@ -3,6 +3,15 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 45 — Be still
+
+- **A new boss fight.** Spamming no longer works:
+  - **Tap on the pulse**: a ring closes on the light; tap as it lands to break a slab. Off-pulse taps only chip at it.
+  - **Be still**: every few seconds the creature stirs, then its great eye opens and stares down at the light. While it watches, don't move — tap and it sees you, lunging closer. It holds still while it looks.
+  - Chains, bindings and the summit sting are as before.
+- **The story in chapters.** A prologue before your first game, and **Chapter I · What the Foundry Remembered** after Hearth is relit — each paragraph over its own living painting. Read them again from **Story**.
+- **Fixed:** the painted source didn't appear on iPhone in build 44.
+
 ## Build 44 — It comes for the light
 
 - **The sky is lit** — the first time you reach Apex's summit, a painted scene: the beam flares, the black sky ripples and tears open, and the source descends with its eyes opening. Retries go straight to the countdown.

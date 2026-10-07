@@ -1832,6 +1832,11 @@
   text-shadow: 0 0 14px rgba(180, 120, 255, 0.8);
 }
 
+.boss-watch {
+  color: #ff8a8a !important;
+  font-size: 13px !important;
+}
+
 .boss-hud {
   margin-top: 6px;
   font-size: 12px;
@@ -3713,4 +3718,126 @@
 
 .gift-name {
   font-size: 23px;
+}
+
+/* The story in chapters: a page per paragraph over its living painting. */
+.chapter {
+  position: fixed;
+  inset: 0;
+  z-index: 26;
+  background: #050409;
+  color: #f3e9dc;
+  animation: screen-in 0.8s ease-out both;
+}
+
+.chapter-art {
+  position: absolute;
+  inset: 0;
+  animation: screen-in 1.2s ease-out both;
+}
+
+.chapter-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    rgba(5, 4, 9, 0.35),
+    rgba(5, 4, 9, 0) 30%,
+    rgba(5, 4, 9, 0.15) 50%,
+    rgba(5, 4, 9, 0.92) 78%
+  );
+}
+
+.chapter-body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(2.4rem, env(safe-area-inset-bottom));
+  padding: 0 1.8rem;
+  text-align: center;
+}
+
+.chapter-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  color: #e9a874;
+  animation: veil-in 1.2s ease-out both;
+}
+
+.chapter-text {
+  margin-top: 0.8rem;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.42;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8);
+  animation: veil-in 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s both;
+}
+
+.chapter-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 1.2rem;
+}
+
+.chapter-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(243, 233, 220, 0.25);
+}
+
+.chapter-dots .on {
+  background: #ffb070;
+  box-shadow: 0 0 8px #ff8a40;
+}
+
+.chapter-tap {
+  margin-top: 1rem;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  animation: veil-in 1s ease-out 1.6s both;
+}
+
+.chapter-cta {
+  position: static;
+  translate: none;
+  margin-top: 1.1rem;
+  background: rgba(8, 5, 12, 0.6);
+}
+
+.chapters .chapter-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  margin-top: 0.7rem;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.chapters .chapter-pick img {
+  width: 54px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.chapters .chapter-pick span {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.chapters-more {
+  margin-top: 0.8rem;
+  font-size: 12px;
+  opacity: 0.6;
 }

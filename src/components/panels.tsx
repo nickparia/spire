@@ -224,8 +224,14 @@ export function RunHud({
         <p className="kicker mt-2">Accuracy</p>
         <p className="stat-num">{started ? formatPercent(hud.accuracy) : "—"}</p>
         {hud.escape && hud.escape.count === 0 ? (
-          <p className="boss-hud">
-            {hud.escape.bound > 0 ? `Bound · tear ×${hud.escape.bound}` : "Escape"}
+          <p className={"boss-hud" + (hud.escape.gaze === "watch" ? " boss-watch" : "")}>
+            {hud.escape.gaze === "watch"
+              ? "It is watching · be still"
+              : hud.escape.gaze === "stir"
+                ? "It stirs…"
+                : hud.escape.bound > 0
+                  ? `Bound · tear ×${Math.ceil(hud.escape.bound)}`
+                  : "Tap on the pulse"}
           </p>
         ) : null}
         {hud.darkGap !== null && started ? (

@@ -25,6 +25,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Pinned ideas (not scheduled)
 
+- **The solar system arc** (Nick): each world is a planet with its own source-boss; a mega boss in the black hole at the centre; through it into their dimension as the next arc. Recorded in STORY.md.
 - **Cosmic horror theme** (user, Oct 7): lean into it — the source above is Lovecraftian (eyes, tentacles, the sky swallowed). Every world's boss is an inversion of its climb and shows more of the source.
 - **More worlds** from the four dials (direction, slab behaviour, enemy, goal): low moon (slow falling, the tender world), heavy world (double gravity), the deep (underwater, currents), twin suns (gravity tilts through the run), ice (slabs slide to a lip), seed (slabs sprout ledges), the tide (waves surge and pull back), the watcher (the Dark drawn to loose slabs), hold-out and squash goals.
 - **The Trial**: the old precision game (shrinking slabs) as a special sky with milestone scoring. Only if it is missed.
@@ -33,6 +34,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 45 Boss rework: the great eye stirs then watches (`gaze`), tapping while it watches makes it lunge (`ESCAPE_LUNGE`); taps on the light's pulse break slabs, off-pulse taps only chip (`ESCAPE_BEAT/_WINDOW/_OFFBEAT`); the source holds still while it watches. Hearth tuned: smart player escapes a sloppy tower in ~1 min, eye-ignorers and spammers are caught. Story as chapters (`ChapterPlayer`, prologue on first Begin, chapter after each world's film, chapter list from Story) with 8 painted vignettes. Fix: the painted source now plays on iOS (play before load). Bot: `tools/bots/gaze.mjs <spam|rhythm|smart>`.
 - 44 Painted boss: `source.mp4` drawn into the chase (`drawSourceArt`, grows as it nears, eyes kept in view), `escape-sting.mp4` on the first lighting (`ESCAPE_STING`), binding tendrils restyled to match. Pattern for later worlds: Higgsfield for watched beats (stings) and living layers (the mass), code for anything that reacts to taps.
 - 43 Full-screen per-world background loops on the world select (`bg-<world>.mp4/.jpg`, crossfade), IM Fell English SC as `--font-display`, story on the first Begin only, new bottom bar, no what's-new for new players.
 - 42 Painted art from Higgsfield: title loop, Hearth/Descent/Wheel panels, the world-end film (plays once, holds, then the line; tap skips), source reference. See ART.md.

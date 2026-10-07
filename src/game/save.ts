@@ -49,6 +49,8 @@ export type Save = {
   whatsNewSeen: number;
   /** The premise has been read once. */
   storySeen: boolean;
+  /** Chapters told, by id. */
+  chaptersSeen: string[];
   /** An update prompt for this build was dismissed. */
   updateSnoozed: number;
   /** Whether others may challenge you. */
@@ -87,6 +89,7 @@ export function emptySave(): Save {
     shadeSeen: new Date(0).toISOString(),
     whatsNewSeen: 0,
     storySeen: false,
+    chaptersSeen: [],
     updateSnoozed: 0,
     challengesOn: true,
     tester: false,
@@ -157,6 +160,9 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
       save.savedAt = Math.max(0, num(data.savedAt, 0));
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));
       save.storySeen = data.storySeen === true;
+      if (Array.isArray(data.chaptersSeen)) {
+        save.chaptersSeen = data.chaptersSeen.filter((x): x is string => typeof x === "string");
+      }
       save.updateSnoozed = Math.max(0, Math.floor(num(data.updateSnoozed, 0)));
       for (const [id, at] of Object.entries(data.feats ?? {})) {
         if (typeof at === "number" && at > 0) save.feats[id] = at;

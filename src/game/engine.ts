@@ -123,8 +123,8 @@ const BOSS_TENDRIL = 4;
  * drives it back, and the combo of quick breaks that makes a surge.
  */
 const ESCAPE_START = 7;
-const ESCAPE_SPEED = 3.2;
-const ESCAPE_ACCEL = 0.12;
+const ESCAPE_SPEED = 0.9;
+const ESCAPE_ACCEL = 0.015;
 const ESCAPE_CHARGE = 0.6;
 const ESCAPE_SURGE_AT = 6;
 const ESCAPE_COMBO_GAP = 0.42;
@@ -134,9 +134,18 @@ const ESCAPE_COMBO_GAP = 0.42;
  * Seconds the first-time briefing shows before the countdown.
  */
 const ESCAPE_BIND_EVERY = 7;
-const ESCAPE_BIND_INTERVAL = 2.8;
+const ESCAPE_BIND_INTERVAL = 3.6;
 const ESCAPE_BIND_TAPS = 3;
-const ESCAPE_BRIEF = 4;
+const ESCAPE_BRIEF = 5.5;
+/**
+ * The escape's rhythm: seconds per pulse of the light, how far either side
+ * of a pulse a tap still counts as on it, what share of a slab an off-pulse
+ * tap breaks, and floors the source lunges when it sees you move.
+ */
+const ESCAPE_BEAT = 0.42;
+const ESCAPE_BEAT_WINDOW = 0.1;
+const ESCAPE_OFFBEAT = 0.34;
+const ESCAPE_LUNGE = 6;
 /** Seconds the summit sting plays, when it is there. */
 const ESCAPE_STING = 5;
 /** Seconds between slabs in a chain of perfects going off. */
@@ -278,6 +287,7 @@ export type Hud = {
     combo: number;
     briefing: boolean;
     sting: boolean;
+    gaze: "shut" | "stir" | "watch";
     count: number;
     bound: number;
   } | null;
@@ -617,9 +627,23 @@ export class SpireEngine {
     briefing: boolean;
     /** The painted sting is playing. */
     sting: boolean;
+    /** The great eye: shut, stirring (about to open), or watching. */
+    gaze: "shut" | "stir" | "watch";
+    /** Seconds left in the current gaze state. */
+    gazeT: number;
+    /** The source's rhythm for this world: seconds shut, stirring, watching. */
+    gazeShut: number;
+    gazeStir: number;
+    gazeWatch: number;
+    /** Seconds into the light's pulse. */
+    beatT: number;
+    /** Seconds the eye flares red after catching you moving. */
+    seen: number;
     /** Whole seconds left on the countdown, or 0 once running. */
     count: number;
   } | null = null;
+  /** Where the source's great eye is on screen this frame. */
+  private eyeAt = { x: 0, y: 0, r: 15 };
   /** The painted source (public/art/source.mp4), drawn into the chase when it has loaded. */
   private sourceArt: HTMLVideoElement | null = null;
   private sourceArtReady = false;
@@ -915,6 +939,7 @@ export class SpireEngine {
       | "practice"
       | "progress"
       | "storySeen"
+      | "chaptersSeen"
     >,
   ): void {
     Object.assign(this.save, patch);
@@ -1784,6 +1809,14 @@ export class SpireEngine {
       bindEvery: Math.max(0.9, ESCAPE_BIND_INTERVAL - world * 0.25),
       briefing: false,
       sting: false,
+      gaze: "shut",
+      gazeT: 0,
+      // Hearth's eye is slow to open and quick to close; later worlds stare longer.
+      gazeShut: Math.max(2.2, 4.6 - world * 0.6),
+      gazeStir: Math.max(0.5, 1.3 - world * 0.15),
+      gazeWatch: 1.5 + world * 0.3,
+      beatT: 0,
+      seen: 0,
       count: 3,
     };
     const esc = this.escape;
@@ -1801,7 +1834,10 @@ export class SpireEngine {
     // The first time the sky is lit, the painted sting plays before anything else.
     esc.sting = fresh && this.stingReady;
     esc.hold = (esc.sting ? ESCAPE_STING : 0) + (esc.briefing ? ESCAPE_BRIEF : 0) + 3;
-    if (this.sourceArtReady) void this.sourceArt?.play().catch(() => undefined);
+    // The first stare comes a little after the run starts.
+    esc.gazeT = esc.gazeShut * 0.8;
+    // Always ask it to play: iOS loads nothing for a hidden video until it plays.
+    void this.sourceArt?.play().catch(() => undefined);
     this.tip = "";
     // The slab that was coming next is put away: the light is what moves now.
     this.mover.fallT = -1;
@@ -1830,15 +1866,32 @@ export class SpireEngine {
     // A chain is going off: the light is already falling.
     if (esc.chain !== null) return;
     const top = this.stack[this.stack.length - 1]!;
+    if (esc.gaze === "watch") {
+      // It sees the light move: it lunges, and the rhythm is broken.
+      esc.source -= SLAB_H * ESCAPE_LUNGE;
+      esc.combo = 0;
+      esc.seen = 0.6;
+      this.float("IT SEES YOU", top.x + top.w / 2, top.y + 110, false, 26);
+      this.trauma = Math.min(1, this.trauma + 0.6);
+      this.flash = Math.max(this.flash, 0.3);
+      this.sfx.fail();
+      haptics.heavy();
+      this.emit();
+      return;
+    }
+    // On the light's pulse a tap breaks a slab; off it, a tap only chips.
+    const phase = esc.beatT / ESCAPE_BEAT;
+    const onBeat = Math.min(phase, 1 - phase) * ESCAPE_BEAT <= ESCAPE_BEAT_WINDOW;
+    const dmg = onBeat ? 1 : ESCAPE_OFFBEAT;
     const bind = esc.bound.get(top);
     if (bind) {
       // A bound slab: each tap tears at the tendril; the last tears it free.
-      bind.taps -= 1;
+      bind.taps -= dmg;
       top.flash = 1;
       this.fx.burst(top.x + top.w / 2, top.y + VISUAL_H / 2, [170, 90, 255], 12, 170);
       this.trauma = Math.min(1, this.trauma + 0.18);
       haptics.medium();
-      if (bind.taps > 0) {
+      if (bind.taps > 0.001) {
         this.sfx.hiss();
         this.emit();
         return;
@@ -1847,16 +1900,17 @@ export class SpireEngine {
       this.float("TORN FREE", top.x + top.w / 2, top.y + 70, true, 20);
       esc.hits = 1;
     }
-    esc.hits -= 1;
-    if (esc.hits > 0) {
-      top.flash = 1;
+    esc.hits -= dmg;
+    if (esc.hits > 0.001) {
+      top.flash = onBeat ? 1 : 0.4;
       this.fx.burst(top.x + top.w / 2, top.y + VISUAL_H / 2, top.rgb, 8, 120);
       this.sfx.tick();
       haptics.light();
       return;
     }
-    const quick = this.runTime - esc.lastBreak < ESCAPE_COMBO_GAP;
-    esc.combo = quick ? esc.combo + 1 : 1;
+    // Only taps on the pulse build toward a surge.
+    const quick = this.runTime - esc.lastBreak < ESCAPE_COMBO_GAP + ESCAPE_BEAT;
+    esc.combo = onBeat ? (quick ? esc.combo + 1 : 1) : 0;
     esc.lastBreak = this.runTime;
     const charged = esc.charged.has(top);
     this.shatter(top);
@@ -1925,6 +1979,8 @@ export class SpireEngine {
   private chase(dt: number): void {
     const esc = this.escape!;
     esc.eye += dt;
+    esc.beatT = (esc.beatT + dt) % ESCAPE_BEAT;
+    esc.seen = Math.max(0, esc.seen - dt);
     if (esc.hold > 0) {
       esc.hold -= dt;
       const count = esc.hold > 3 ? 3 : Math.max(0, Math.ceil(esc.hold));
@@ -1951,6 +2007,28 @@ export class SpireEngine {
       }
       return;
     }
+    // The great eye: shut, then it stirs, then it watches.
+    esc.gazeT -= dt;
+    if (esc.gazeT <= 0) {
+      const top = this.stack[this.stack.length - 1]!;
+      if (esc.gaze === "shut") {
+        esc.gaze = "stir";
+        esc.gazeT = esc.gazeStir;
+        this.sfx.hiss();
+        haptics.medium();
+      } else if (esc.gaze === "stir") {
+        esc.gaze = "watch";
+        esc.gazeT = esc.gazeWatch;
+        this.float("BE STILL", top.x + top.w / 2, top.y + 130, false, 26);
+        haptics.heavy();
+      } else {
+        esc.gaze = "shut";
+        esc.gazeT = esc.gazeShut * (0.75 + Math.random() * 0.5);
+        this.float("RUN", top.x + top.w / 2, top.y + 130, true, 26);
+      }
+      this.emit();
+    }
+    if (esc.gaze === "stir") this.trauma = Math.max(this.trauma, 0.12);
     // Tendrils keep reaching in and wrapping slabs just below the light.
     esc.bindT -= dt;
     if (esc.bindT <= 0) {
@@ -1996,8 +2074,11 @@ export class SpireEngine {
         if (esc.chained % 4 === 0) this.emit();
       }
     } else if (this.runTime - esc.lastBreak > ESCAPE_COMBO_GAP) esc.combo = 0;
-    esc.speed += esc.accel * dt;
-    esc.source -= esc.speed * dt;
+    // While it watches it holds still: it is looking, not reaching.
+    if (esc.gaze !== "watch") {
+      esc.speed += esc.accel * dt;
+      esc.source -= esc.speed * dt;
+    }
     const top = this.stack[this.stack.length - 1]!;
     const light = top.y + SLAB_H;
     const gap = (esc.source - light) / SLAB_H;
@@ -2040,6 +2121,7 @@ export class SpireEngine {
     v.addColorStop(1, `rgba(8,3,16,${0.35 + near * 0.5})`);
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, this.vw, this.vh);
+    this.eyeAt = { x: light.x, y: edge - 70, r: 15 };
     if (this.sourceArtReady && this.sourceArt) {
       this.drawSourceArt(ctx, edge, near);
     } else if (edge > -120) {
@@ -2123,6 +2205,7 @@ export class SpireEngine {
         ctx.fill();
       });
     }
+    this.drawGaze(ctx, light);
     // Tendrils wrapped round the slabs they have bound, reaching down from the mass.
     for (const [slab, bind] of esc.bound) {
       const c = this.worldToScreen(slab.x + slab.w / 2, slab.y + VISUAL_H / 2);
@@ -2162,7 +2245,7 @@ export class SpireEngine {
         ctx.font = '900 13px "Nunito Variable", system-ui, sans-serif';
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(225,200,255,0.95)";
-        ctx.fillText(`TEAR ×${bind.taps}`, c.x, c.y - 26);
+        ctx.fillText(`TEAR ×${Math.ceil(bind.taps)}`, c.x, c.y - 26);
       }
       ctx.restore();
     }
@@ -2180,6 +2263,18 @@ export class SpireEngine {
       ctx.fillStyle = glow;
       ctx.fillRect(c.x - r * 2.4, c.y - r * 2.4, r * 4.8, r * 4.8);
       ctx.restore();
+      // The pulse: a ring closing on the light; tap as it lands.
+      if (esc.gaze !== "watch") {
+        const p = esc.beatT / ESCAPE_BEAT;
+        const ring = 24 + (1 - p) * 70;
+        ctx.save();
+        ctx.strokeStyle = `rgba(255,225,170,${0.25 + p * 0.6})`;
+        ctx.lineWidth = 2 + p * 2;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, ring, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
       if (esc.hits > 1 && !esc.bound.has(top)) {
         ctx.save();
         ctx.font = '800 12px "Nunito Variable", system-ui, sans-serif';
@@ -2204,14 +2299,18 @@ export class SpireEngine {
     // In the page but invisible: iOS will not decode frames for a detached video.
     v.style.cssText =
       "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
-    v.addEventListener("loadeddata", () => {
-      this.sourceArtReady = true;
-    });
+    const ready = () => {
+      if (v.readyState >= 2) this.sourceArtReady = true;
+    };
+    v.addEventListener("loadeddata", ready);
+    v.addEventListener("playing", ready);
+    v.addEventListener("timeupdate", ready);
     v.addEventListener("error", () => {
       this.sourceArtReady = false;
     });
     document.body.appendChild(v);
     this.sourceArt = v;
+    v.load();
     // The sting is only played by the page; here we only learn whether it exists.
     fetch("art/escape-sting.mp4", { method: "HEAD" })
       .then((r) => {
@@ -2252,11 +2351,75 @@ export class SpireEngine {
     m.fillStyle = fade;
     m.fillRect(0, 0, mw, mh);
     ctx.drawImage(mask, (this.vw - w) / 2, top);
+    this.eyeAt = { x: this.vw / 2, y: top + h * 0.28, r: w * 0.1 };
     // Above the painting, the same dark: the mass is endless.
     if (top > 0) {
       ctx.fillStyle = "rgb(6,3,12)";
       ctx.fillRect(0, 0, this.vw, top + 2);
     }
+  }
+
+  /**
+   * The great eye: lidded while shut, trembling open as it stirs, and when it
+   * watches, a glare that falls on the light and floods the screen violet.
+   */
+  private drawGaze(ctx: CanvasRenderingContext2D, light: { x: number; y: number }): void {
+    const esc = this.escape!;
+    const { x, y, r } = this.eyeAt;
+    const t = this.reduceMotion ? 0 : this.clock;
+    const open =
+      esc.gaze === "watch"
+        ? 1
+        : esc.gaze === "stir"
+          ? 1 - esc.gazeT / Math.max(0.01, esc.gazeStir)
+          : 0;
+    // The lid: dark over the painted eye, drawn back as it opens.
+    ctx.save();
+    ctx.fillStyle = `rgba(10,4,14,${0.9 * (1 - open)})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      x,
+      y,
+      r * 1.6,
+      r * (0.95 - open * 0.6) + Math.sin(t * 30) * open * 1.5,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    // Its light.
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
+    const red = esc.seen > 0;
+    glow.addColorStop(
+      0,
+      red ? `rgba(255,110,90,${0.9 * open})` : `rgba(230,200,255,${0.85 * open})`,
+    );
+    glow.addColorStop(
+      0.3,
+      red ? `rgba(220,40,60,${0.5 * open})` : `rgba(170,100,255,${0.45 * open})`,
+    );
+    glow.addColorStop(1, "rgba(120,60,200,0)");
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - r * 4, y - r * 4, r * 8, r * 8);
+    if (esc.gaze === "watch") {
+      // The stare: a cone from the eye to the light.
+      const g = ctx.createLinearGradient(x, y, light.x, light.y);
+      g.addColorStop(0, red ? "rgba(255,90,80,0.35)" : "rgba(190,140,255,0.32)");
+      g.addColorStop(1, red ? "rgba(255,90,80,0.12)" : "rgba(190,140,255,0.08)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.6, y);
+      ctx.lineTo(light.x - 70, light.y + 20);
+      ctx.lineTo(light.x + 70, light.y + 20);
+      ctx.lineTo(x + r * 0.6, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = red ? "rgba(120,10,30,0.22)" : "rgba(60,20,110,0.2)";
+      ctx.fillRect(0, 0, this.vw, this.vh);
+    }
+    ctx.restore();
   }
 
   /** One tentacle: a tapering curve from its root, swaying, its tip curling. */
@@ -3573,6 +3736,7 @@ export class SpireEngine {
             combo: this.escape.combo,
             briefing: this.escape.briefing,
             sting: this.escape.sting,
+            gaze: this.escape.gaze,
             count: this.escape.count,
             bound: (() => {
               const top = this.stack[this.stack.length - 1];

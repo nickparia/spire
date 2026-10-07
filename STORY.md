@@ -44,6 +44,15 @@ Each world is a place the Spire once stood through, with its own voice.
 - **The Low Moon** — the tender world; it grieves rather than threatens. _Here the falling is slow. You get to watch what you let go._ **Revelation:** _The tower was never finished._
 - **The last world** — **Revelation:** _You were not the first to try. You are the first to be remembered._
 
+## The shape of the whole (Nick, Oct 7)
+
+The worlds are the planets of one system, each with its Spire and its sky, and each with its own source above it — one of a kind, not one creature. Every boss is a different one of them. At the centre of the system is a black hole: the mega boss sits there, and it is where they came through. Beating it opens the way into their dimension: the next arc of the game is played on their side.
+
+- Prologue: the skies went out one by one.
+- I · Hearth: what the foundry remembered; "it was never the Dark below."
+- Later chapters reveal, world by world: there are many of them; they came from the centre; the builders stopped because they understood; the black hole is a door.
+- Chapters are four paragraphs, each over its own living painting (`src/game/story.ts`, art in `public/art/story/`).
+
 ## Rules for the voice
 
 - Never more than two sentences at a time.

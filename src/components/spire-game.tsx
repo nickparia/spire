@@ -8,7 +8,8 @@ import { StarMap } from "./star-map";
 import { WorldEnd } from "./world-end";
 import { ReadyCard } from "./ready";
 import { EscapeBrief } from "./escape-brief";
-import { StoryCard } from "./story";
+import { ChapterList, ChapterPlayer } from "./story";
+import { CHAPTERS, chapterFor, type Chapter } from "@/game/story";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect } from "./screens";
@@ -89,7 +90,19 @@ export function SpireGame() {
   /** The pause sheet, opened to end the run rather than to rest. */
   const [ending, setEnding] = useState(false);
   /** The story card, opened by hand; it also opens itself once at the start. */
+  /** The chapter list, opened from Story. */
   const [story, setStory] = useState(false);
+  /** A chapter being told, and what happens after it. */
+  const [telling, setTelling] = useState<{
+    chapter: Chapter;
+    cta: string;
+    then: () => void;
+  } | null>(null);
+  const tell = useCallback((chapter: Chapter, cta: string, then: () => void) => {
+    engineRef.current?.click();
+    setStory(false);
+    setTelling({ chapter, cta, then });
+  }, []);
   const setRival = useCallback((rival: Rival | null, ghosts: Record<string, Ghost>) => {
     engineRef.current?.updateSave({ rival, rivalGhosts: ghosts });
   }, []);
@@ -189,7 +202,9 @@ export function SpireGame() {
     const done = state.current.hud.levelIndex;
     const world = worldOf(LEVELS[done]!.id);
     // The last sky of a world leads to the map, where its constellation completes.
-    if (isBoss(LEVELS[done]!.id) && worldDone(state.current.save, world)) {
+    // Beating a world's boss ends the world (a player has relit every sky to
+    // reach it; a tester's shortcut gets the same ending).
+    if (isBoss(LEVELS[done]!.id)) {
       // First the scene on Earth, then the map with the constellation drawing.
       engineRef.current?.click();
       setMapLit(world.id);
@@ -361,7 +376,16 @@ export function SpireGame() {
           <WorldEnd
             world={WORLDS.find((w) => w.id === mapLit) ?? WORLDS[0]!}
             onDone={() => {
-              openWorlds();
+              // A world relit opens its chapter of the story, the first time.
+              const chapter = mapLit ? chapterFor(mapLit) : undefined;
+              if (chapter && !save.chaptersSeen.includes(chapter.id)) {
+                tell(chapter, "Go on", () => {
+                  engineRef.current?.updateSave({
+                    chaptersSeen: [...state.current.save.chaptersSeen, chapter.id],
+                  });
+                  openWorlds();
+                });
+              } else openWorlds();
             }}
           />
         ) : null}
@@ -487,20 +511,48 @@ export function SpireGame() {
         ) : null}
       </div>
 
-      {hud.phase === "menu" && (story || storyThen !== null) ? (
-        <StoryCard
-          cta={storyThen !== null ? "Tap to begin" : "Close"}
+      {hud.phase === "menu" && storyThen !== null && !telling ? (
+        <ChapterPlayer
+          chapter={CHAPTERS[0]!}
+          cta="Begin"
           onDone={() => {
             const engine = engineRef.current;
             engine?.click();
+            // A new player starts on this build: nothing to tell them is new.
+            engine?.updateSave({ storySeen: true, whatsNewSeen: BUILD });
+            const at = storyThen;
+            setStoryThen(null);
+            engine?.startLevel(at);
+          }}
+        />
+      ) : null}
+
+      {hud.phase === "menu" && telling ? (
+        <ChapterPlayer
+          key={telling.chapter.id}
+          chapter={telling.chapter}
+          cta={telling.cta}
+          onDone={() => {
+            engineRef.current?.click();
+            const then = telling.then;
+            setTelling(null);
+            then();
+          }}
+        />
+      ) : null}
+
+      {hud.phase === "menu" && story && !telling ? (
+        <ChapterList
+          chapters={CHAPTERS.filter(
+            (c) =>
+              !c.world ||
+              save.chaptersSeen.includes(c.id) ||
+              worldDone(save, WORLDS.find((w) => w.id === c.world) ?? WORLDS[0]!),
+          )}
+          onPick={(c) => tell(c, "Close", () => undefined)}
+          onClose={() => {
+            engineRef.current?.click();
             setStory(false);
-            if (storyThen !== null) {
-              // A new player starts on this build: nothing to tell them is new.
-              engine?.updateSave({ storySeen: true, whatsNewSeen: BUILD });
-              const at = storyThen;
-              setStoryThen(null);
-              engine?.startLevel(at);
-            }
           }}
         />
       ) : null}
