@@ -1,4 +1,4 @@
-import { Award, BookOpen, Lock, Play, RotateCcw, Settings, Trophy } from "lucide-react";
+import { Award, BookOpen, Lock, Play, RotateCcw, Settings, Skull, Trophy } from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -46,6 +46,7 @@ export function WorldSelect({
   onContinue,
   onNew,
   onOpen,
+  onBoss,
   onOptions,
   onBoard,
   onAchievements,
@@ -58,6 +59,8 @@ export function WorldSelect({
   onContinue: (levelIndex: number) => void;
   onNew: (world: number) => void;
   onOpen: (levelIndex: number) => void;
+  /** Tester tools: start a world's boss straight away. */
+  onBoss: (levelIndex: number) => void;
   onOptions: () => void;
   onBoard: () => void;
   onAchievements: () => void;
@@ -112,6 +115,7 @@ export function WorldSelect({
               onContinue={onContinue}
               onNew={onNew}
               onOpen={onOpen}
+              onBoss={onBoss}
             />
           ) : (
             <div
@@ -160,6 +164,7 @@ function WorldPanel({
   onContinue,
   onNew,
   onOpen,
+  onBoss,
 }: {
   save: Save;
   index: number;
@@ -167,6 +172,7 @@ function WorldPanel({
   onContinue: (levelIndex: number) => void;
   onNew: (world: number) => void;
   onOpen: (levelIndex: number) => void;
+  onBoss: (levelIndex: number) => void;
 }) {
   const world = WORLDS[index]!;
   const levels = levelsOf(world);
@@ -231,6 +237,15 @@ function WorldPanel({
           {done ? "Every sky relit" : `Sky ${next + 1} of ${levels.length}`} ·{" "}
           <StarIcon on size={12} /> {stars}/{levels.length * 3}
         </p>
+        {open && save.tester ? (
+          <button
+            type="button"
+            className="wpanel-boss"
+            onClick={() => onBoss(LEVELS.indexOf(levels[levels.length - 1]!))}
+          >
+            <Skull size={14} strokeWidth={2.4} /> Boss · tester
+          </button>
+        ) : null}
         {open ? (
           <div className="wpanel-actions">
             {active ? (

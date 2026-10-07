@@ -2172,6 +2172,21 @@
   opacity: 0.8;
 }
 
+.wpanel-boss {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.6rem;
+  border: 1px solid rgba(190, 130, 255, 0.6);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: rgba(150, 90, 230, 0.15);
+  color: #d9c2ff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .wpanel-actions {
   display: grid;
   grid-template-columns: 1fr auto;

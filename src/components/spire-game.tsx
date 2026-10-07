@@ -307,6 +307,13 @@ export function SpireGame() {
               play(LEVELS.findIndex((l) => l.id === world.levelIds[0]));
             }}
             onOpen={(index) => openLevels(index)}
+            onBoss={(index) => {
+              const engine = engineRef.current;
+              if (!engine) return;
+              engine.click();
+              setSelected(index);
+              engine.startBoss(index);
+            }}
             onOptions={() => {
               engineRef.current?.click();
               setOptions(true);

@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 40 — Boss button
+
+- With **Options → Unlock every sky** on, each world's panel on the world screen has a **Boss · tester** button that starts that world's boss straight away, without playing its skies. The run isn't posted.
+
 ## Build 39 — Chain reaction
 
 - In the escape, **perfect slabs laid in a row are one fuse**. Break the first and the whole run detonates down the tower on its own, quickening as it goes and blasting the thing above back. A loose or rubble slab stops the chain. A climb with no misses is one tap and a cascade all the way to the ground.
