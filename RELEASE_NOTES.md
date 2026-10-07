@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 48 — The boss, the story, the score
+
+- **The Dark is painted.** A slow, heaving sea of black ink and ash with an ember-lit surface. Smoke lifts off it, and faint violet light and sparks sink inside it. It swallows what falls. Its edge is still marked by the violet line, so you can judge how close it is.
+- First release to everyone since build 43. It also includes builds 44–47: the new boss fight (tap on the pulse, be still when the eye opens, with RUN / IT STIRS / STOP signals), the story in chapters with living paintings, and the new composed music.
+
 ## Build 47 — A real score
 
 - **New music.** The repeating synth tune is gone. Hearth now has five composed pieces that play in a shuffled order and crossfade into each other, so you'll hear about 10 minutes before anything repeats. The title screen and the boss fight have their own pieces.

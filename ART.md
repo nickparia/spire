@@ -40,6 +40,10 @@ Keep the same seed / style reference across a batch so the worlds feel like one 
 
 Made with the Higgsfield CLI (GPT Image 2.5 for stills, Seedance 2.5 for video, 1080p): `title.jpg`/`title.mp4` (loop made seamless by cross-fading its last 1.5 s into its start), `world-hearth.jpg`, `world-descent.jpg`, `world-wheel.jpg`, `end-hearth.mp4` (12 s film: wind, stars igniting, the galaxy; plays once and holds) with `end-hearth.jpg` its last frame, and `source-ref.jpg`. Also `bg-hearth`, `bg-descent`, `bg-wheel` (.mp4 + .jpg): full-screen world-select backgrounds, 9:16, seamless 720p loops. Also `source.mp4` (the living mass, a seamless 720p loop the engine draws into the chase, its tentacle line at the source's edge) and `escape-sting.mp4` (5 s: the beam flares, the sky tears, the source descends; plays once when the sky is first lit). Still to make: panel loops; a caught sting and a victory sting. Videos are re-encoded to H.264 (Seedance returns HEVC, which some browsers can't play): `ffmpeg -i in.mp4 -an -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p -movflags +faststart out.mp4`.
 
+## The Dark
+
+`dark-hearth.mp4`: the rising Dark for Hearth, a 9:16 seamless 720p loop (GPT Image 2.5 still, then Seedance with a locked-off camera, then `loopenc.sh`). Its surface sits a fifth of the way down the frame (`DARK_ART_SURFACE`). Not the source: no eyes or creatures, an indifferent sea of ink and ash. Each world can get its own.
+
 ## Music
 
 `public/music/*.m4a`, made with Higgsfield's `sonilo_music` (120 s, about 7.5 credits each): `menu`, `hearth-1`…`hearth-5` (the climb, played in a shuffled rotation with 4 s crossfades) and `boss` (beatless dread for the escape, so it never fights the tap pulse). Prompts name the world, the instruments, a tempo and key, and "no vocals". Check each for dead air (`ffmpeg -af silencedetect=n=-45dB:d=0.6`) and cut it, then encode: `ffmpeg -i in -af "silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-50dB,loudnorm=I=-20:TP=-2:LRA=11" -ar 44100 -ac 2 -c:a aac -b:a 128k -movflags +faststart out.m4a`. A new world adds its own climb set and a line in `RECORDED` (`music.ts`).
