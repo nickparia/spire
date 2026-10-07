@@ -147,6 +147,8 @@ const ESCAPE_BEAT_WINDOW = 0.1;
 const ESCAPE_OFFBEAT = 0.34;
 const ESCAPE_LUNGE = 6;
 /** Seconds the summit sting plays, when it is there. */
+/** How far down the painted Dark its surface lies, as a share of its height. */
+const DARK_ART_SURFACE = 0.2;
 const ESCAPE_STING = 5;
 /** Seconds between slabs in a chain of perfects going off. */
 const ESCAPE_CHAIN_STEP = 0.07;
@@ -650,6 +652,10 @@ export class SpireEngine {
   private sourceArt: HTMLVideoElement | null = null;
   private sourceArtReady = false;
   private sourceMask: HTMLCanvasElement | null = null;
+  /** The painted Dark (public/art/dark-<world>.mp4), drawn beneath its edge once loaded. */
+  private darkArt: HTMLVideoElement | null = null;
+  private darkArtReady = false;
+  private darkMask: HTMLCanvasElement | null = null;
   /** The summit sting (public/art/escape-sting.mp4) is there to play. */
   private stingReady = false;
   /** The tower as it stood at the summit, kept so a failed escape can be retried from there. */
@@ -686,6 +692,7 @@ export class SpireEngine {
     this.fx.calm = this.reduceMotion;
     this.save = loadSave();
     this.loadSourceArt();
+    this.loadDarkArt();
     this.rig.setMusic(this.save.music);
     this.rig.setSfx(this.save.sfx);
     this.music = new Music(this.rig, this.theme.track);
@@ -2290,6 +2297,73 @@ export class SpireEngine {
   }
 
   /** Loads the painted source and the sting quietly; the drawn versions stand in until then. */
+  /** Loads the painted Dark quietly; the drawn gradient stands in until then. */
+  private loadDarkArt(): void {
+    if (typeof document === "undefined") return;
+    const v = document.createElement("video");
+    v.src = "art/dark-hearth.mp4";
+    v.muted = true;
+    v.loop = true;
+    v.playsInline = true;
+    v.preload = "auto";
+    v.setAttribute("playsinline", "");
+    v.style.cssText =
+      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+    const ready = () => {
+      if (v.readyState >= 2) this.darkArtReady = true;
+    };
+    v.addEventListener("loadeddata", ready);
+    v.addEventListener("playing", ready);
+    v.addEventListener("timeupdate", ready);
+    v.addEventListener("error", () => {
+      this.darkArtReady = false;
+    });
+    document.body.appendChild(v);
+    this.darkArt = v;
+    v.load();
+    // Always ask it to play: iOS loads nothing for a hidden video until it does.
+    void v.play().catch(() => undefined);
+  }
+
+  /**
+   * The painted Dark: its surface (a fifth of the way down the painting) at
+   * the Dark's line, the night above it faded out so only the smoke lifts off.
+   */
+  private drawDarkArt(ctx: CanvasRenderingContext2D, surface: number): void {
+    const v = this.darkArt!;
+    if (v.paused) void v.play().catch(() => undefined);
+    const w = this.vw * 1.1;
+    const h = w * (v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9);
+    const top = surface - h * DARK_ART_SURFACE;
+    if (top > this.vh) return;
+    const mask = (this.darkMask ??= document.createElement("canvas"));
+    const mw = Math.ceil(w);
+    const mh = Math.ceil(h);
+    if (mask.width !== mw || mask.height !== mh) {
+      mask.width = mw;
+      mask.height = mh;
+    }
+    const m = mask.getContext("2d")!;
+    m.globalCompositeOperation = "source-over";
+    m.clearRect(0, 0, mw, mh);
+    m.drawImage(v, 0, 0, mw, mh);
+    m.globalCompositeOperation = "destination-in";
+    const fade = m.createLinearGradient(0, 0, 0, mh);
+    fade.addColorStop(0, "rgba(0,0,0,0)");
+    fade.addColorStop(DARK_ART_SURFACE * 0.45, "rgba(0,0,0,0)");
+    fade.addColorStop(DARK_ART_SURFACE * 0.95, "rgba(0,0,0,1)");
+    fade.addColorStop(1, "rgba(0,0,0,1)");
+    m.fillStyle = fade;
+    m.fillRect(0, 0, mw, mh);
+    ctx.drawImage(mask, (this.vw - w) / 2, top);
+    // Below the painting, the same black: the Dark is bottomless.
+    const bottom = top + h - 2;
+    if (bottom < this.vh + 160) {
+      ctx.fillStyle = "rgb(4,2,8)";
+      ctx.fillRect(-120, bottom, this.vw + 240, this.vh - bottom + 160);
+    }
+  }
+
   private loadSourceArt(): void {
     if (typeof document === "undefined") return;
     const v = document.createElement("video");
@@ -4149,13 +4223,17 @@ export class SpireEngine {
     const surface = this.worldToScreen(0, this.darkShown).y;
     if (surface < -120) return;
     const clock = this.reduceMotion ? 0 : this.clock;
-    const soft = 70;
-    const g = ctx.createLinearGradient(0, surface - soft, 0, surface + 30);
-    g.addColorStop(0, "rgba(14,6,26,0)");
-    g.addColorStop(0.55, "rgba(14,6,26,0.78)");
-    g.addColorStop(1, "rgba(10,4,20,0.96)");
-    ctx.fillStyle = g;
-    ctx.fillRect(-120, surface - soft, this.vw + 240, this.vh - surface + soft + 160);
+    if (this.darkArtReady && this.darkArt) {
+      this.drawDarkArt(ctx, surface);
+    } else {
+      const soft = 70;
+      const g = ctx.createLinearGradient(0, surface - soft, 0, surface + 30);
+      g.addColorStop(0, "rgba(14,6,26,0)");
+      g.addColorStop(0.55, "rgba(14,6,26,0.78)");
+      g.addColorStop(1, "rgba(10,4,20,0.96)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-120, surface - soft, this.vw + 240, this.vh - surface + soft + 160);
+    }
     // The edge: a few slow waves of violet light along the surface.
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
