@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
+import { skyNumber } from "@/game/worlds";
 
 /**
  * Said before each climb, over the sky, clear of the stack: the sky's line
@@ -25,9 +26,13 @@ export function ReadyCard({ hud }: { hud: Hud }) {
   return (
     <div className={"ready" + (fading ? " ready-out" : "")} aria-live="polite">
       <p className="ready-kicker">
-        Sky {shown + 1} · {level.name}
+        {hud.ascent ? "The way back up" : `Sky ${skyNumber(level.id)} · ${level.name}`}
       </p>
-      <p className="ready-line">{level.line}</p>
+      <p className="ready-line">
+        {hud.ascent
+          ? "The door is open. Something blind is coming up after you. Climb."
+          : level.line}
+      </p>
     </div>
   );
 }

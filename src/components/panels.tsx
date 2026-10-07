@@ -40,7 +40,7 @@ import { Post } from "./post";
 import { FeatToasts, Journey } from "./journey";
 import { ThrowShade } from "./shade";
 import type { FeatId } from "@/game/feats";
-import { worldOf } from "@/game/worlds";
+import { skyNumber, worldOf } from "@/game/worlds";
 import { GiftCards } from "./gifts";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
@@ -231,7 +231,9 @@ export function RunHud({
         ) : null}
         {hud.darkGap !== null && started ? (
           <>
-            <p className="kicker mt-2">{hud.descent ? "They climb" : "The Dark"}</p>
+            <p className="kicker mt-2">
+              {hud.ascent ? "It rises" : hud.descent ? "They climb" : "The Dark"}
+            </p>
             <p className={"stat-num dark-gap" + (hud.darkGap <= 3 ? " dark-near" : "")}>
               {hud.darkGap} {hud.darkGap === 1 ? "floor" : "floors"}{" "}
               {hud.descent ? "away" : "below"}
@@ -458,9 +460,15 @@ export function ResultsPanel({
     <section className="panel panel-won" aria-live="polite" data-ui data-armed={armed || undefined}>
       <div className="won-head">
         <p className="kicker">
-          Sky {result.levelIndex + 1} · {level.name}
+          Sky {skyNumber(level.id)} · {level.name}
         </p>
-        <h2 className="sheet-title">{result.boss ? "The light escapes" : "Relit"}</h2>
+        <h2 className="sheet-title">
+          {result.boss
+            ? worldOf(level.id).id === "descent"
+              ? "Out of the deep"
+              : "The light escapes"
+            : "Relit"}
+        </h2>
         {result.boss ? <p className="revelation">{worldOf(level.id).revelation}</p> : null}
       </div>
       <Journey save={save} ignite={result.levelIndex} size="large" />

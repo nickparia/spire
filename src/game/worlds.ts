@@ -75,10 +75,13 @@ export function worldOf(levelId: string): WorldDef {
   return WORLDS.find((w) => w.levelIds.includes(levelId)) ?? WORLDS[0]!;
 }
 
+/** A sky's number within its own world, from 1. */
+export function skyNumber(levelId: string): number {
+  return worldOf(levelId).levelIds.indexOf(levelId) + 1;
+}
+
 export function isBoss(levelId: string): boolean {
   const w = worldOf(levelId);
-  // The Descent's boss is not built yet.
-  if (w.id === "descent") return false;
   return w.levelIds[w.levelIds.length - 1] === levelId;
 }
 

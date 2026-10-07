@@ -79,6 +79,7 @@ for (const t of [350, 250, 250, 300]) {
 }
 await wait(9000);
 await page.screenshot({ path: `${out}/dark-a.png` });
+console.log("sfx-loaded", await page.evaluate(() => window.__spire.sfx.samples.size));
 await page.evaluate(() => {
   const e = window.__spire;
   window.__bot.last = 1e12;

@@ -3,6 +3,15 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 57 — The way back up (internal)
+
+- **The Descent's boss.** Reach the Floor of the World and the sealed door bursts open: something blind and enormous, all mouths and reaching arms, comes up out of it. Now you build _up_, fast, back up the shaft, with it rising behind you. It never falls far behind; every perfect vaults you clear of it (further on a streak). Reach the top and you're **out of the deep**. Testers: the Descent's last sky has a Boss button that goes straight to it.
+- **Real sound effects** (made with Higgsfield): stone thuds and cracks, a singing-bowl chime for perfects that climbs with your streak, a magical swoosh for the cards, wet crunches for squashed climbers, thunder for Starfall, ice for Rime, grinding stone for Bedrock, a door bursting, a summit swell, and more. The old synth blips only play if a sound can't load.
+- **Falling has weight.** A slab or cut-off piece that falls into the Dark splashes black ink with a gloop; one that comes to rest on the ground crumbles in dust; in the Descent, cut-off pieces tumble away down the shaft.
+- **Fixed: the music.** Build 56 fell back to the old synth on iPhone; your composed tracks play again, from memory, at full quality. Testers: Options › Tester tools shows what the music is doing.
+- **Subtler side scenery.** The ruins and rocks in front are smaller, keep to the bottom corners and slip away sooner as you climb.
+- Skies are numbered within their world (the Floor of the World is sky 8, not 16).
+
 ## Build 56 — The Descent, all eight depths (internal)
 
 - **The Descent is a full world.** Eight depths down the shaft, each a living painting with its own stone and its own climbers:

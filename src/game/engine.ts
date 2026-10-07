@@ -144,6 +144,10 @@ const ESCAPE_LUNGE = 6;
 const DARK_ART_SURFACE = 0.2;
 /** Down the screen the Descent's tip sits, as a share of the view. */
 const DESCENT_SEAT = 0.42;
+/** The near scenery: its size, how fast it leaves as you climb, and how solid it is. */
+const FG_SCALE = 0.7;
+const FG_PARALLAX = 1.9;
+const FG_ALPHA = 0.88;
 /** Skies with a living painted plate in public/art/sky/; the rest are drawn. */
 const PAINTED_SKIES: readonly string[] = [
   "foundry",
@@ -229,6 +233,8 @@ function climber(i: number): {
 /** What spills when a climber is crushed. */
 const BLOOD_RGB: RGB = [150, 18, 24];
 const BLOOD_DEEP_RGB: RGB = [70, 6, 12];
+/** What the Dark throws up when something falls into it. */
+const INK_RGB: RGB = [26, 12, 40];
 /** The painted slab's end caps and centre mark, as shares of its width. */
 const SLAB_CAP = 0.058;
 /** Depths that borrow a Hearth stone that suits them. */
@@ -257,7 +263,7 @@ const SKY_STONES: readonly string[] = [
 const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
-  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THEY REACH YOU|THE DARK QUICKENS|THEY QUICKEN|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THEY REACH YOU|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THEY QUICKEN|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
 /** A streak is only called out at these milestones. */
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
@@ -267,6 +273,20 @@ const SLAB_MID = 0.07;
 const CLIMBERS = 20;
 /** Floors behind the tip the climbers are held within, however fast you build. */
 const DESCENT_REACH = 7;
+/** The ascent: floors to climb out, its pace (px/s, and per second more), and how far behind it may fall. */
+const ASCENT_FLOORS = 30;
+const ASCENT_RATE = 36;
+const ASCENT_ACCEL = 0.6;
+const ASCENT_REACH = 4.5;
+/** Floors a perfect vaults you clear, and more on a streak of three. */
+const ASCENT_VAULT = 1.4;
+const ASCENT_VAULT_STREAK = 1;
+/** Seconds per traverse at the start of the climb out. */
+const ASCENT_PERIOD = 0.72;
+/** Seconds the door's sting holds the climb. */
+const ASCENT_STING = 3.5;
+/** How far down the blind thing's painting its reaching hands are. */
+const BLIND_SURFACE = 0.34;
 /** Floors a cut-off piece knocks the climbers back, plus more for a wide one. */
 const SQUASH_PUSH = 0.6;
 const SQUASH_PER_WIDTH = 1.6;
@@ -393,6 +413,8 @@ export type Hud = {
   darkGap: number | null;
   /** Built down: the Dark is the climbers. */
   descent: boolean;
+  /** The Descent's boss: climbing back up; and whether the door's sting is playing. */
+  ascent: { sting: boolean } | null;
   /** The current sky's accent, as a CSS colour. */
   accent: string;
   result: LevelResult | null;
@@ -468,6 +490,8 @@ type Slab = {
   counts: boolean;
   /** Laid under a gift: it keeps that element's living look. */
   element?: SlabLook;
+  /** It has fallen into the Dark (splashed once). */
+  sank?: boolean;
 };
 
 type Piece = { x: number; w: number };
@@ -498,6 +522,8 @@ type Scrap = {
   life: number;
   /** Down the Descent: it has already landed on the climbers. */
   squashed?: boolean;
+  /** It has fallen into the Dark (splashed once). */
+  sank?: boolean;
 };
 
 type Floater = {
@@ -791,6 +817,17 @@ export class SpireEngine {
   private demo = false;
   /** Set while the demo makes its own drop, so the tap gets through. */
   private demoing = false;
+  /**
+   * The Descent's boss: the door at the bottom opened, and you climb back up
+   * the shaft while the blind thing rises after you.
+   */
+  private ascent = false;
+  /** The ascent's painted mass (public/art/blind.mp4), drawn as its Dark. */
+  private blindArt: HTMLVideoElement | null = null;
+  private blindReady = false;
+  private blindMask: HTMLCanvasElement | null = null;
+  /** Seconds left of the door's sting before the climb can start. */
+  private ascentSting = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
   private slabLookNow: SlabLook | null = null;
   /** Sprite sheets (public/art/sprites/<name>.webp), one row of square frames. */
@@ -921,7 +958,15 @@ export class SpireEngine {
 
   /** Call from any user gesture so the audio can start. */
   wake(): void {
-    if (this.rig.unlock()) this.music.start();
+    if (this.rig.unlock()) {
+      this.music.start();
+      this.sfx.load();
+    }
+  }
+
+  /** For the tester line in Options. */
+  musicStatus(): string {
+    return this.music.status();
   }
 
   /** The title is tapped: the sting, and the score swells in. */
@@ -949,6 +994,7 @@ export class SpireEngine {
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
     if (this.demo && !this.demoing) return;
+    if (this.ascentSting > 0) return;
     if (this.bomb && this.bomb.fuse > 0) {
       this.detonate();
       return;
@@ -977,6 +1023,11 @@ export class SpireEngine {
    */
   startBoss(levelIndex: number): void {
     this.startLevel(levelIndex);
+    if (this.plan.descent) {
+      this.unranked = true;
+      this.beginAscent(true);
+      return;
+    }
     if (!this.stage) return;
     this.unranked = true;
     const goal = this.plan.goal;
@@ -997,6 +1048,7 @@ export class SpireEngine {
 
   startLevel(levelIndex: number): void {
     this.mode = "level";
+    this.ascent = false;
     this.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, levelIndex));
     const level = LEVELS[this.levelIndex]!;
     this.plan = levelPlan(level, this.levelIndex);
@@ -1013,7 +1065,12 @@ export class SpireEngine {
 
   retry(): void {
     if (this.mode === "endless") this.startEndless();
-    else if (this.escapeTower && isBoss(LEVELS[this.levelIndex]!.id)) {
+    else if (this.ascent) {
+      const unranked = this.unranked;
+      this.startLevel(this.levelIndex);
+      this.unranked = unranked;
+      this.beginAscent(false);
+    } else if (this.escapeTower && isBoss(LEVELS[this.levelIndex]!.id)) {
       // A failed escape is retried from the summit, on the same tower.
       const tower = this.escapeTower;
       const unranked = this.unranked;
@@ -1766,6 +1823,7 @@ export class SpireEngine {
     if (stage.takeTopple() && this.phase === "play") {
       this.slowmo = 0.8;
       this.music.topple();
+      this.sfx.topple();
       if (this.kit.breather > 0) {
         this.breather = this.kit.breather;
         this.float("BREATHER", 0, this.dark + 40, false, 18);
@@ -1780,8 +1838,18 @@ export class SpireEngine {
       if (slab.body === null) continue;
       const view = stage.read(slab.body);
       if (!view) continue;
+      // Falling past the Dark's line, it plunges in.
+      if (i > 0 && !slab.sank && this.plan.darkRate > 0 && view.cy < this.darkShown) {
+        slab.sank = true;
+        this.inkSplash(view.cx, this.darkShown, view.w);
+      }
       if (i > 0 && (lost.has(slab.body) || view.cy < -300 || Math.abs(view.cx) > 1600)) {
         // Down on the ground, or over the edge of the world: it crumbles.
+        if (!slab.sank && view.cy > -100) {
+          this.fx.burst(view.cx, view.cy, [150, 128, 110], 22, 200);
+          this.fx.sparkle(view.cx, view.cy, view.w, [120, 104, 92], 10);
+          this.sfx.rubble();
+        }
         this.scraps.push({
           x: view.cx - view.w / 2,
           y: view.cy - view.h / 2,
@@ -1819,6 +1887,7 @@ export class SpireEngine {
         if (
           this.mode === "level" &&
           !this.boss &&
+          !this.ascent &&
           isLanding(reached, this.plan.goal) &&
           !this.landed.has(reached) &&
           this.mover.fallT < 0
@@ -1910,6 +1979,7 @@ export class SpireEngine {
         this.sfx.fire();
         break;
       case "frost":
+        this.sfx.frost();
         this.gift.frost = 5;
         this.gift.set = Math.max(this.gift.set, 5);
         this.rime = RIME_SECONDS;
@@ -1918,13 +1988,13 @@ export class SpireEngine {
         break;
       case "storm":
         this.gift.storm = 3;
-        this.sfx.boom();
+        this.sfx.thunder();
         break;
       case "stone":
         this.gift.broad = Math.max(this.gift.broad, 4);
         if (this.stage) this.stage.sway *= 0.5;
         this.bedrock = 0;
-        this.sfx.boom();
+        this.sfx.bedrock();
         this.trauma = Math.min(1, this.trauma + 0.4);
         break;
       case "shadow":
@@ -2841,10 +2911,18 @@ export class SpireEngine {
         false,
         22,
       );
-      this.sfx.hiss();
+      this.sfx.quicken();
       this.pulse = Math.max(this.pulse, 0.5);
     }
     return 1 + QUICKEN_RATE * over;
+  }
+
+  /** Something falls into the Dark: black ink thrown up with violet glints, a ripple, a gloop. */
+  private inkSplash(x: number, y: number, w: number): void {
+    this.fx.blood(x, y, INK_RGB, 34, 260);
+    this.fx.blood(x, y, [120, 60, 190], 10, 200);
+    this.fx.ring(x, y, [150, 80, 220], 50 + w * 0.4, 3);
+    this.sfx.splash();
   }
 
   /** The streak's fire goes out: each burning slab hisses, steams and smokes. */
@@ -2897,7 +2975,7 @@ export class SpireEngine {
       true,
       22,
     );
-    this.sfx.drop();
+    this.sfx.squash();
     this.freeze = Math.max(this.freeze, this.reduceMotion ? 0.02 : 0.07);
     this.trauma = Math.min(1, this.trauma + 0.32);
     haptics.heavy();
@@ -2946,9 +3024,11 @@ export class SpireEngine {
       this.freeze <= 0 &&
       this.breather <= 0
     ) {
-      const base = this.boss
-        ? this.plan.darkRate * (1 + this.boss.surge * 0.25)
-        : this.plan.darkRate;
+      const base = this.ascent
+        ? ASCENT_RATE + ASCENT_ACCEL * this.runTime
+        : this.boss
+          ? this.plan.darkRate * (1 + this.boss.surge * 0.25)
+          : this.plan.darkRate;
       // Linger past par and the Dark quickens: about 40% faster ten seconds
       // over, more than twice as fast by thirty. Not in the boss fight.
       const rate = base * (this.boss ? 1 : this.quickening());
@@ -2970,7 +3050,7 @@ export class SpireEngine {
       if (this.dark >= seat - SLAB_H * 0.5) {
         this.dark = seat - SLAB_H * 0.5;
         this.float(
-          this.plan.descent ? "THEY REACH YOU" : "TAKEN BY THE DARK",
+          this.ascent ? "IT HAS YOU" : this.plan.descent ? "THEY REACH YOU" : "TAKEN BY THE DARK",
           top.x + top.w / 2,
           seat + 40,
           false,
@@ -2990,6 +3070,14 @@ export class SpireEngine {
     // Down the shaft they never fall far behind: outbuild them and they keep pace.
     if (this.plan.descent && this.phase === "play") {
       this.dark = Math.max(this.dark, this.crownY() - SLAB_H * DESCENT_REACH);
+    }
+    // Nor does the blind thing on the way back up.
+    if (this.ascent && this.phase === "play") {
+      this.dark = Math.max(this.dark, this.crownY() - SLAB_H * ASCENT_REACH);
+    }
+    if (this.ascentSting > 0) {
+      this.ascentSting = Math.max(0, this.ascentSting - dt);
+      if (this.ascentSting === 0) this.emit();
     }
     const k = 1 - Math.exp(-(this.darkShown < this.dark ? 4 : 7) * dt);
     this.darkShown += (this.dark - this.darkShown) * k;
@@ -3432,6 +3520,13 @@ export class SpireEngine {
       }
     }
     this.pushDark(push);
+    // The ascent: a perfect vaults you clear of it, further on a streak.
+    if (this.ascent && result.perfect) {
+      const vault = ASCENT_VAULT + (this.streak >= 3 ? ASCENT_VAULT_STREAK : 0);
+      this.dark -= SLAB_H * vault;
+      this.fx.burst(cx, this.dark + SLAB_H * 2, [200, 170, 255], 20, 260);
+      this.trauma = Math.min(1, this.trauma + 0.15);
+    }
     // The gifts at work.
     if (this.gift.fire > 0) {
       this.gift.fire -= 1;
@@ -3452,7 +3547,7 @@ export class SpireEngine {
       this.fx.burst(cx, this.dark, LANDING_BY_ID.storm.rgb, 40, 380);
       this.flash = Math.max(this.flash, 0.85);
       this.trauma = Math.min(1, this.trauma + 0.5);
-      this.sfx.boom();
+      this.sfx.thunder();
       haptics.heavy();
     }
     const heatBefore = this.heat;
@@ -3469,6 +3564,8 @@ export class SpireEngine {
       this.sfx.drop();
       if (result.scrap && result.scrap.w > 6) {
         this.sfx.slice();
+        // Down the shaft, the cut-off piece tumbles away out of sight.
+        if (this.plan.descent) this.sfx.fall();
         this.scraps.push({
           x: result.scrap.x,
           y: slab.y,
@@ -3542,6 +3639,10 @@ export class SpireEngine {
     this.music.setTension(tensionFor(slab.w, this.startW));
 
     if (!this.stage && this.plan.goal > 0 && this.floors >= this.plan.goal) {
+      if (this.plan.descent && this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) {
+        this.beginAscent(true);
+        return;
+      }
       this.win();
       return;
     }
@@ -4099,6 +4200,7 @@ export class SpireEngine {
           ? Math.max(0, Math.floor(this.darkGap()))
           : null,
       descent: !!this.plan.descent,
+      ascent: this.ascent ? { sting: this.ascentSting > 0 } : null,
       accent: rgbCss(this.theme.accent),
       result: this.result,
       rescue: this.rescueOpen()
@@ -4202,7 +4304,7 @@ export class SpireEngine {
     if (this.escape && this.phase === "play") this.chase(dt);
     if (this.demo) this.runDemo();
     this.riseDark(dt);
-    this.music.setBoss(this.escape !== null);
+    this.music.setBoss(this.escape !== null || this.ascent);
     if (this.stage && this.phase === "play") {
       // The score follows the climb: height, the Dark's nearness, the streak.
       const goal = this.plan.goal > 0 ? this.plan.goal : 40;
@@ -4286,6 +4388,11 @@ export class SpireEngine {
       } else {
         s.vy -= 1400 * dt;
         s.y += s.vy * dt;
+        if (!s.sank && this.plan.darkRate > 0 && s.y < this.darkShown) {
+          s.sank = true;
+          s.life = Math.min(s.life, 0.2);
+          this.inkSplash(s.x + s.w / 2, this.darkShown, s.w);
+        }
       }
       s.x += s.vx * dt;
       s.rot += s.vr * dt;
@@ -4585,14 +4692,30 @@ export class SpireEngine {
     if (!fg.complete || fg.naturalWidth === 0) return;
     // As the summit pulls back, the near ruins step aside for the tower.
     if (this.pull >= 0.99) return;
-    const w = view.w * 1.1;
+    // Its two halves, each smaller and pinned to its own corner, so the
+    // scenery frames the edges without walling in the view.
+    const k = FG_SCALE;
+    const w = view.w * 1.1 * k;
     const h = w * (fg.naturalHeight / fg.naturalWidth);
     // Closer than the tower: it falls away faster than the climb.
-    const y = view.h - h * 0.92 + (view.camY - this.anchor) * 1.35;
+    const y = view.h - h * 0.92 + (view.camY - this.anchor) * FG_PARALLAX;
     if (y > view.h) return;
+    const half = fg.naturalWidth / 2;
+    const shift = view.camX * 0.25;
     ctx.save();
-    ctx.globalAlpha = 1 - this.pull;
-    ctx.drawImage(fg, (view.w - w) / 2 - view.camX * 0.25, y, w, h);
+    ctx.globalAlpha = (1 - this.pull) * FG_ALPHA;
+    ctx.drawImage(fg, 0, 0, half, fg.naturalHeight, -shift - w * 0.04, y, w / 2, h);
+    ctx.drawImage(
+      fg,
+      half,
+      0,
+      half,
+      fg.naturalHeight,
+      view.w - w / 2 - shift + w * 0.04,
+      y,
+      w / 2,
+      h,
+    );
     ctx.restore();
   }
 
@@ -4648,6 +4771,101 @@ export class SpireEngine {
     this.tap();
     this.demoing = false;
     this.demo = false;
+  }
+
+  /**
+   * The door at the bottom opens: a fresh tower from the floor of the shaft,
+   * built upward now, fast, with the blind thing rising behind. The first
+   * time, its sting plays before the climb can start.
+   */
+  private beginAscent(fresh: boolean): void {
+    this.ascent = true;
+    this.plan = {
+      ...this.plan,
+      descent: false,
+      physics: false,
+      goal: ASCENT_FLOORS,
+      span: ASCENT_FLOORS,
+      darkRate: ASCENT_RATE,
+      courseAt: () => "slide",
+      fallAt: () => null,
+      periodAt: (f) => Math.max(0.5, ASCENT_PERIOD - f * 0.004),
+      hazardsAt: () => ({ keystones: false, motes: false, bombs: false }),
+      gateAt: () => ASCENT_FLOORS,
+      pickAt: () => false,
+    };
+    const unranked = this.unranked;
+    this.resetRun("ready", true);
+    this.unranked = unranked;
+    this.ascent = true;
+    this.loadBlind();
+    this.music.setMood("play");
+    this.music.restart();
+    if (fresh) {
+      this.ascentSting = ASCENT_STING;
+      this.sfx.door();
+      this.float("THE DOOR OPENS", 0, SLAB_H * 6, false, 26);
+    }
+    this.emit();
+  }
+
+  private loadBlind(): void {
+    if (this.blindArt || typeof document === "undefined") return;
+    const v = document.createElement("video");
+    v.src = "art/blind.mp4";
+    v.muted = true;
+    v.loop = true;
+    v.playsInline = true;
+    v.preload = "auto";
+    v.setAttribute("playsinline", "");
+    v.style.cssText =
+      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+    const ready = () => {
+      if (v.readyState >= 2) this.blindReady = true;
+    };
+    v.addEventListener("loadeddata", ready);
+    v.addEventListener("playing", ready);
+    v.addEventListener("timeupdate", ready);
+    document.body.appendChild(v);
+    this.blindArt = v;
+    v.load();
+    void v.play().catch(() => undefined);
+  }
+
+  /** The blind thing rising: its reaching hands at the Dark's line, its bulk below. */
+  private drawBlind(ctx: CanvasRenderingContext2D): void {
+    const v = this.blindArt!;
+    if (v.paused) void v.play().catch(() => undefined);
+    const surface = this.worldToScreen(0, this.darkShown).y;
+    const w = this.vw * 1.12;
+    const h = w * (v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9);
+    const top = surface - h * BLIND_SURFACE;
+    if (top > this.vh) return;
+    const mask = (this.blindMask ??= document.createElement("canvas"));
+    const mw = Math.ceil(w);
+    const mh = Math.ceil(h);
+    if (mask.width !== mw || mask.height !== mh) {
+      mask.width = mw;
+      mask.height = mh;
+    }
+    const m = mask.getContext("2d")!;
+    m.globalCompositeOperation = "source-over";
+    m.clearRect(0, 0, mw, mh);
+    m.drawImage(v, 0, 0, mw, mh);
+    m.globalCompositeOperation = "destination-in";
+    const fade = m.createLinearGradient(0, 0, 0, mh);
+    fade.addColorStop(0, "rgba(0,0,0,0)");
+    fade.addColorStop(BLIND_SURFACE * 0.7, "rgba(0,0,0,0)");
+    fade.addColorStop(BLIND_SURFACE * 1.05, "rgba(0,0,0,1)");
+    fade.addColorStop(1, "rgba(0,0,0,1)");
+    m.fillStyle = fade;
+    m.fillRect(0, 0, mw, mh);
+    ctx.drawImage(mask, (this.vw - w) / 2, top);
+    const bottom = top + h - 2;
+    if (bottom < this.vh + 160) {
+      ctx.fillStyle = "rgb(8,6,10)";
+      ctx.fillRect(-120, bottom, this.vw + 240, this.vh - bottom + 160);
+    }
   }
 
   /** One climber in the swarm, as this sky's kinds allow. */
@@ -4770,6 +4988,7 @@ export class SpireEngine {
     // Once the sky is won the Dark is gone: the pull-back must not reveal it.
     if (this.plan.darkRate > 0 && this.phase !== "menu" && this.phase !== "won" && !this.escape) {
       if (this.plan.descent) this.drawClimbers(ctx);
+      else if (this.ascent && this.blindReady) this.drawBlind(ctx);
       else this.drawDark(ctx);
     }
     if (this.escape) this.drawEscape(ctx);

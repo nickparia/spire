@@ -83,6 +83,7 @@ export function SettingsSheet({
   onReset,
   onEnded,
   onClose,
+  music,
 }: {
   save: Save;
   challenge: Challenge | null;
@@ -92,6 +93,8 @@ export function SettingsSheet({
   onTester: (patch: { tester?: boolean; practice?: boolean }) => void;
   onWeapon: (id: WeaponId) => void;
   onReset: () => void;
+  /** How the music is doing, for testers. */
+  music?: string;
   onEnded: () => void;
   onClose: () => void;
 }) {
@@ -239,6 +242,7 @@ export function SettingsSheet({
             onChange={(e) => onTester({ practice: e.target.checked })}
           />
         </label>
+        {music ? <p className="panel-meta mt-2">Music: {music}</p> : null}
 
         <div className="mt-3">
           <button type="button" className="btn btn-primary" onClick={onClose}>

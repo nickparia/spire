@@ -12,7 +12,7 @@ import {
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ShadeMark, type Rival } from "./shade";
 import { sendChallenge, type Challenge, type SendResult } from "@/game/board";
-import { isBoss, WORLDS, worldOf } from "@/game/worlds";
+import { isBoss, skyNumber, WORLDS, worldOf } from "@/game/worlds";
 import type { Shade } from "@/game/board";
 import { fetchBoard, fetchPlayer, type Entry } from "@/game/board";
 import type { Ghost } from "@/game/logic";
@@ -139,7 +139,7 @@ export function LevelSelect({
                   onClick={() => onSelect(index)}
                 >
                   <span className="level-swatch" style={swatch(level)}>
-                    {open ? index + 1 : <Lock size={16} strokeWidth={2.2} />}
+                    {open ? skyNumber(level.id) : <Lock size={16} strokeWidth={2.2} />}
                   </span>
                   <span className="level-text">
                     <span className="level-name">

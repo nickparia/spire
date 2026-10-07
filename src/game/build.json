@@ -1,8 +1,9 @@
 {
-  "build": 56,
-  "title": "The Descent, all eight depths",
+  "build": 57,
+  "title": "The way back up",
   "notes": [
-    "The Descent now has all eight depths, each a living painting with its own stone and its own climbers: the Roots, the Ossuary, the Drowned Halls, Crystal Veins, the Furnace Below, the Quiet, the Hollow and the Floor of the World.",
-    "Fixed: the music warped on iPhone, and the summit showed a black band at the top."
+    "The Descent's boss: at the Floor of the World the door bursts open, and you race back up the shaft while a blind thing rises after you. Perfects vault you clear.",
+    "Real sound effects for everything: stone thuds and cracks, a singing chime for perfects, wet crunches, thunder, ice, a summit swell. Falling slabs splash into the Dark or crumble on the ground.",
+    "The music plays your composed tracks again (fixed on iPhone), and the side scenery is smaller and keeps to the corners."
   ]
 }

@@ -54,6 +54,7 @@ const INITIAL: Hud = {
   coins: 0,
   darkGap: null,
   descent: false,
+  ascent: null,
   rescue: null,
   taken: false,
   ghostGap: null,
@@ -563,6 +564,7 @@ export function SpireGame() {
       {options ? (
         <SettingsSheet
           save={save}
+          music={save.tester ? engineRef.current?.musicStatus() : undefined}
           challenge={challenge}
           me={me}
           onName={(name) => engineRef.current?.updateSave({ name })}

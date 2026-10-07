@@ -6,6 +6,14 @@ import type { Hud } from "@/game/engine";
  */
 export function EscapeBrief({ hud }: { hud: Hud }) {
   const esc = hud.escape;
+  // The Descent's door bursting open, before the climb back up.
+  if (hud.ascent?.sting) {
+    return (
+      <div className="sting" aria-hidden="true">
+        <video src="art/door-sting.mp4" autoPlay muted playsInline />
+      </div>
+    );
+  }
   if (esc && esc.count === 0) return <GazeCue gaze={esc.gaze} stirFor={esc.stirFor} />;
   if (!esc) return null;
   if (esc.sting) {

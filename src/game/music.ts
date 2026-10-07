@@ -130,10 +130,17 @@ type Recorded = {
   pending: string | null;
 };
 
-/** Pieces are kept decoded at this rate, in mono: about 15 MB for two minutes. */
-const MUSIC_RATE = 32000;
-/** Decoded pieces kept at once: what plays, what's next, what was left. */
-const MUSIC_KEEP = 3;
+/** Decoded pieces kept at once (about 45 MB each): what plays and what's next. */
+const MUSIC_KEEP = 2;
+
+/** decodeAudioData in its callback form, which every iOS version takes. */
+function decode(ctx: BaseAudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
+  return new Promise((resolve, reject) => {
+    const p = (ctx as AudioContext).decodeAudioData(data, resolve, reject);
+    // Newer engines also return a promise; its rejection is already handled above.
+    if (p && typeof p.catch === "function") p.catch(() => undefined);
+  });
+}
 
 function shuffled<T>(list: readonly T[]): T[] {
   const out = [...list];
@@ -252,6 +259,8 @@ export class Music {
   private queue: Partial<Record<Playlist, { order: string[]; at: number }>> = {};
   /** Where each playlist was left, to pick up again. */
   private left: Partial<Record<Playlist, { name: string; pos: number; at: number }>> = {};
+  /** What went wrong last loading a piece, for the tester line in Options. */
+  private lastError = "";
   /** Decoded pieces by name, newest last. */
   private buffers = new Map<string, Promise<AudioBuffer | null>>();
 
@@ -291,6 +300,18 @@ export class Music {
     if (this.rec) this.rec.level.gain.cancelScheduledValues(this.rec.ctx.currentTime);
   }
 
+  /** One line on how the music is doing: recorded or synth, what plays, any failure. */
+  status(): string {
+    const deck = this.rec?.decks[this.rec.active];
+    const what =
+      this.recState === "ok"
+        ? `recorded · ${deck?.name ?? "?"}`
+        : this.recState === "failed"
+          ? "synth (recorded failed)"
+          : "loading recorded";
+    return this.lastError ? `${what} · last error ${this.lastError}` : what;
+  }
+
   /** The escape is on: the boss piece takes over. */
   setBoss(on: boolean): void {
     this.boss = on;
@@ -328,7 +349,7 @@ export class Music {
     this.rec = null;
   }
 
-  /** Fetches and decodes a piece, kept small (mono, MUSIC_RATE); null if it can't be had. */
+  /** Fetches and decodes a piece; null if it can't be had. */
   private load(name: string, ctx: BaseAudioContext): Promise<AudioBuffer | null> {
     const have = this.buffers.get(name);
     if (have) {
@@ -339,18 +360,13 @@ export class Music {
     }
     const made = fetch(`music/${name}.m4a`)
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .then((data) => (ctx as AudioContext).decodeAudioData(data))
-      .then((full) => {
-        // Down to mono at a lower rate: a fifth of the memory, and still music.
-        const length = Math.ceil(full.duration * MUSIC_RATE);
-        const off = new OfflineAudioContext(1, length, MUSIC_RATE);
-        const src = off.createBufferSource();
-        src.buffer = full;
-        src.connect(off.destination);
-        src.start();
-        return off.startRendering();
-      })
-      .catch(() => null);
+      // Kept as decoded, full stereo: shrinking it (an offline render at a lower
+      // rate) failed on iPhone and left the synth playing instead.
+      .then((data) => decode(ctx, data))
+      .catch((err: unknown) => {
+        this.lastError = `${name}: ${err instanceof Error ? err.message : String(err)}`;
+        return null;
+      });
     this.buffers.set(name, made);
     while (this.buffers.size > MUSIC_KEEP) {
       const oldest = this.buffers.keys().next().value!;
