@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 60 — No more bands (internal)
+
+- **Fixed: the band at the top of the summit** on iPhone (Tidewater especially). The pillar of light's frames carried a faint haze to their edges, which lit a hard-edged rectangle over the sky as they flickered. Each frame now fades to black at its edges. Checked on an iPhone 17 Pro Max simulator.
+- The shadow at the tower's foot is a soft pool under the tower, not a line across the screen.
+
 ## Build 59 — Tap the title any time (internal)
 
 - **Fixed:** tapping the title did nothing until its "Tap to begin" button appeared. The painting behind no longer takes taps, and the title goes in as your finger lifts.

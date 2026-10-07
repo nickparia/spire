@@ -4676,14 +4676,22 @@ export class SpireEngine {
    * for the tower's foot, never a flat band (it rose across the sky at the summit).
    */
   private drawPaintedGround(ctx: CanvasRenderingContext2D): void {
-    const y = this.worldToScreen(0, 0).y;
-    if (y > this.vh + 80) return;
-    const g = ctx.createLinearGradient(0, y - 6, 0, y + 90);
-    g.addColorStop(0, "rgba(8,5,6,0)");
-    g.addColorStop(0.25, "rgba(8,5,6,0.55)");
+    const base = this.stack[0];
+    if (!base) return;
+    const c = this.worldToScreen(base.x + base.w / 2, 0);
+    if (c.y > this.vh + 80) return;
+    // A pool of shadow under the tower's foot, not a band across the sky.
+    const r = base.w * 0.9;
+    const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
+    g.addColorStop(0, "rgba(8,5,6,0.6)");
     g.addColorStop(1, "rgba(8,5,6,0)");
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.scale(1, 0.22);
+    ctx.translate(-c.x, -c.y);
     ctx.fillStyle = g;
-    ctx.fillRect(-120, y - 6, this.vw + 240, 96);
+    ctx.fillRect(c.x - r, c.y - r, r * 2, r * 2);
+    ctx.restore();
   }
 
   /** In front of the tower: near embers, quick, and the ruins you rise out of. */

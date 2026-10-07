@@ -1,7 +1,7 @@
 {
-  "build": 59,
-  "title": "Tap the title any time",
+  "build": 60,
+  "title": "No more bands",
   "notes": [
-    "Fixed: tapping the title did nothing until its button appeared."
+    "Fixed: at the summit a band of a different style flickered across the top of the sky on iPhone."
   ]
 }
