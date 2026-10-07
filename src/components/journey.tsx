@@ -1,7 +1,8 @@
 import { Award } from "lucide-react";
 import { FEAT_BY_ID, FEATS, type FeatId } from "@/game/feats";
 import { LEVELS } from "@/game/levels";
-import { levelStars, skiesLit, type Save } from "@/game/save";
+import { levelsOf, WORLDS, worldOf, type WorldDef } from "@/game/worlds";
+import { levelStars, type Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
 
 /**
@@ -13,23 +14,26 @@ export function Journey({
   ignite,
   caption = true,
   size = "normal",
+  world,
 }: {
   save: Save;
+  /** Whose skies to show: by default the world of the sky being lit, else the first. */
+  world?: WorldDef;
   /** The level index that lights up now, with a flare. */
   ignite?: number;
   caption?: boolean;
   size?: "normal" | "large";
 }) {
-  const lit = skiesLit(save);
+  const shown =
+    world ?? (ignite !== undefined && LEVELS[ignite] ? worldOf(LEVELS[ignite].id) : WORLDS[0]!);
+  const skies = levelsOf(shown);
+  const lit = skies.filter((l) => save.levels[l.id]?.clear).length;
   return (
-    <div
-      className={"journey journey-" + size}
-      aria-label={`${lit} of ${LEVELS.length} skies relit`}
-    >
+    <div className={"journey journey-" + size} aria-label={`${lit} of ${skies.length} skies relit`}>
       <span className="journey-row" aria-hidden="true">
-        {LEVELS.map((level, i) => {
+        {skies.map((level, i) => {
           const on = Boolean(save.levels[level.id]?.clear);
-          const now = ignite === i;
+          const now = ignite !== undefined && LEVELS[ignite]?.id === level.id;
           const accent = rgbCss(THEMES[level.theme].accent);
           return (
             <span
@@ -52,9 +56,9 @@ export function Journey({
         <span className="kicker journey-caption">
           {lit === 0
             ? "No skies relit yet"
-            : lit === LEVELS.length
+            : lit === skies.length
               ? "Every sky relit"
-              : `${lit} of ${LEVELS.length} skies relit`}
+              : `${lit} of ${skies.length} skies relit`}
         </span>
       ) : null}
     </div>

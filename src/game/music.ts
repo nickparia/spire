@@ -106,7 +106,18 @@ const XFADE_FAST = 1.2;
 /** Returning to a playlist within this many seconds resumes where it left off. */
 const RESUME_WITHIN = 90;
 
-type Deck = { el: HTMLAudioElement; gain: GainNode; name: string };
+/**
+ * A deck plays one decoded piece from memory. (Streamed through Web Audio,
+ * iOS warped the pitch whenever the page was busy; a buffer can't.)
+ */
+type Deck = {
+  src: AudioBufferSourceNode | null;
+  gain: GainNode;
+  name: string;
+  /** The context time at which this piece's 0 s would have played. */
+  startAt: number;
+  dur: number;
+};
 
 type Recorded = {
   ctx: BaseAudioContext;
@@ -115,7 +126,14 @@ type Recorded = {
   decks: Deck[];
   active: number;
   playlist: Playlist | null;
+  /** A piece being fetched and decoded to cross to; nothing else crosses meanwhile. */
+  pending: string | null;
 };
+
+/** Pieces are kept decoded at this rate, in mono: about 15 MB for two minutes. */
+const MUSIC_RATE = 32000;
+/** Decoded pieces kept at once: what plays, what's next, what was left. */
+const MUSIC_KEEP = 3;
 
 function shuffled<T>(list: readonly T[]): T[] {
   const out = [...list];
@@ -234,6 +252,8 @@ export class Music {
   private queue: Partial<Record<Playlist, { order: string[]; at: number }>> = {};
   /** Where each playlist was left, to pick up again. */
   private left: Partial<Record<Playlist, { name: string; pos: number; at: number }>> = {};
+  /** Decoded pieces by name, newest last. */
+  private buffers = new Map<string, Promise<AudioBuffer | null>>();
 
   constructor(rig: AudioRig, track: Track) {
     this.rig = rig;
@@ -263,7 +283,6 @@ export class Music {
   stop(): void {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
-    for (const d of this.rec?.decks ?? []) d.el.pause();
   }
 
   /** A slow swell up to full: the title being woken. */
@@ -287,37 +306,70 @@ export class Music {
     tone.Q.value = 0.5;
     tone.connect(level);
     const decks = [0, 1].map(() => {
-      const el = new Audio();
-      el.preload = "auto";
-      el.setAttribute("playsinline", "");
       const gain = ctx.createGain();
       gain.gain.value = 0;
-      const src = (ctx as AudioContext).createMediaElementSource(el);
-      src.connect(gain);
       gain.connect(tone);
-      el.addEventListener("playing", () => {
-        this.recState = "ok";
-      });
-      el.addEventListener("error", () => {
-        // A missing file means no recorded score: the synth plays instead.
-        if (this.recState !== "ok") {
-          this.recState = "failed";
-          this.dropRecorded();
-        }
-      });
-      return { el, gain, name: "" };
+      return { src: null, gain, name: "", startAt: 0, dur: 0 };
     });
-    return { ctx, tone, level, decks, active: 0, playlist: null };
+    return { ctx, tone, level, decks, active: 0, playlist: null, pending: null };
   }
 
   private dropRecorded(): void {
     for (const d of this.rec?.decks ?? []) {
-      d.el.pause();
-      d.el.removeAttribute("src");
+      try {
+        d.src?.stop();
+      } catch {
+        // Never started.
+      }
+      d.src?.disconnect();
       d.gain.disconnect();
     }
     this.rec?.level.disconnect();
     this.rec = null;
+  }
+
+  /** Fetches and decodes a piece, kept small (mono, MUSIC_RATE); null if it can't be had. */
+  private load(name: string, ctx: BaseAudioContext): Promise<AudioBuffer | null> {
+    const have = this.buffers.get(name);
+    if (have) {
+      // Freshly wanted: to the back of the queue.
+      this.buffers.delete(name);
+      this.buffers.set(name, have);
+      return have;
+    }
+    const made = fetch(`music/${name}.m4a`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => (ctx as AudioContext).decodeAudioData(data))
+      .then((full) => {
+        // Down to mono at a lower rate: a fifth of the memory, and still music.
+        const length = Math.ceil(full.duration * MUSIC_RATE);
+        const off = new OfflineAudioContext(1, length, MUSIC_RATE);
+        const src = off.createBufferSource();
+        src.buffer = full;
+        src.connect(off.destination);
+        src.start();
+        return off.startRendering();
+      })
+      .catch(() => null);
+    this.buffers.set(name, made);
+    while (this.buffers.size > MUSIC_KEEP) {
+      const oldest = this.buffers.keys().next().value!;
+      if (this.rec?.decks.some((d) => d.name === oldest)) break;
+      this.buffers.delete(oldest);
+    }
+    return made;
+  }
+
+  /** Where a deck is in its piece, in seconds. */
+  private deckAt(rec: Recorded, deck: Deck): number {
+    return deck.src ? rec.ctx.currentTime - deck.startAt : 0;
+  }
+
+  /** The piece a playlist will play next, without taking it. */
+  private peekNext(list: Playlist): string {
+    const q = this.queue[list];
+    if (q && q.at < q.order.length) return q.order[q.at]!;
+    return RECORDED[list][0];
   }
 
   private nextName(list: Playlist): string {
@@ -333,35 +385,64 @@ export class Music {
     return q.order[q.at++]!;
   }
 
-  /** Crosses to `name` on the other deck, from `pos` seconds in. */
-  private cross(rec: Recorded, name: string, pos: number, fade: number): void {
-    const now = rec.ctx.currentTime;
+  /** Crosses to `name` on the other deck, from `pos` seconds in, once it's decoded. */
+  private cross(rec: Recorded, name: string, pos: number, fade: number, list: Playlist): void {
+    rec.pending = name;
+    void this.load(name, rec.ctx).then((buffer) => {
+      if (this.rec !== rec || rec.pending !== name) return;
+      rec.pending = null;
+      if (!buffer) {
+        // A piece that can't be had: if nothing ever played, the synth takes over.
+        if (this.recState !== "ok") {
+          this.recState = "failed";
+          this.dropRecorded();
+        }
+        return;
+      }
+      this.startDeck(rec, name, buffer, pos, fade);
+      // Have the next one ready before this ends.
+      void this.load(this.peekNext(list), rec.ctx);
+    });
+  }
+
+  private startDeck(
+    rec: Recorded,
+    name: string,
+    buffer: AudioBuffer,
+    pos: number,
+    fade: number,
+  ): void {
+    const ctx = rec.ctx;
+    const now = ctx.currentTime;
     const from = rec.decks[rec.active]!;
     const to = rec.decks[1 - rec.active]!;
     from.gain.gain.cancelScheduledValues(now);
     from.gain.gain.setValueAtTime(from.gain.gain.value, now);
     from.gain.gain.linearRampToValueAtTime(0, now + fade);
-    const old = from.el;
-    setTimeout(
-      () => {
-        if (rec.decks[rec.active] !== from) old.pause();
-      },
-      fade * 1000 + 100,
-    );
-    if (to.name !== name) {
-      to.el.src = `music/${name}.m4a`;
-      to.name = name;
+    try {
+      from.src?.stop(now + fade + 0.05);
+    } catch {
+      // Already stopped.
     }
     try {
-      to.el.currentTime = pos;
+      to.src?.stop();
     } catch {
-      // Not seekable yet; it starts from the top.
+      // Already stopped.
     }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(to.gain);
+    const at = Math.max(0, Math.min(pos, buffer.duration - XFADE - 1));
+    src.start(now, at);
+    to.src = src;
+    to.name = name;
+    to.startAt = now - at;
+    to.dur = buffer.duration;
     to.gain.gain.cancelScheduledValues(now);
     to.gain.gain.setValueAtTime(0, now);
     to.gain.gain.linearRampToValueAtTime(1, now + fade);
-    void to.el.play().catch(() => undefined);
     rec.active = 1 - rec.active;
+    this.recState = "ok";
   }
 
   /** Keeps the recorded score on the right piece; returns whether it is playing. */
@@ -373,7 +454,7 @@ export class Music {
     const wall = performance.now() / 1000;
     if (want !== rec.playlist) {
       if (rec.playlist && deck.name) {
-        this.left[rec.playlist] = { name: deck.name, pos: deck.el.currentTime, at: wall };
+        this.left[rec.playlist] = { name: deck.name, pos: this.deckAt(rec, deck), at: wall };
       }
       const back = this.left[want];
       const resume = back && wall - back.at < RESUME_WITHIN;
@@ -384,15 +465,15 @@ export class Music {
         resume ? back.name : this.nextName(want),
         resume ? back.pos : 0,
         want === "boss" || leaving === "boss" ? XFADE_FAST : XFADE,
+        want,
       );
-    } else if (deck.el.paused && deck.name && !deck.el.ended) {
-      // Back from the background: pick up again.
-      void deck.el.play().catch(() => undefined);
     } else if (
-      (deck.el.duration > 0 && deck.el.duration - deck.el.currentTime < XFADE + 0.3) ||
-      deck.el.ended
+      !rec.pending &&
+      deck.src &&
+      deck.dur > 0 &&
+      deck.dur - this.deckAt(rec, deck) < XFADE + 0.3
     ) {
-      this.cross(rec, this.nextName(want), 0, XFADE);
+      this.cross(rec, this.nextName(want), 0, XFADE, want);
     }
     // The game still shapes it: muffled low down, open as the climb and the
     // Dark close in, sunk after a fall.
@@ -481,12 +562,8 @@ export class Music {
 
   private pump = (): void => {
     const graph = this.graph;
-    const decks = this.rec?.decks ?? [];
-    if (!graph || !this.rig.musicEnabled || graph.ctx.state !== "running") {
-      // Silent or backgrounded: the recorded pieces wait where they are.
-      for (const d of decks) if (!d.el.paused) d.el.pause();
-      return;
-    }
+    // Silent or backgrounded: a suspended context holds the pieces where they are.
+    if (!graph || !this.rig.musicEnabled || graph.ctx.state !== "running") return;
     const now = graph.ctx.currentTime;
     // After a stall (backgrounded tab) skip ahead rather than machine-gun the backlog.
     if (this.nextTime < now - 0.2) this.nextTime = now + 0.05;

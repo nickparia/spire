@@ -3,6 +3,22 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 56 — The Descent, all eight depths (internal)
+
+- **The Descent is a full world.** Eight depths down the shaft, each a living painting with its own stone and its own climbers:
+  - **The Roots**: colossal roots grip the walls, faint daylight far above. The starved builders climb.
+  - **The Ossuary**: walls of skull niches and guttering candles; the groove walks. Mites join them.
+  - **The Drowned Halls**: waterfalls pour down carved stairways; the beat.
+  - **Crystal Veins**: violet crystals throw shafts of light; the rush. The first **brutes**: their stone backs take a blow before they break.
+  - **The Furnace Below**: rivers of molten rock; breathe at the walls.
+  - **The Quiet**: grey walls of faded murals; the split.
+  - **The Hollow**: no light at all. You only see the **lantern-bearers** by the violet glow in their chests.
+  - **The Floor of the World**: a sealed door below leaking violet light; every depth's rule in turn.
+- The Descent's boss (the climb back up) and its chapter come next.
+- **Fixed: the music warped** on iPhone (like a slowing record). Pieces now play from memory instead of streaming.
+- **Fixed: the summit's black band.** iPhones drew the pillar of light's black frame solid over the sky; it's now drawn the way the phone blends properly. The Dark no longer shows when the camera pulls back.
+- **Fixed:** the summit card and skies list counted every world's skies together.
+
 ## Build 55 — A clean summit (internal)
 
 - **Fixed: the summit's background.** When the camera pulled back to show your tower, a flat band of old ground rose across the painted sky, the pillar of light laid a grey box over everything, and the ruins slid back in front. Now it is one painted scene: the pillar rises over the sky, the ruins step aside.

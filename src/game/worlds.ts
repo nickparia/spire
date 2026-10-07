@@ -46,10 +46,19 @@ export const WORLDS: WorldDef[] = [
     name: "The Descent",
     blurb: "Build down. Something is climbing up.",
     concept: "The Spire's roots, hung down a shaft into stone older than the tower.",
-    // A test sky for now; the world's eight follow.
-    levelIds: ["roots"],
+    levelIds: ["roots", "ossuary", "drowned", "crystal", "furnace", "quiet", "hollow", "floor"],
     revelation: "They stopped. That is all. The builders stopped.",
-    stars: [[0.82, 0.62]],
+    // A constellation falling away down the map, as the shaft does.
+    stars: [
+      [0.72, 0.5],
+      [0.78, 0.56],
+      [0.74, 0.63],
+      [0.81, 0.68],
+      [0.77, 0.75],
+      [0.84, 0.8],
+      [0.8, 0.87],
+      [0.86, 0.93],
+    ],
   },
 ];
 

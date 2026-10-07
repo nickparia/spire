@@ -64,11 +64,17 @@ await page.evaluate((level) => {
   };
   loop();
 }, level);
-await wait(7000);
+// Climb to the top floors, as a real summit would be.
+const t0 = Date.now();
+while (Date.now() - t0 < 60000) {
+  const f = await page.evaluate(() => window.__spire.probe().floors ?? window.__spire.floors);
+  if (f >= (Number(process.env.FLOORS) || 6)) break;
+  await wait(300);
+}
 await page.screenshot({ path: `${out}/sm-play.png` });
 await page.evaluate(() => window.__spire.win());
 await page.addStyleTag({ content: ".panel-won { opacity: 0.08 !important; }" });
-for (const t of [700, 900, 1400, 2500]) {
+for (const t of [700, 900, 1400, 2500, 2500]) {
   await wait(t);
   await page.screenshot({ path: `${out}/sm-${t}.png` });
 }

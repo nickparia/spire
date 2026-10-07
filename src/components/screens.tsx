@@ -12,13 +12,13 @@ import {
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ShadeMark, type Rival } from "./shade";
 import { sendChallenge, type Challenge, type SendResult } from "@/game/board";
-import { isBoss, WORLDS } from "@/game/worlds";
+import { isBoss, WORLDS, worldOf } from "@/game/worlds";
 import type { Shade } from "@/game/board";
 import { fetchBoard, fetchPlayer, type Entry } from "@/game/board";
 import type { Ghost } from "@/game/logic";
 import { LEVELS, type LevelDef } from "@/game/levels";
 import { formatPercent, formatTime } from "@/game/logic";
-import { isUnlocked, levelStars, totalStars, type Save } from "@/game/save";
+import { isUnlocked, levelStars, type Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
 import { Goal, IconButton, StarIcon, Stars } from "./bits";
 import { Journey } from "./journey";
@@ -86,6 +86,11 @@ export function LevelSelect({
   onBack: () => void;
 }) {
   const listRef = useRef<HTMLOListElement>(null);
+  // The skies of the world the chosen sky belongs to.
+  const world = worldOf(LEVELS[selected]?.id ?? LEVELS[0]!.id);
+  const worldIndex = Math.max(0, WORLDS.indexOf(world));
+  const ids = new Set(world.levelIds);
+  const worldStars = world.levelIds.reduce((n: number, id: string) => n + levelStars(save, id), 0);
   useEffect(() => {
     // Keep the opened card, with its Play button, inside the scroll view.
     const card = listRef.current?.children[selected];
@@ -103,18 +108,19 @@ export function LevelSelect({
         </IconButton>
         <p className="kicker">Skies</p>
         <p className="kicker menu-stars">
-          <StarIcon on size={13} /> {totalStars(save)} / {LEVELS.length * 3}
+          <StarIcon on size={13} /> {worldStars} / {world.levelIds.length * 3}
         </p>
       </div>
 
-      <Journey save={save} size="large" caption={false} />
+      <Journey save={save} size="large" caption={false} world={world} />
       <p className="kicker world-head">
-        World 1 · {WORLDS[0]!.name} <small>— {WORLDS[0]!.blurb}</small>
+        World {worldIndex + 1} · {world.name} <small>— {world.blurb}</small>
       </p>
-      <p className="world-concept">{WORLDS[0]!.concept}</p>
+      <p className="world-concept">{world.concept}</p>
 
       <ol className="levels" ref={listRef}>
         {LEVELS.map((level, index) => {
+          if (!ids.has(level.id)) return null;
           const open = isUnlocked(save, index);
           const rec = save.levels[level.id];
           const active = index === selected;

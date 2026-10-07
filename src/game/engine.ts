@@ -154,6 +154,14 @@ const PAINTED_SKIES: readonly string[] = [
   "glacier",
   "eclipse",
   "apex",
+  "roots",
+  "ossuary",
+  "drowned",
+  "crystal",
+  "furnace",
+  "quiet",
+  "hollow",
+  "floor",
 ];
 type SlabLook = "fire" | "ice" | "charge" | "key";
 /** Each living slab's box inside its sheet's frames, as shares of the frame. */
@@ -182,8 +190,10 @@ const STARBURST_SIZE = 260;
 const STARBURST_LIFE = 1.6;
 /** Where in the pillar clip its foot is (share of height), and where its hold begins (s). */
 const BEACON_FOOT = 0.85;
-const BEACON_HOLD = 1.4;
-const BEACON_END = 3.2;
+/** The pillar sheet: its frames, their rate, and the frame its loop starts from. */
+const BEACON_FRAMES = 20;
+const BEACON_FPS = 6;
+const BEACON_LOOP = 8;
 /** An ordinary perfect's glint: shorter, and only the burst's opening frames. */
 const FLARE_GLINT = 0.3;
 const FLARE_GLINT_FRAMES = 4;
@@ -221,6 +231,13 @@ const BLOOD_RGB: RGB = [150, 18, 24];
 const BLOOD_DEEP_RGB: RGB = [70, 6, 12];
 /** The painted slab's end caps and centre mark, as shares of its width. */
 const SLAB_CAP = 0.058;
+/** Depths that borrow a Hearth stone that suits them. */
+const STONE_FOR: Record<string, string> = {
+  furnace: "foundry",
+  quiet: "ridge",
+  hollow: "eclipse",
+  floor: "apex",
+};
 /** Skies with their own painted stone; any other uses the foundry's. */
 const SKY_STONES: readonly string[] = [
   "foundry",
@@ -231,6 +248,10 @@ const SKY_STONES: readonly string[] = [
   "glacier",
   "eclipse",
   "apex",
+  "roots",
+  "ossuary",
+  "drowned",
+  "crystal",
 ];
 /** Room cut above and below a sky's stone (tools/cutslab.mjs pads 12% of its height each side). */
 const STONE_PAD = 0.12 / 1.24;
@@ -774,6 +795,8 @@ export class SpireEngine {
   private slabLookNow: SlabLook | null = null;
   /** Sprite sheets (public/art/sprites/<name>.webp), one row of square frames. */
   private sprites = new Map<string, HTMLImageElement>();
+  /** Brutes whose stone back has taken one blow already. */
+  private climberCracked = new Set<number>();
   /** Climbers crushed, by index, with the clock when it happened. */
   private climberDead = new Map<number, number>();
   /** Each sky's painted stone (public/art/slabs/<theme>.webp), cut so it fits any width. */
@@ -802,9 +825,6 @@ export class SpireEngine {
   private rime = 0;
   /** The summit's painted starbursts, each playing out. */
   private bursts: { x: number; y: number; size: number; life: number }[] = [];
-  /** The pillar of light: its clip, and when it was set going (-1 to start it). */
-  private beaconVideo: HTMLVideoElement | null = null;
-  private beaconFrom = 0;
   /** Perfect hits' painted bursts, each playing out. */
   private flares: {
     x: number;
@@ -2842,18 +2862,29 @@ export class SpireEngine {
 
   /** A cut-off piece lands on the climbers: they are knocked back down the shaft. */
   private squash(x: number, w: number): void {
-    const push = SLAB_H * (SQUASH_PUSH + SQUASH_PER_WIDTH * Math.min(1, w / this.startW));
-    this.dark = Math.max(DARK_START, this.dark - push);
     const at = this.climbersY();
+    let braced = false;
     // Those under it die: the near ones within the slab's reach.
     const sx = x - this.camX + this.vw / 2;
     for (let i = 0; i < CLIMBERS; i++) {
-      const c = climber(i);
+      const c = this.climberAt(i);
       const cx = c.x * (this.vw + 40) - 20;
       if (c.depth < 0.45 && Math.abs(cx - sx) < w / 2 + 18 && !this.climberDead.has(i)) {
-        this.climberDead.set(i, this.clock);
+        // A brute's stone back takes the first blow: it cracks, and holds the line.
+        if (c.kind === "brute" && !this.climberCracked.has(i)) {
+          this.climberCracked.add(i);
+          braced = true;
+          this.fx.burst(cx + this.camX - this.vw / 2, at, [150, 130, 110], 24, 260);
+        } else {
+          this.climberDead.set(i, this.clock);
+          this.climberCracked.delete(i);
+        }
       }
     }
+    // A cracked brute in the way halves the knock-back.
+    const push =
+      SLAB_H * (SQUASH_PUSH + SQUASH_PER_WIDTH * Math.min(1, w / this.startW)) * (braced ? 0.5 : 1);
+    this.dark = Math.max(DARK_START, this.dark - push);
     // The crunch: blood flung out and down, pale chips of them, a stain, a
     // beat of hit-stop and a shove of the camera.
     this.fx.blood(x, at, BLOOD_RGB, 80, 340);
@@ -3925,8 +3956,6 @@ export class SpireEngine {
     this.fitZoom = Math.max(0.28, Math.min(1, (this.summitHorizon() - 44) / (crown + 60)));
 
     const accent = this.theme.accent;
-    // The painted pillar takes it from here (drawBeacon); a burst of sparks at its foot.
-    this.beaconFrom = -1;
     this.fx.sparkle(cx, crown, top.w, mix(accent, BONE, 0.5), 40);
     for (let i = 0; i < this.stack.length; i++) this.stack[i]!.ripple = i * 0.035;
     this.float("SUMMIT", cx, crown + 44, true, 30);
@@ -4371,9 +4400,13 @@ export class SpireEngine {
     ctx.fillStyle = g;
     ctx.fillRect(-120, front - 10, this.vw + 240, this.vh - front + 200);
     // The climbers: painted things crawling up the shaft, far ones fading into the black.
-    const order = [...Array(CLIMBERS).keys()].sort((a, b) => climber(b).depth - climber(a).depth);
+    const order = [...Array(CLIMBERS).keys()].sort(
+      (a, b) => this.climberAt(b).depth - this.climberAt(a).depth,
+    );
+    // In the Hollow there is no light: only the lantern-bearers' glow shows.
+    const dark = this.mover.course === "eclipse";
     for (const i of order) {
-      const c = climber(i);
+      const c = this.climberAt(i);
       const sheet = this.sprite(c.kind);
       if (!sheet) continue;
       const dead = this.climberDead.get(i);
@@ -4389,8 +4422,21 @@ export class SpireEngine {
         else if (age < CLIMBER_RESPAWN + 1) alpha *= age - CLIMBER_RESPAWN;
         else this.climberDead.delete(i);
       }
+      if (dark && c.kind !== "lantern") alpha *= 0.12;
       const x = c.x * (this.vw + 40) - 20;
       const size = CLIMBER_SIZE[c.kind] * (1 - c.depth * 0.4);
+      if (c.kind === "lantern") {
+        const yy = front + 8 + size * 0.4 + c.depth ** 1.4 * 170;
+        const pulse = 0.6 + 0.4 * Math.sin(clock * 3 + i);
+        const g = ctx.createRadialGradient(x, yy, 0, x, yy, size * 0.9);
+        g.addColorStop(0, `rgba(180,110,255,${0.4 * pulse * alpha})`);
+        g.addColorStop(1, "rgba(180,110,255,0)");
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = g;
+        ctx.fillRect(x - size, yy - size, size * 2, size * 2);
+        ctx.restore();
+      }
       const y =
         front + 8 + size * 0.4 + c.depth ** 1.4 * 170 + Math.sin(clock * (3 + c.r * 3) + i) * 3;
       const fps = CLIMBER_FPS[c.kind];
@@ -4450,8 +4496,8 @@ export class SpireEngine {
    * the drawn backdrop (and while it loads).
    */
   private paintedSky(): { video: HTMLVideoElement; fg: HTMLImageElement } | null {
-    const id = this.theme.id;
-    if (!PAINTED_SKIES.includes(id) || this.plan.descent || typeof document === "undefined") {
+    const id = this.paintKey();
+    if (!PAINTED_SKIES.includes(id) || typeof document === "undefined") {
       return null;
     }
     let sky = this.skies.get(id);
@@ -4501,7 +4547,9 @@ export class SpireEngine {
     const w = Math.max(view.w * 1.06, (view.h * 1.22) / ratio);
     const h = w * ratio;
     const climb = clamp01(view.altitude);
-    const y = (view.h - h) * (1 - climb);
+    // Climbing, the plate slides from its ground up to its night; going down
+    // the shaft, from its mouth down to its depths.
+    const y = (view.h - h) * (this.plan.descent ? climb : 1 - climb);
     const x = (view.w - w) / 2 - view.camX * 0.04;
     ctx.drawImage(v, x, y, w, h);
     // Held back, darkest down the middle, so the tower reads first.
@@ -4600,6 +4648,20 @@ export class SpireEngine {
     this.tap();
     this.demoing = false;
     this.demo = false;
+  }
+
+  /** One climber in the swarm, as this sky's kinds allow. */
+  private climberAt(i: number): ReturnType<typeof climber> {
+    const c = climber(i);
+    const kinds = this.mode === "level" ? LEVELS[this.levelIndex]!.climbers : undefined;
+    if (!kinds || kinds.length === 0 || kinds.includes(c.kind)) return c;
+    return { ...c, kind: kinds[i % kinds.length]! };
+  }
+
+  /** The art the current sky is painted with: its own, or its theme's. */
+  private paintKey(): string {
+    const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
+    return level?.paint ?? this.theme.id;
   }
 
   /** A sprite sheet once loaded: frames are square, side by side. */
@@ -4705,7 +4767,8 @@ export class SpireEngine {
     if (this.phase === "play" && this.ghost) this.drawGhostLine(ctx);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
-    if (this.plan.darkRate > 0 && this.phase !== "menu" && !this.escape) {
+    // Once the sky is won the Dark is gone: the pull-back must not reveal it.
+    if (this.plan.darkRate > 0 && this.phase !== "menu" && this.phase !== "won" && !this.escape) {
       if (this.plan.descent) this.drawClimbers(ctx);
       else this.drawDark(ctx);
     }
@@ -4768,7 +4831,7 @@ export class SpireEngine {
   }
 
   private drawBackdrop(ctx: CanvasRenderingContext2D, view: BackdropView, zoom: number): void {
-    if (this.plan.descent) {
+    if (this.plan.descent && !this.paintedSky()) {
       this.drawShaft(ctx, view);
       return;
     }
@@ -4987,14 +5050,27 @@ export class SpireEngine {
     const top = this.peak();
     if (!top) return;
     const s = this.worldToScreen(top.x + top.w / 2, top.y + VISUAL_H);
-    const clip = this.beacon();
-    if (clip) {
-      // The painted pillar, its foot on the crown, rising out of the top of the view.
+    // The painted pillar, a sprite sheet (iOS won't blend a video additively):
+    // it erupts once, then its shimmering hold loops.
+    let sheet = this.sprites.get("beacon");
+    if (!sheet) {
+      sheet = Object.assign(new Image(), { src: "art/sprites/beacon.webp" });
+      this.sprites.set("beacon", sheet);
+    }
+    if (sheet.complete && sheet.naturalWidth > 0) {
+      const age = this.phase === "menu" ? this.demoAge : this.wonAge;
+      const t = (this.reduceMotion ? BEACON_LOOP : age) * BEACON_FPS;
+      const frame =
+        t < BEACON_FRAMES
+          ? Math.floor(t)
+          : BEACON_LOOP + (Math.floor(t - BEACON_LOOP) % (BEACON_FRAMES - BEACON_LOOP));
+      const cw = sheet.naturalWidth / BEACON_FRAMES;
+      const ch = sheet.naturalHeight;
       const h = Math.max(this.vh * 1.1, s.y * 1.25);
-      const w = h * (clip.videoWidth / Math.max(1, clip.videoHeight) || 9 / 16);
+      const w = h * (cw / ch);
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.drawImage(clip, s.x - w / 2, s.y - h * BEACON_FOOT, w, h);
+      ctx.drawImage(sheet, frame * cw, 0, cw, ch, s.x - w / 2, s.y - h * BEACON_FOOT, w, h);
       ctx.restore();
       return;
     }
@@ -5184,37 +5260,6 @@ export class SpireEngine {
       );
     }
     ctx.restore();
-  }
-
-  /** The pillar's clip: erupts once, then its shimmering hold loops. */
-  private beacon(): HTMLVideoElement | null {
-    if (typeof document === "undefined") return null;
-    let v = this.beaconVideo;
-    if (!v) {
-      v = document.createElement("video");
-      v.src = "art/fx/beacon.mp4";
-      v.muted = true;
-      v.playsInline = true;
-      v.preload = "auto";
-      v.setAttribute("playsinline", "");
-      v.style.cssText =
-        "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
-      v.addEventListener("ended", () => {
-        v!.currentTime = BEACON_HOLD;
-        void v!.play().catch(() => undefined);
-      });
-      document.body.appendChild(v);
-      v.load();
-      this.beaconVideo = v;
-    }
-    if (this.beaconFrom < 0) {
-      this.beaconFrom = 0;
-      v.currentTime = 0;
-    }
-    // Hold on the pillar's bright middle; its clip fades out after.
-    if (v.currentTime > BEACON_END) v.currentTime = BEACON_HOLD;
-    if (v.paused) void v.play().catch(() => undefined);
-    return v.readyState >= 2 ? v : null;
   }
 
   /** The perfect bursts: a painted flare out of the groove, added as light. */
@@ -5636,7 +5681,8 @@ export class SpireEngine {
   ): void {
     if (w < 0.5 || h < 0.5) return;
     const sy = Number.isFinite(scaleY) ? Math.max(0.2, scaleY) : 1;
-    const stone = SKY_STONES.includes(this.theme.id) ? this.theme.id : "foundry";
+    const key = this.paintKey();
+    const stone = STONE_FOR[key] ?? (SKY_STONES.includes(key) ? key : "foundry");
     let art = this.slabArts.get(stone);
     if (!art) {
       art = Object.assign(new Image(), { src: `art/slabs/${stone}.webp` });

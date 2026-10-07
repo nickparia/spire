@@ -43,8 +43,9 @@ const state = () =>
       list: r?.playlist,
       decks: r?.decks.map(
         (d) =>
-          `${d.name || "-"}:${d.el.paused ? "paused" : "playing"}@${d.el.currentTime.toFixed(1)} g${d.gain.gain.value.toFixed(2)}`,
+          `${d.name || "-"}:${d.src ? "on" : "idle"}@${(r.ctx.currentTime - d.startAt).toFixed(1)}/${d.dur.toFixed(0)} g${d.gain.gain.value.toFixed(2)}`,
       ),
+      kept: [...m.buffers.keys()].join(","),
       cutoff: Math.round(r?.tone.frequency.value ?? 0),
     };
   });
@@ -58,7 +59,7 @@ console.log("climb ", JSON.stringify(await state()));
 await page.evaluate(() => {
   const r = window.__spire.music.rec;
   const d = r.decks[r.active];
-  d.el.currentTime = d.el.duration - 6;
+  d.startAt = r.ctx.currentTime - (d.dur - 6);
 });
 await wait(5000);
 console.log("next  ", JSON.stringify(await state()));
