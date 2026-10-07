@@ -48,6 +48,50 @@ Made with the Higgsfield CLI (GPT Image 2.5 for stills, Seedance 2.5 for video, 
 
 `public/music/*.m4a`, made with Higgsfield's `sonilo_music` (120 s, about 7.5 credits each): `menu`, `hearth-1`…`hearth-5` (the climb, played in a shuffled rotation with 4 s crossfades) and `boss` (beatless dread for the escape, so it never fights the tap pulse). Prompts name the world, the instruments, a tempo and key, and "no vocals". Check each for dead air (`ffmpeg -af silencedetect=n=-45dB:d=0.6`) and cut it, then encode: `ffmpeg -i in -af "silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-50dB,loudnorm=I=-20:TP=-2:LRA=11" -ar 44100 -ac 2 -c:a aac -b:a 128k -movflags +faststart out.m4a`. A new world adds its own climb set and a line in `RECORDED` (`music.ts`).
 
+## Everything still drawn by code (the restyle list, Oct 7)
+
+How each kind is made:
+
+- **Plate**: a painted still (GPT Image 2.5, ~3 credits).
+- **Loop**: a seamless Seedance clip (~50 credits at 720p).
+- **Flipbook**: a short Seedance clip on black, cut into a sprite sheet and drawn additively (~50 credits).
+- **Slice**: a still cut into fixed ends and a stretched middle, so it fits any width.
+
+### Hearth: the stacking itself
+
+1. **Slabs** (slice): carved stone with an ember groove, its centre mark doubling as the perfect mark. Variants: normal, rubble/cracked, keystone, charged (the escape). The falling slab is the same art with a glow. Sample: scratch `hf/slabs-1.png`.
+2. **Perfect hit** (flipbook): an ember flare from the groove, plus a bigger one for streaks and keystones.
+3. **Lighting the sky** (flipbook or loop over the beacon): the beam rising and the sky igniting star by star, replacing the drawn rays and fireworks.
+4. **Taken by the Dark** (flipbook): the ink sea surging up over the tip.
+5. **Topple and crumble** (flipbook): stone dust and debris.
+6. **Ground and plinth** (plate): the foundry floor the first slab sits on.
+
+### Hearth: the eight skies
+
+7. **Sky plates** (plates, 2 layers each): the backdrops are drawn silhouettes now. Paint far and mid layers per sky (Foundry, Tidewater, Pulse City, Red Canyon, Gale Ridge, Glacier, Eclipse, Apex); code keeps the parallax, clouds and embers.
+8. **Course effects** (loops or flipbooks): wind streamers (gust), the beat pulse, the eclipse corona, breath frost, rush lanes.
+9. **Pickups** (plates with code glow): ember mote, bomb, keystone mark, shield dome.
+
+### Hearth: the escape
+
+10. **Shatter** (flipbook): a slab bursting into light-shards.
+11. **Binding tendrils** (plate): painted tendrils instead of drawn ones.
+12. **Caught and victory stings** (5 s films).
+
+### World 2: the Descent
+
+13. **Shaft plates** for eight depths (plates, 2 layers): the roots, the ossuary, drowned halls, crystal veins, the furnace below, the quiet, the hollow, the floor of the world.
+14. **Climbers** (flipbooks, crawl cycles): the swarm, a dodger, a brute that takes two hits, the lantern-blind ones for the dark sky. Plus a **squash** splat.
+15. **Descent slabs** (slice): root-bound stone, with the ceiling rock as a plate.
+16. **The deep** (loop): black beneath the climbers, its own take on the painted Dark.
+17. **The boss**: the blind source rising from below (loop), its sting, and caught and victory stings.
+18. **Chapter II** (4 plates + 4 loops) and the **world-end film**.
+19. **Music**: five climb pieces, menu and boss (~50 credits).
+
+### Cost and order
+
+About 450 credits for Hearth (sky plates and flipbooks are most of it) and about 750 for the Descent: ~1,200 in all, against ~1,550 in hand. Order: slabs, perfect hit and lighting the sky first (most visible per credit), then the climbers and shaft plates (the Descent needs them to be playable), then sky plates, then the rest.
+
 ## Order
 
 Make 1, 5 and 6 first (the title, the world-end scene, the source), then 2–4. If time allows, 7.
