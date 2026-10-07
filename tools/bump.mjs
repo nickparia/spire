@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Bumps the build: public/version.json (with a title and notes passed in) and
+// Bumps the build: src/game/build.json (with a title and notes passed in) and
 // the Xcode build number. Usage: node tools/bump.mjs "Title" "note one" "note two" ...
 import { readFileSync, writeFileSync } from "node:fs";
 
 const [title, ...notes] = process.argv.slice(2);
-const file = "public/version.json";
+const file = "src/game/build.json";
 const v = JSON.parse(readFileSync(file, "utf8"));
 v.build += 1;
 if (title) v.title = title;

@@ -17,7 +17,8 @@ Read this first, then BACKLOG.md (what is next), STORY.md (the voice), README.md
 
 ## Shipping
 
-- `node tools/bump.mjs "Title" "note" "note"` bumps `public/version.json` (the in-app What's new and the update prompt) and the Xcode build number. Add an entry to RELEASE_NOTES.md.
+- `node tools/bump.mjs "Title" "note" "note"` bumps `src/game/build.json` (this build's number and the in-app What's new notes) and the Xcode build number. Add an entry to RELEASE_NOTES.md.
+- Builds are private by default. Nick decides when testers get one: he attaches it to the external group in TestFlight (with "Automatically notify testers" off unless he wants the email), then `node tools/release.mjs` copies build.json into the published `public/version.json`, and a push makes every installed copy show "Build N is ready". Never run release.mjs on his behalf.
 - Commit, push `professionalise` (GitHub Pages deploys the web build and version.json to https://nickparia.github.io/spire/).
 - `npm run build && npx cap sync ios`, then from `ios/App`: `xcodebuild -project App.xcodeproj -scheme App -configuration Release -destination "generic/platform=iOS" -archivePath <path> archive -allowProvisioningUpdates`, then `xcodebuild -exportArchive -archivePath <path> -exportOptionsPlist <export.plist> -exportPath <dir> -allowProvisioningUpdates` with a plist of method `app-store-connect`, destination `upload`, teamID `XUKTV95C24`, signingStyle automatic, uploadSymbols true, manageAppVersionAndBuildNumber true. Build numbers so far: 1–29.
 - TestFlight: app "Spire: Stack the Sky", bundle `com.nickprince.spire`. Nick attaches new builds to his external group himself.

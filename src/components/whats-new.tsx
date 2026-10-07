@@ -22,6 +22,8 @@ export function WhatsNew({ save, onSeen }: { save: Save; onSeen: (build: number)
     fetch(`${VERSION_URL}?t=${Date.now()}`, { signal: ctl.signal, cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((v: Remote | null) => {
+        // The published file names only a build released to testers, so
+        // builds pushed for testing in private never ask anyone to update.
         if (v && typeof v.build === "number" && v.build > BUILD) setRemote(v);
       })
       .catch(() => undefined);
