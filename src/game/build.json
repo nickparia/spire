@@ -1,8 +1,10 @@
 {
-  "build": 36,
-  "title": "Tester tools",
+  "build": 37,
+  "title": "A new home",
   "notes": [
-    "Options has tester tools: unlock every sky, fight Apex's boss straight from the summit, and a practice mode with no Dark.",
-    "Fixed: the Hollow could not be beaten in build 35."
+    "A new title: the Spire rising, a column of light, tap to begin.",
+    "Choose your world: swipe through the worlds, each with its own constellation lighting up as you relight its skies. Continue where you left off, or New to start that world again from sky 1 (your stars and records stay).",
+    "Options, Leaderboard, Achievements and the Story along the bottom.",
+    "Coins, the forge and paid rebuilds are gone; Endless is put away for now."
   ]
 }

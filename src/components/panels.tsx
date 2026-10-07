@@ -46,7 +46,7 @@ import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { formatPercent, formatTime, starCount } from "@/game/logic";
 import type { Save } from "@/game/save";
-import { Clock, Coin, IconButton, StarIcon } from "./bits";
+import { Clock, IconButton, StarIcon } from "./bits";
 import { SoundToggles } from "./screens";
 import { useCountUp } from "./use-count-up";
 
@@ -232,12 +232,6 @@ export function RunHud({
             </p>
           </>
         ) : null}
-        <p className="stat-num purse-live mt-2" aria-label={`${hud.runCoins} coins this run`}>
-          <Coin size={14} />
-          <span key={hud.runCoins} className="score-pop inline-block">
-            {hud.runCoins}
-          </span>
-        </p>
         {!level && hud.best > 0 ? (
           <>
             <p className="kicker mt-2">Best</p>
@@ -306,7 +300,7 @@ export function PauseSheet({
             </>
           )}
           <p className="panel-meta">
-            Your skies, stars and coins are saved as you go. Ending the run only loses this climb.
+            Your skies and stars are saved as you go. Ending the run only loses this climb.
           </p>
         </div>
         <div className="mt-4 flex justify-center">
@@ -322,34 +316,18 @@ export function OverPanel({
   hud,
   onRetry,
   onQuit,
-  onRebuild,
   onWeapon,
 }: {
   hud: Hud;
   onRetry: () => void;
   onQuit: () => void;
-  onRebuild: () => void;
   onWeapon: (id: WeaponId) => void;
 }) {
   const level = hud.mode === "level";
-  const rescue = hud.rescue;
   const weapon = WEAPONS[hud.weapon];
   const armed = useArmed();
   return (
     <section className="panel panel-in" aria-live="polite" data-armed={armed || undefined}>
-      {rescue ? (
-        <div className="rescue" data-ui>
-          <button type="button" className="btn btn-primary" onClick={onRebuild} autoFocus>
-            <span>
-              Rebuild and carry on
-              <small>
-                <Coin size={13} /> {rescue.price} · once per run · no pace star
-              </small>
-            </span>
-          </button>
-          <p className="rescue-timer">{rescue.seconds}s</p>
-        </div>
-      ) : null}
       <p className="kicker">{hud.taken ? "Taken by the Dark" : "The spire fell"}</p>
       {level ? (
         <p className="score mt-1">
@@ -374,11 +352,6 @@ export function OverPanel({
           {STYLE_LINES[hud.style]} <span>Climbed like a {FAMILIES[hud.style].name}.</span>
         </p>
       ) : null}
-      {hud.runCoins > 0 ? (
-        <p className="purse">
-          <Coin size={16} /> +{hud.runCoins} kept
-        </p>
-      ) : null}
       <div className="mt-4 grid grid-cols-[1fr_auto] gap-2" data-ui>
         <button type="button" className="btn btn-primary" onClick={onRetry}>
           <RotateCcw size={17} strokeWidth={2.4} />
@@ -400,7 +373,7 @@ export function OverPanel({
           <small>tap to try another</small>
         </span>
       </button>
-      {rescue ? null : <p className="tap-hint mt-3">Tap anywhere to retry</p>}
+      <p className="tap-hint mt-3">Tap anywhere to retry</p>
     </section>
   );
 }
@@ -429,90 +402,10 @@ function Record({
   );
 }
 
-/** What the run paid, and where it came from. */
-function Purse({ result }: { result: LevelResult }) {
-  const { coins } = result;
-  const total = useCountUp(coins.total, 1300, 900);
-  const parts = [
-    ["slabs", coins.drops],
-    ["ghost", result.ghost?.beaten ? 25 : 0],
-    ["summit", coins.clear],
-    ["accuracy", coins.accuracy],
-    ["pace", coins.pace],
-    ["new stars", coins.stars],
-  ] as const;
-  return (
-    <p className="purse">
-      <Coin size={16} /> +{Math.round(total)}
-      <small>
-        {parts
-          .filter(([, amount]) => amount > 0)
-          .map(([label, amount]) => `${label} ${amount}`)
-          .join(" · ")}
-      </small>
-    </p>
-  );
-}
-
 /** Summit reached: stars, the two numbers that matter, and what to chase next. */
-/** The forge: what your coins can buy, right where you earned them. */
-function Forge({
-  result,
-  house,
-  onForge,
-}: {
-  result: LevelResult;
-  house: Family;
-  onForge: (index: number) => void;
-}) {
-  const offers = result.offers.slice(0, 3);
-  if (offers.length === 0) return null;
-  return (
-    <div className="forge" data-ui>
-      <p className="kicker">
-        <span className={"build-" + house}>House {FAMILIES[house].name}</span> pays less
-      </p>
-      {offers.map((offer, i) => {
-        const open = offer.needs === 0;
-        return (
-          <button
-            key={offer.kind + offer.name}
-            type="button"
-            className={"offer build-" + offer.family + (offer.house ? " offer-house" : "")}
-            disabled={!open || !offer.affordable}
-            onClick={() => onForge(i)}
-          >
-            <span className="offer-text">
-              <span className="pick-family">
-                {FAMILIES[offer.family].name}
-                {offer.house ? <em>Your house</em> : null}
-              </span>
-              <span className="offer-name">{offer.name}</span>
-              <span className="offer-effect">{offer.effect}</span>
-            </span>
-            <span className="offer-price">
-              {open ? (
-                <>
-                  <Coin size={13} /> {offer.price}
-                  {!offer.affordable ? <small>short</small> : null}
-                </>
-              ) : (
-                <small>
-                  Light {offer.needs} more {offer.needs === 1 ? "sky" : "skies"}
-                </small>
-              )}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 export function ResultsPanel({
   result,
-  house,
-  onForge,
   onNext,
   onRetry,
   onQuit,
@@ -523,8 +416,6 @@ export function ResultsPanel({
 }: {
   result: LevelResult;
   style: Family | null;
-  house: Family;
-  onForge: (index: number) => void;
   onNext: (() => void) | null;
   onRetry: () => void;
   onQuit: () => void;
@@ -540,7 +431,6 @@ export function ResultsPanel({
   const time = useCountUp(result.time, 800, 1900);
   const accuracy = useCountUp(result.accuracy, 900, 2000);
   const armed = useArmed();
-  const [forgeOpen, setForgeOpen] = useState(false);
   const captions = [
     "Summit",
     `${formatPercent(level.parAccuracy)} accuracy`,
@@ -597,10 +487,6 @@ export function ResultsPanel({
         />
       </div>
 
-      <div className="reveal" style={{ "--at": "2.3s" } as React.CSSProperties}>
-        <Purse result={result} />
-      </div>
-
       <div className="won-quiet reveal" style={{ "--at": "2.7s" } as React.CSSProperties}>
         {result.ghost ? (
           <p className={"ghost-line" + (result.ghost.beaten ? " ghost-won" : "")}>
@@ -616,31 +502,6 @@ export function ResultsPanel({
       </div>
 
       <FeatToasts ids={result.feats} />
-
-      {result.offers.length > 0 ? (
-        <div className="forge-fold reveal" style={{ "--at": "3s" } as React.CSSProperties}>
-          <button
-            type="button"
-            className="forge-toggle"
-            aria-expanded={forgeOpen}
-            onClick={() => setForgeOpen((v) => !v)}
-          >
-            <span>
-              The forge · {result.offers.slice(0, 3).length} offers
-              <small>
-                {" "}
-                · <Coin size={12} /> {save.coins}
-              </small>
-            </span>
-            <ChevronRight
-              size={16}
-              strokeWidth={2.4}
-              style={{ transform: forgeOpen ? "rotate(90deg)" : undefined }}
-            />
-          </button>
-          {forgeOpen ? <Forge result={result} house={house} onForge={onForge} /> : null}
-        </div>
-      ) : null}
 
       <div className="mt-3 flex flex-col gap-2">
         {onNext ? (

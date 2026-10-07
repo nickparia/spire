@@ -57,6 +57,11 @@ export type Save = {
   tester: boolean;
   /** Practice: the Dark stays away; runs are not posted or kept as ghosts. */
   practice: boolean;
+  /**
+   * Each world's active game: the index of the next sky to play there.
+   * New sets it back to 0; stars and records are never touched by it.
+   */
+  progress: Record<string, number>;
   /** When this save was last written, ms since the epoch. */
   savedAt: number;
 };
@@ -86,6 +91,7 @@ export function emptySave(): Save {
     challengesOn: true,
     tester: false,
     practice: false,
+    progress: {},
     savedAt: 0,
   };
 }
@@ -144,6 +150,9 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
       }
       save.challengesOn = data.challengesOn !== false;
       save.tester = data.tester === true;
+      for (const [id, n] of Object.entries(data.progress ?? {})) {
+        if (typeof n === "number" && n >= 0) save.progress[id] = Math.floor(n);
+      }
       save.practice = data.practice === true;
       save.savedAt = Math.max(0, num(data.savedAt, 0));
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));

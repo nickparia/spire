@@ -8,6 +8,9 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Next, in order
 
+- **Unlocks from stars and feats** (agreed Oct 7, replaces the forge): e.g. three stars on a sky unlocks a stone finish for your slabs, finishing a world a beacon style, a feat a slab trail; chosen under Achievements.
+- **World art slots for Higgsfield**: a still panel image and an optional short loop per world (and the title loop); `WorldDef` gains `art`/`loop` fields and the panels use them when present, the procedural gradient otherwise.
+- **Tidy the dead systems**: coins, ranks (`gear.ts` tracks), the forge offers, rescue and Endless are hidden but still in the engine and save; remove them once unlocks replace them.
 - **Motif per world** (music idea 3): a short theme for Hearth that each sky varies, the Hollow breaks and the world-end scene resolves; world two arrives with its own.
 
 1. **Tester read on builds 27–29**: the Hollow's three surges (target ~2, 4, 5 perfects), landing spacing (8) and whether any gift is a dud, the Foundry's fairness for a newcomer, Apex's fairness at the top, whether the "Update in TestFlight" button works on a real phone.
@@ -29,6 +32,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 37 The app shell: title splash (`home.tsx` TitleSplash), world select with per-world constellation panels and Continue/New (per-world active game in `save.progress`, `progress.ts`), bottom bar (Options, Leaderboard, Achievements, Story), Achievements = star map + feats; coins/forge/rescue/Endless removed from the UI; weapon and new game moved to Options. House style: the story's ember ground, rising text, glowing pill and constellations.
 - (next build) Update prompt only for builds released with `tools/release.mjs`; the build's own info moved to `src/game/build.json`.
 - 36 Tester tools in Options (`save.tester`, `save.practice`; `engine.startBoss`); unranked runs not posted; boss fight exempt from `DARK_REACH` (the cap made the Hollow unbeatable in 35). `tools/bots/tester.mjs`.
 - 35 Music driven by the climb (form A/B/A/break, earned layers, landing swell, topple strip; `music.ts` `setClimb`, `tools/bots/music.mjs`); the Dark quickens past par (`QUICKEN_RATE`, `QUICKEN_EVERY`) and light can push it at most `DARK_REACH` = 12 floors below the top (`tools/bots/linger.mjs`).

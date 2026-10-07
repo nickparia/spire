@@ -1912,6 +1912,342 @@
   }
 }
 
+/* The title: the Spire behind, a column of light, one tap. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 18vh;
+  text-align: center;
+  color: #f3e9dc;
+  background: linear-gradient(rgba(7, 6, 11, 0.55), rgba(7, 6, 11, 0) 45%, rgba(7, 6, 11, 0.5));
+  cursor: pointer;
+}
+
+.splash-beam {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  width: 90px;
+  height: 140vh;
+  translate: -50% 0;
+  background: linear-gradient(to top, rgba(255, 190, 120, 0.55), rgba(255, 190, 120, 0) 70%);
+  filter: blur(14px);
+  transform-origin: bottom;
+  animation:
+    beam 3.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s both,
+    glow 3s ease-in-out 3.8s infinite;
+  pointer-events: none;
+}
+
+.splash-text {
+  position: relative;
+}
+
+.splash-kicker {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: #e09468;
+  animation: veil-in 1.2s ease-out 0.4s both;
+}
+
+.splash-word {
+  margin: 0.2rem 0 0;
+  font-size: 92px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 40px rgba(255, 170, 100, 0.35);
+  animation: veil-in 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.9s both;
+}
+
+.splash-cta {
+  animation-delay: 2.4s, 3.4s;
+}
+
+@keyframes beam {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* Choose your world. */
+.worlds-home {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: max(1.4rem, env(safe-area-inset-top)) 0 max(1rem, env(safe-area-inset-bottom));
+  color: #f3e9dc;
+  background: linear-gradient(rgba(7, 6, 11, 0.6), rgba(7, 6, 11, 0.15) 30%, rgba(7, 6, 11, 0.7));
+  animation: screen-in 0.6s ease-out both;
+}
+
+.worlds-head {
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #e09468;
+  animation: veil-in 1s ease-out both;
+}
+
+.worlds-sub {
+  margin-top: 0.3rem;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  animation: veil-in 1.2s ease-out 0.3s both;
+}
+
+.worlds-home > .shade,
+.worlds-home > .shade-mark {
+  align-self: center;
+}
+
+.world-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 1rem 15vw;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.world-row::-webkit-scrollbar {
+  display: none;
+}
+
+.wpanel {
+  flex: none;
+  width: 70vw;
+  max-width: 300px;
+  height: min(62vh, 500px);
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(16, 11, 14, 0.78);
+  box-shadow:
+    0 24px 50px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 220, 190, 0.14);
+  transform: skewY(-3deg) scale(0.9);
+  opacity: 0.6;
+  transition:
+    transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.wpanel-focus {
+  transform: skewY(-3deg) scale(1);
+  opacity: 1;
+  box-shadow:
+    0 28px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 1.5px rgba(255, 190, 130, 0.55),
+    0 0 40px rgba(255, 150, 80, 0.18);
+}
+
+.wpanel-locked {
+  filter: saturate(0.2) brightness(0.7);
+}
+
+.wpanel-art {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background:
+    radial-gradient(
+      90% 70% at 50% 110%,
+      color-mix(in srgb, var(--c, #ff8a40) 55%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(var(--a, #0c1026), var(--b, #3a1a10));
+  cursor: pointer;
+}
+
+.wpanel-art-dark {
+  background:
+    radial-gradient(80% 60% at 50% 60%, rgba(120, 100, 160, 0.18), transparent 70%), #0b0a10;
+}
+
+.wpanel-stars {
+  position: absolute;
+  inset: 8% 6% 6%;
+  width: 88%;
+  height: 86%;
+  transform: skewY(3deg);
+}
+
+.wstar-line {
+  stroke: rgba(255, 245, 230, 0.16);
+  stroke-width: 0.6;
+  stroke-dasharray: 2 2;
+}
+
+.wstar-line-on {
+  stroke: rgba(255, 245, 230, 0.7);
+  stroke-dasharray: none;
+}
+
+.wstar {
+  fill: rgba(255, 245, 230, 0.22);
+}
+
+.wstar-on {
+  fill: var(--c);
+  filter: drop-shadow(0 0 3px var(--c));
+}
+
+.wstar-next {
+  fill: #fff;
+  animation: glow 1.6s ease-in-out infinite;
+}
+
+.wpanel-body {
+  padding: 0.9rem 1rem 1rem;
+  transform: skewY(3deg);
+}
+
+.wpanel-num {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #e09468;
+}
+
+.wpanel-name {
+  margin-top: 0.15rem;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.wpanel-blurb {
+  margin-top: 0.25rem;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.wpanel-meta {
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.wpanel-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 0.75rem;
+}
+
+.wpanel-actions .btn:only-child {
+  grid-column: 1 / -1;
+}
+
+.wpanel-lock {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.home-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 0 0.8rem;
+}
+
+.home-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0.6rem 0;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f3e9dc;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+/* Achievements: the feats under the sky. */
+.feats-list > .kicker {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #e09468;
+  opacity: 1;
+}
+
+.feats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.feat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.55;
+}
+
+.feat-row .feat-medal {
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 245, 230, 0.5);
+  box-shadow: none;
+}
+
+.feat-row-on {
+  opacity: 1;
+  background: linear-gradient(90deg, rgba(255, 208, 96, 0.18), rgba(255, 208, 96, 0.04));
+}
+
+.feat-row-on .feat-medal {
+  background: rgb(255, 208, 96);
+  color: #14100d;
+  box-shadow: 0 0 12px rgba(255, 208, 96, 0.5);
+}
+
 /* A landing's gifts: cards dealt, chosen, broken into light. */
 .gifts {
   position: fixed;

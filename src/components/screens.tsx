@@ -2,18 +2,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
-  Infinity as InfinityIcon,
   Lock,
   Music,
   Play,
   Trophy,
   Volume2,
   VolumeX,
-  LayoutGrid,
 } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ShadeMark, type Rival } from "./shade";
-import { SettingsButton } from "./challenge";
 import { sendChallenge, type Challenge, type SendResult } from "@/game/board";
 import { isBoss, WORLDS } from "@/game/worlds";
 import type { Shade } from "@/game/board";
@@ -21,38 +18,10 @@ import { fetchBoard, fetchPlayer, type Entry } from "@/game/board";
 import type { Ghost } from "@/game/logic";
 import { LEVELS, type LevelDef } from "@/game/levels";
 import { formatPercent, formatTime } from "@/game/logic";
-import { isUnlocked, levelStars, nextLevelIndex, totalStars, type Save } from "@/game/save";
+import { isUnlocked, levelStars, totalStars, type Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
-import { Coin, Goal, IconButton, StarIcon, Stars } from "./bits";
-import { FAMILIES, WEAPONS, type WeaponId } from "@/game/build";
-import { houseOf, rankOf, TRACKS } from "@/game/gear";
-import { nextWeapon } from "./use-count-up";
-import { Journey, Medals } from "./journey";
-
-/** What you've built, as three quiet rows of pips: one per house. */
-export function Houses({ save }: { save: Save }) {
-  const house = houseOf(save.tracks, save.weapon);
-  return (
-    <div className="houses" aria-label="Houses built">
-      {TRACKS.map((t) => {
-        const have = rankOf(save.tracks, t.family);
-        return (
-          <span
-            key={t.family}
-            className={"house build-" + t.family + (t.family === house ? " house-lead" : "")}
-          >
-            <span className="house-name">{t.name}</span>
-            <span className="gear-pips">
-              {t.ranks.map((_, i) => (
-                <span key={i} className={"pip" + (i < have ? " pip-on" : "")} />
-              ))}
-            </span>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
+import { Goal, IconButton, StarIcon, Stars } from "./bits";
+import { Journey } from "./journey";
 
 export function SoundToggles({
   save,
@@ -79,147 +48,6 @@ export function SoundToggles({
       >
         {save.sfx ? <Volume2 size={18} strokeWidth={2} /> : <VolumeX size={18} strokeWidth={2} />}
       </IconButton>
-    </div>
-  );
-}
-
-export function TitleScreen({
-  save,
-  shade,
-  onRace,
-  onShadeSeen,
-  invite,
-  onOptions,
-  onMap,
-  onPlay,
-  onLevels,
-  onBoard,
-  onEndless,
-  onReset,
-  onWeapon,
-  onMusic,
-  onSfx,
-}: {
-  save: Save;
-  shade: Shade[];
-  onRace: (rival: Rival, ghosts: Record<string, Ghost>, index: number) => void;
-  onShadeSeen: (at: string) => void;
-  invite?: ReactNode;
-  onOptions: () => void;
-  onMap: () => void;
-  onPlay: (index: number) => void;
-  onLevels: () => void;
-  onBoard: () => void;
-  onEndless: () => void;
-  onReset: () => void;
-  onWeapon: (id: WeaponId) => void;
-  onMusic: (on: boolean) => void;
-  onSfx: (on: boolean) => void;
-}) {
-  const [confirmReset, setConfirmReset] = useState(false);
-  const next = nextLevelIndex(save);
-  const level = LEVELS[next]!;
-  const stars = totalStars(save);
-  const started = Object.keys(save.levels).length > 0;
-  return (
-    <div className="screen screen-in" data-ui>
-      <div className="flex items-start justify-between">
-        <div className="title-top">
-          <p className="kicker title-kicker">Relight the sky</p>
-          <h1 className="wordmark" data-text="Spire">
-            Spire
-          </h1>
-          <p className="title-copy">
-            Something put the skies out. Stack the Spire high enough to light them again, one sky at
-            a time.
-          </p>
-          <button
-            type="button"
-            className="beacons beacons-btn"
-            onClick={onMap}
-            aria-label="Open the star map"
-          >
-            <Journey save={save} />
-            <Medals save={save} />
-          </button>
-        </div>
-        <div className="flex gap-2">
-          <SettingsButton onPress={onOptions} />
-          <SoundToggles save={save} onMusic={onMusic} onSfx={onSfx} />
-        </div>
-      </div>
-      {invite}
-
-      <div className="flex-1" />
-
-      <div className="menu">
-        <div className="menu-row">
-          <p className="kicker menu-stars">
-            <StarIcon on size={13} /> {stars} / {LEVELS.length * 3}
-          </p>
-          <p className="wallet" aria-label={`${save.coins} coins`}>
-            <Coin size={15} /> {save.coins}
-          </p>
-        </div>
-        <ShadeMark
-          shade={shade.find((s) => s.levelId === level.id)}
-          levelName={level.name}
-          onRace={(rival, ghosts) => onRace(rival, ghosts, next)}
-          onSeen={onShadeSeen}
-        />
-        <button type="button" className="btn btn-primary" onClick={() => onPlay(next)}>
-          <Play size={18} strokeWidth={2.4} fill="currentColor" />
-          <span>
-            {started ? "Continue" : "Play"}
-            <small>
-              Sky {next + 1} · {level.name}
-            </small>
-          </span>
-        </button>
-        <button
-          type="button"
-          className={"carrying weapon-" + WEAPONS[save.weapon].family + " weapon-on"}
-          onClick={() => onWeapon(nextWeapon(save.weapon))}
-          aria-label={`Carrying the ${WEAPONS[save.weapon].name}. Tap to change weapon.`}
-        >
-          <span className="carrying-name">
-            {WEAPONS[save.weapon].name}
-            <small>{FAMILIES[WEAPONS[save.weapon].family].name}'s weapon · tap to change</small>
-          </span>
-          <span className="carrying-creed">{WEAPONS[save.weapon].creed}</span>
-        </button>
-        <div className="grid grid-cols-3 gap-2">
-          <button type="button" className="btn btn-stack" onClick={onLevels}>
-            <LayoutGrid size={18} strokeWidth={2.2} />
-            Worlds
-          </button>
-          <button type="button" className="btn btn-stack" onClick={onBoard}>
-            <Trophy size={18} strokeWidth={2.2} />
-            Board
-          </button>
-          <button type="button" className="btn btn-stack" onClick={onEndless}>
-            <InfinityIcon size={18} strokeWidth={2.2} />
-            Endless
-          </button>
-        </div>
-        {started ? (
-          <button
-            type="button"
-            className={"link-btn" + (confirmReset ? " link-btn-warn" : "")}
-            onClick={() => {
-              if (!confirmReset) {
-                setConfirmReset(true);
-                return;
-              }
-              setConfirmReset(false);
-              onReset();
-            }}
-            onBlur={() => setConfirmReset(false)}
-          >
-            {confirmReset ? "Tap again to erase all progress" : "Start a new game"}
-          </button>
-        ) : null}
-      </div>
     </div>
   );
 }
@@ -283,7 +111,6 @@ export function LevelSelect({
         World 1 · {WORLDS[0]!.name} <small>— {WORLDS[0]!.blurb}</small>
       </p>
       <p className="world-concept">{WORLDS[0]!.concept}</p>
-      <Houses save={save} />
 
       <ol className="levels" ref={listRef}>
         {LEVELS.map((level, index) => {

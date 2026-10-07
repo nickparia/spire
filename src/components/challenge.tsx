@@ -12,6 +12,8 @@ import {
 import type { Ghost } from "@/game/logic";
 import type { Save } from "@/game/save";
 import { IconButton } from "./bits";
+import { nextWeapon } from "./use-count-up";
+import { WEAPONS, type WeaponId } from "@/game/build";
 import { adoptRival, partnerOf, type Rival } from "./use-challenge";
 
 /** "Lois challenges you": accept and race, or decline. */
@@ -77,6 +79,8 @@ export function SettingsSheet({
   onName,
   onChallenges,
   onTester,
+  onWeapon,
+  onReset,
   onEnded,
   onClose,
 }: {
@@ -86,11 +90,15 @@ export function SettingsSheet({
   onName: (name: string) => void;
   onChallenges: (on: boolean) => void;
   onTester: (patch: { tester?: boolean; practice?: boolean }) => void;
+  onWeapon: (id: WeaponId) => void;
+  onReset: () => void;
   onEnded: () => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(save.name);
   const [busy, setBusy] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const weapon = WEAPONS[save.weapon];
   const partner = challenge ? partnerOf(challenge, me) : null;
   const sentByMe = challenge?.fromPublic === me;
   const rename = async (event: FormEvent) => {
@@ -177,6 +185,34 @@ export function SettingsSheet({
             No challenge on. Pick someone on a sky's leaderboard to challenge.
           </p>
         )}
+
+        <p className="kicker settings-section">Play</p>
+        <div className="switch-row">
+          <span>
+            <b>Weapon: {weapon.name}</b>
+            <small>{weapon.creed}</small>
+          </span>
+          <button
+            type="button"
+            className="shade-btn"
+            onClick={() => onWeapon(nextWeapon(save.weapon))}
+          >
+            Change
+          </button>
+        </div>
+        <div className="switch-row">
+          <span>
+            <b>Start a new game</b>
+            <small>Clears every sky, star and record on this phone.</small>
+          </span>
+          <button
+            type="button"
+            className={"shade-btn" + (confirmReset ? " shade-race" : "")}
+            onClick={() => (confirmReset ? onReset() : setConfirmReset(true))}
+          >
+            {confirmReset ? "Tap to confirm" : "Reset"}
+          </button>
+        </div>
 
         <p className="kicker settings-section">Tester tools</p>
         <label className="switch-row">

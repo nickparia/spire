@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 37 — A new home
+
+- **New title**: the Spire rising behind, a column of light released into the sky, and _Tap to begin_.
+- **Choose your world**: swipe through the worlds. Each panel carries that world's constellation, which lights up star by star as you relight its skies (the next sky pulses). **Continue** picks up at your next sky in that world; **New** starts the world again from sky 1 — your stars, records and other worlds are untouched. Worlds to come are shown locked. Tap a panel's picture to see all its skies.
+- **Along the bottom**: Options, Leaderboard, Achievements (the star map and your feats) and the Story.
+- **Options** gains your weapon and _Start a new game_ (moved off the title).
+- **Removed**: coins, the forge and the paid rebuild; Endless is put away for now.
+
 ## Build 36 — Tester tools
 
 - **Options → Tester tools**:

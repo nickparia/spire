@@ -3,13 +3,16 @@ import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { BUILD } from "@/game/version";
 import { isBoss, worldDone, worldOf, WORLDS } from "@/game/worlds";
+import { nextSkyIn } from "@/game/progress";
 import { StarMap } from "./star-map";
 import { WorldEnd } from "./world-end";
 import { ReadyCard } from "./ready";
 import { StoryCard } from "./story";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
-import { BoardScreen, LevelSelect, TitleScreen } from "./screens";
+import { BoardScreen, LevelSelect } from "./screens";
+import { TitleSplash, WorldSelect } from "./home";
+import { ShadeMark } from "./shade";
 import { useShade } from "./use-shade";
 import { Invite, SettingsSheet } from "./challenge";
 import { adoptRival, partnerOf, useChallenge, type Rival } from "./use-challenge";
@@ -58,7 +61,7 @@ const INITIAL: Hud = {
   result: null,
 };
 
-type Menu = "title" | "levels" | "board" | "map" | "end";
+type Menu = "title" | "worlds" | "levels" | "board" | "map" | "end";
 
 /** Text colour that reads on the sky's accent: dark on a pale accent, white on a deep one. */
 function onAccent(css: string): string {
@@ -80,7 +83,7 @@ export function SpireGame() {
   const shade = useShade(save);
   const { challenge, me, refresh } = useChallenge(save);
   const [options, setOptions] = useState(false);
-  const [boardFrom, setBoardFrom] = useState<"title" | "levels">("levels");
+  const [boardFrom, setBoardFrom] = useState<"worlds" | "levels">("levels");
   /** The pause sheet, opened to end the run rather than to rest. */
   const [ending, setEnding] = useState(false);
   /** The story card, opened by hand; it also opens itself once at the start. */
@@ -110,11 +113,6 @@ export function SpireGame() {
     engine.startLevel(index);
   }, []);
 
-  const endless = useCallback(() => {
-    engineRef.current?.click();
-    engineRef.current?.startEndless();
-  }, []);
-
   const openLevels = useCallback((index?: number) => {
     const engine = engineRef.current;
     if (!engine) return;
@@ -133,6 +131,21 @@ export function SpireGame() {
     engine.showMenu(nextLevelIndex(state.current.save));
   }, []);
 
+  const [worldFocus, setWorldFocus] = useState(0);
+  /** The sky shown behind a world's panel: its active game's next sky. */
+  const skyFor = useCallback((world: number): number => {
+    const w = WORLDS[world]!;
+    const n = Math.min(nextSkyIn(state.current.save, w), w.levelIds.length - 1);
+    return LEVELS.findIndex((l) => l.id === w.levelIds[n]);
+  }, []);
+  const openWorlds = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.click();
+    setMenu("worlds");
+    engine.showMenu(skyFor(worldFocus));
+  }, [skyFor, worldFocus]);
+
   const select = useCallback((index: number) => {
     const engine = engineRef.current;
     if (!engine) return;
@@ -145,8 +158,8 @@ export function SpireGame() {
   const quit = useCallback(() => {
     const { hud: now } = state.current;
     if (now.mode === "level") openLevels(now.levelIndex);
-    else openTitle();
-  }, [openLevels, openTitle]);
+    else openWorlds();
+  }, [openLevels, openWorlds]);
 
   const retry = useCallback(() => {
     engineRef.current?.click();
@@ -225,7 +238,8 @@ export function SpireGame() {
         if (now.hud.paused) engine.resume();
         else if (now.hud.phase === "won") next();
         else if (now.hud.phase === "menu") {
-          if (now.menu === "title") play(nextLevelIndex(now.save));
+          if (now.menu === "title") openWorlds();
+          else if (now.menu === "worlds") play(skyFor(worldFocus));
           else if (now.menu === "levels") play(now.selected);
         } else engine.tap();
       } else if (event.code === "Escape" || event.code === "KeyP") {
@@ -249,7 +263,7 @@ export function SpireGame() {
     });
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [next, openTitle, play, quit, retry]);
+  }, [next, openTitle, openWorlds, play, quit, retry, skyFor, worldFocus]);
 
   const running = hud.phase === "ready" || hud.phase === "play";
   const setMusic = (on: boolean) => engineRef.current?.setMusic(on);
@@ -275,39 +289,55 @@ export function SpireGame() {
       <canvas ref={canvasRef} className="game-canvas" aria-hidden="true" />
 
       <div className={"hud hud-safe" + (hud.phase === "menu" ? " hud-menu" : "")}>
-        {hud.phase === "menu" && menu === "title" ? (
-          <TitleScreen
+        {hud.phase === "menu" && menu === "title" ? <TitleSplash onEnter={openWorlds} /> : null}
+
+        {hud.phase === "menu" && menu === "worlds" ? (
+          <WorldSelect
             save={save}
-            shade={shade}
-            onRace={(_rival, _ghosts, index) => play(index)}
-            onShadeSeen={(at) => engineRef.current?.updateSave({ shadeSeen: at })}
-            invite={
-              <Invite
-                challenge={challenge}
-                me={me}
-                save={save}
-                onRival={setRival}
-                onAnswered={refresh}
-              />
-            }
+            focus={worldFocus}
+            onFocus={(w) => {
+              setWorldFocus(w);
+              engineRef.current?.showMenu(skyFor(w));
+            }}
+            onContinue={play}
+            onNew={(w) => {
+              const world = WORLDS[w]!;
+              engineRef.current?.updateSave({ progress: { ...save.progress, [world.id]: 0 } });
+              play(LEVELS.findIndex((l) => l.id === world.levelIds[0]));
+            }}
+            onOpen={(index) => openLevels(index)}
             onOptions={() => {
               engineRef.current?.click();
               setOptions(true);
             }}
-            onPlay={play}
-            onLevels={() => openMap()}
             onBoard={() => {
               engineRef.current?.click();
-              setSelected(nextLevelIndex(state.current.save));
-              setBoardFrom("title");
+              setSelected(skyFor(worldFocus));
+              setBoardFrom("worlds");
               setMenu("board");
             }}
-            onMap={() => openMap()}
-            onEndless={endless}
-            onReset={() => engineRef.current?.resetProgress()}
-            onWeapon={(id) => engineRef.current?.setWeapon(id)}
-            onMusic={setMusic}
-            onSfx={setSfx}
+            onAchievements={() => openMap()}
+            onStory={() => {
+              engineRef.current?.click();
+              setStory(true);
+            }}
+            notices={
+              <>
+                <Invite
+                  challenge={challenge}
+                  me={me}
+                  save={save}
+                  onRival={setRival}
+                  onAnswered={refresh}
+                />
+                <ShadeMark
+                  shade={shade.find((x) => x.levelId === LEVELS[skyFor(worldFocus)]?.id)}
+                  levelName={LEVELS[skyFor(worldFocus)]?.name ?? ""}
+                  onRace={() => play(skyFor(worldFocus))}
+                  onSeen={(at) => engineRef.current?.updateSave({ shadeSeen: at })}
+                />
+              </>
+            }
           />
         ) : null}
 
@@ -315,8 +345,7 @@ export function SpireGame() {
           <WorldEnd
             world={WORLDS.find((w) => w.id === mapLit) ?? WORLDS[0]!}
             onDone={() => {
-              engineRef.current?.click();
-              setMenu("map");
+              openWorlds();
             }}
           />
         ) : null}
@@ -325,7 +354,7 @@ export function SpireGame() {
           <StarMap
             save={save}
             justLit={mapLit}
-            onBack={openTitle}
+            onBack={openWorlds}
             onWorld={(index) => openLevels(index)}
             onStory={() => {
               engineRef.current?.click();
@@ -379,7 +408,7 @@ export function SpireGame() {
               setBoardFrom("levels");
               setMenu("board");
             }}
-            onBack={() => openMap()}
+            onBack={openWorlds}
           />
         ) : null}
 
@@ -418,7 +447,6 @@ export function SpireGame() {
             hud={hud}
             onRetry={retry}
             onQuit={quit}
-            onRebuild={() => engineRef.current?.rebuild()}
             onWeapon={(id) => engineRef.current?.setWeapon(id)}
           />
         ) : null}
@@ -427,8 +455,6 @@ export function SpireGame() {
           <ResultsPanel
             result={hud.result}
             style={hud.style}
-            house={hud.house}
-            onForge={(i) => engineRef.current?.forge(i)}
             onNext={
               hud.result.levelIndex + 1 < LEVELS.length || isBoss(LEVELS[hud.result.levelIndex]!.id)
                 ? next
@@ -463,6 +489,12 @@ export function SpireGame() {
           onName={(name) => engineRef.current?.updateSave({ name })}
           onChallenges={(on) => engineRef.current?.updateSave({ challengesOn: on })}
           onTester={(patch) => engineRef.current?.updateSave(patch)}
+          onWeapon={(id) => engineRef.current?.setWeapon(id)}
+          onReset={() => {
+            engineRef.current?.resetProgress();
+            setOptions(false);
+            openTitle();
+          }}
           onEnded={() => {
             setRival(null, {});
             refresh();
@@ -471,7 +503,7 @@ export function SpireGame() {
         />
       ) : null}
 
-      {hud.phase === "menu" && menu === "title" && !options ? (
+      {hud.phase === "menu" && menu === "worlds" && !options ? (
         <WhatsNew
           save={save}
           onSeen={(build) =>

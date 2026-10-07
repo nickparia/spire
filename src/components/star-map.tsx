@@ -1,9 +1,11 @@
-import { ChevronLeft } from "lucide-react";
+import { Award, ChevronLeft } from "lucide-react";
+import { FEATS } from "@/game/feats";
+import { totalStars } from "@/game/save";
 import { LEVELS } from "@/game/levels";
 import type { Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
-import { levelsOf, skiesLitIn, worldDone, WORLDS, WORLDS_TO_COME } from "@/game/worlds";
-import { IconButton } from "./bits";
+import { levelsOf, worldDone, WORLDS, WORLDS_TO_COME } from "@/game/worlds";
+import { IconButton, StarIcon } from "./bits";
 
 /**
  * The star map: every relit sky is a star, every finished world a
@@ -23,13 +25,15 @@ export function StarMap({
   onWorld: (levelIndex: number) => void;
   onStory: () => void;
 }) {
+  const earned = FEATS.filter((f) => save.feats[f.id]).length;
+  const stars = totalStars(save);
   return (
     <div className="screen screen-in starmap" data-ui>
       <div className="flex items-center justify-between">
         <IconButton label="Back" onPress={onBack}>
           <ChevronLeft size={20} strokeWidth={2.2} />
         </IconButton>
-        <p className="kicker">Worlds</p>
+        <p className="kicker">Achievements</p>
         <button type="button" className="link" onClick={onStory}>
           The story
         </button>
@@ -112,48 +116,25 @@ export function StarMap({
           </g>
         ))}
       </svg>
-      <div className="worlds">
-        {WORLDS.map((world, i) => {
-          const lit = skiesLitIn(save, world);
-          const done = worldDone(save, world);
-          const open = i === 0 || worldDone(save, WORLDS[i - 1]!);
-          const levels = levelsOf(world);
-          const next = levels.find((l) => !save.levels[l.id]?.clear) ?? levels[levels.length - 1]!;
+      <div className="feats-list">
+        <p className="kicker">
+          {earned} of {FEATS.length} feats · <StarIcon on size={12} /> {stars} of{" "}
+          {LEVELS.length * 3} stars
+        </p>
+        {FEATS.map((f) => {
+          const on = Boolean(save.feats[f.id]);
           return (
-            <div key={world.id} className={"world" + (open ? "" : " world-locked")}>
-              <div className="world-text">
-                <p className="kicker">
-                  World {i + 1} · {world.name}
-                </p>
-                <p className="world-blurb">{world.concept}</p>
-                <p className="world-progress">
-                  {done ? "Every sky relit" : `${lit} of ${world.levelIds.length} skies relit`}
-                  {done ? <small> — {world.revelation}</small> : null}
-                </p>
-              </div>
-              {open ? (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => onWorld(LEVELS.indexOf(next))}
-                >
-                  {lit === 0 ? "Enter" : done ? "Return" : "Continue"}
-                </button>
-              ) : null}
+            <div key={f.id} className={"feat-row" + (on ? " feat-row-on" : "")}>
+              <span className="feat-medal">
+                <Award size={16} strokeWidth={2.2} />
+              </span>
+              <span className="feat-text">
+                <b>{f.name}</b>
+                <small>{f.blurb}</small>
+              </span>
             </div>
           );
         })}
-        {WORLDS_TO_COME.map((w) => (
-          <div key={w.name} className="world world-locked">
-            <div className="world-text">
-              <p className="kicker">{w.name}</p>
-              <p className="world-blurb">{w.blurb}</p>
-              <p className="world-progress">
-                Relight every sky of {WORLDS[WORLDS.length - 1]!.name} to open
-              </p>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

@@ -76,7 +76,7 @@ import {
 import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
-import { isBoss } from "./worlds";
+import { isBoss, worldOf } from "./worlds";
 import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
 import {
   BOMB_RGB,
@@ -809,6 +809,7 @@ export class SpireEngine {
       | "challengesOn"
       | "tester"
       | "practice"
+      | "progress"
       | "storySeen"
     >,
   ): void {
@@ -2609,13 +2610,7 @@ export class SpireEngine {
     this.hint = false;
     this.bomb = null;
     this.freeze = 0;
-    // The offer to rebuild, if a free save isn't still owed and it can be paid for.
-    const owed = this.kit.secondWind && !this.secondWindUsed;
-    const price = this.rescuePrice();
-    this.rescue =
-      !this.stage && !this.rebuilt && !owed && this.stack.length > 1 && this.save.coins >= price
-        ? { price, until: 6, stack: this.stack.map((s) => ({ x: s.x, y: s.y })) }
-        : null;
+    this.rescue = null;
     const rgb = this.slabColor(this.floors + 1);
     this.scraps.push({
       x: this.mover.x,
@@ -2655,6 +2650,11 @@ export class SpireEngine {
     // A rebuilt run can still light the sky, but it was not a clean climb.
     if (this.rebuilt) goals.swift = false;
     const outcome = recordRun(this.save, level.id, this.runTime, accuracy, goals);
+    {
+      const world = worldOf(level.id);
+      const at = world.levelIds.indexOf(level.id) + 1;
+      this.save.progress[world.id] = Math.max(this.save.progress[world.id] ?? 0, at);
+    }
     this.result = {
       levelIndex: this.levelIndex,
       time: this.runTime,
@@ -2748,7 +2748,8 @@ export class SpireEngine {
 
   /** Pays for a drop on the spot: the wallet grows and a coin pops off the slab. */
   private pay(base: number, x: number, y: number): void {
-    const coins = Math.round(base * this.kit.coins);
+    // Coins are retired: nothing is bought any more, so nothing is paid.
+    const coins = 0 * Math.round(base * this.kit.coins);
     if (coins <= 0) return;
     this.save.coins += coins;
     this.runCoins += coins;
