@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 73 — Every tap fires (internal)
+
+- **Fixed:** after each shot the drill ignored taps for about 0.7 s while the bolt and lurch played, so quick taps did nothing. Now the way opens at once and every tap fires; the machine still visibly lurches down.
+
 ## Build 72 — The world kit: the Descent (internal)
 
 - **The Descent, rebuilt.** You've stolen the light; now the machine takes it down into the earth.

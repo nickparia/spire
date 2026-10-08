@@ -1,7 +1,7 @@
 {
-  "build": 72,
-  "title": "The world kit: the Descent",
+  "build": 73,
+  "title": "Every tap fires",
   "notes": [
-    "The Descent rebuilt on a new engine: a fixed shaft, the colossal machine always in view, its head swinging to fire the stolen light at the rock. Seams drive you deeper in a lurch; veins of light push the ooze back. Misses crack the walls and the ooze gathers momentum above you."
+    "Fixed: after each shot the drill ignored taps for a moment; now every tap fires."
   ]
 }

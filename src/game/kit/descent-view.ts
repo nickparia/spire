@@ -25,6 +25,8 @@ export const PIVOT_Y = 0.6;
 /** How much bigger than its rite numbers the view is drawn. */
 export const SCALE = 1.5;
 const HEAD_FRAMES = 24;
+/** Seconds a bolt of light flares on screen. */
+const BOLT_TIME = 0.32;
 const HEAD_H = 150;
 
 const ready = (i: HTMLImageElement | null): i is HTMLImageElement =>
@@ -35,12 +37,23 @@ export class DescentView {
   shown = 0;
   /** How far the ooze has churned, for its flow. */
   churn = 0;
+  /** The last shot's bolt, kept on screen for its own flare, whatever the rite's timing. */
+  private bolt: { shot: import("./rite").Shot; age: number } | null = null;
+  private seen: unknown = null;
 
   step(dt: number, r: Rite): void {
     // The machine lurches down: quick, then settling.
     this.shown += (r.progress - this.shown) * Math.min(1, dt * 5);
     // The ooze churns faster with momentum.
     this.churn += dt * (12 + 30 * r.momentum);
+    if (r.acting && r.acting !== this.seen) {
+      this.seen = r.acting;
+      this.bolt = { shot: r.acting.shot, age: 0 };
+    }
+    if (this.bolt) {
+      this.bolt.age += dt;
+      if (this.bolt.age > BOLT_TIME) this.bolt = null;
+    }
   }
 
   /** View position of a rite point (the pivot is (0,0)). */
@@ -228,11 +241,11 @@ export class DescentView {
     py: number,
     clock: number,
   ): void {
-    const a = r.acting;
-    if (!a || a.t > 0.45) return;
-    const s = a.shot;
+    const b = this.bolt;
+    if (!b) return;
+    const s = b.shot;
     const end = s.hit ? this.to(s.target.x, s.target.y, w, h) : this.to(s.x, s.y, w, h);
-    const fade = 1 - a.t / 0.45;
+    const fade = 1 - b.age / BOLT_TIME;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.lineCap = "round";

@@ -120,7 +120,17 @@ export class Rite {
       hit.target.hp -= 1;
       const broke = hit.target.hp <= 0;
       shot = { hit: true, target: hit.target, perfect: hit.perfect, broke };
-      if (broke) this.apply(hit.target.kind, hit.perfect);
+      if (broke) {
+        this.apply(hit.target.kind, hit.perfect);
+        // The way opens at once: the field rises by the lurch and refills, so
+        // the next shot never has to wait (the view eases the lurch in).
+        this.targets = this.targets.filter((t) => t !== hit.target);
+        const adv = this.lastAdvance(shot);
+        for (const t of this.targets) t.y -= adv;
+        for (const c of this.cracks) c.y -= adv;
+        this.targets = this.targets.filter((t) => t.y > -30);
+        this.fill();
+      }
     } else {
       const wild = Math.min(1, this.missBy() / 4);
       const reach = 70;
@@ -156,15 +166,6 @@ export class Rite {
     if (this.acting) {
       this.acting.t = Math.min(1, this.acting.t + dt / this.world.actTime);
       if (this.acting.t >= 1) {
-        const s = this.acting.shot;
-        if (s.hit && s.broke) {
-          this.targets = this.targets.filter((t) => t !== s.target);
-          // A lurch down carries the field with it: everything left rises.
-          const adv = this.lastAdvance(s);
-          for (const t of this.targets) t.y -= adv;
-          for (const c of this.cracks) c.y -= adv;
-          this.targets = this.targets.filter((t) => t.y > -30);
-        }
         this.acting = null;
         this.fill();
       }

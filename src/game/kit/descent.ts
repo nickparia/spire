@@ -59,7 +59,7 @@ export function descentWorld(tier: number, floors: number): RiteWorld {
     goal: floors * DESCENT_FLOOR,
     aim: swing(kind, 1.25, Math.max(2.6, 3.6 - tier * 0.12)),
     perfect: 0.4,
-    actTime: 0.7,
+    actTime: 0.18,
     outcomes: {
       seam: { advance: 42, push: 0, calm: 0.1, light: 0, perfectBonus: 1.4 },
       vein: { advance: 0, push: 70, calm: 0.6, light: 0.35, perfectBonus: 1.4 },
