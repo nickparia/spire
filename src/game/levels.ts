@@ -128,7 +128,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "glacier",
     name: "The Glacier",
-    blurb: "It holds at the walls. Breathe with it.",
+    blurb: "Swing wild and the wire heats. Hot, it gives to the Dark.",
     line: "Slow. The cold is honest; it only takes what you give it time to take.",
     theme: "glacier",
     floors: 30,
@@ -214,7 +214,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "drowned",
     name: "The Drowned Halls",
-    blurb: "Flooded. The tower swings slow and heavy.",
+    blurb: "Flooded. The swing is slow and heavy, and the current pulls.",
     line: "The water came down after the light went. Break through before it fills the shaft.",
     theme: "foundry",
     floors: 26,
@@ -232,7 +232,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "crystal",
     name: "Crystal Veins",
-    blurb: "It bursts through the centre.",
+    blurb: "Crystal closes the walls as the roots grow.",
     line: "The stone here grew light of its own once. It is hard. Strike it true.",
     theme: "foundry",
     floors: 28,
@@ -268,7 +268,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "quiet",
     name: "The Quiet",
-    blurb: "Two halves on two clocks.",
+    blurb: "The machine sways on its mount. Time the swing against it.",
     line: "The builders painted what they saw coming. Then they stopped painting.",
     theme: "foundry",
     floors: 30,
@@ -286,7 +286,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "hollow",
     name: "The Hollow",
-    blurb: "The slab goes dark. Watch for the glow.",
+    blurb: "Unlit. Only what the roots' glow reaches can be seen.",
     line: "No light has reached here in an age. Something down here makes its own.",
     theme: "foundry",
     floors: 32,
@@ -304,7 +304,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "floor",
     name: "The Floor of the World",
-    blurb: "Every depth, one after another.",
+    blurb: "Every depth's twist, each in turn.",
     line: "At the bottom of everything, a door. It was never meant to be opened from this side.",
     theme: "foundry",
     floors: 40,

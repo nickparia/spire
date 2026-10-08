@@ -4902,6 +4902,9 @@ export class SpireEngine {
       if (Math.random() < dt * 0.7) this.rubble(h, 1);
       if (Math.random() < dt * 1.5)
         this.fx.sparkle(h.pivotX + (Math.random() - 0.5) * 160, 0, 20, [255, 150, 70], 1);
+      // A hot wire sheds sparks.
+      if (h.heat > 0.35 && Math.random() < dt * 10 * h.heat)
+        this.fx.sparkle(h.pivotX + Math.sin(h.theta) * 30, 30, 8, [255, 210, 130], 1);
     }
     for (let i = this.floaters.length - 1; i >= 0; i--) {
       const f = this.floaters[i]!;
@@ -4977,6 +4980,19 @@ export class SpireEngine {
         this.hangView.menace = 1;
         this.hangView.shake = 0.5;
         this.rubble(h, 2);
+        break;
+      case "scorch":
+        // The wire gave: a hiss, sparks off it, the Dark hauls.
+        this.sfx.hiss();
+        this.fx.sparkle(h.pivotX, 20, 40, [255, 220, 150], 18);
+        this.hangView.shake = 0.7;
+        this.hangView.menace = 0.6;
+        this.streak = 0;
+        haptics.medium();
+        break;
+      case "twist":
+        this.sfx.pulse();
+        this.hangView.shake = 0.3;
         break;
       case "snap": {
         // The wire parts and the roots go through the floor: rock everywhere, light pouring up.
