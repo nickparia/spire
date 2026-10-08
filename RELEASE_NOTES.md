@@ -3,6 +3,17 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 72 — The world kit: the Descent (internal)
+
+- **The Descent, rebuilt.** You've stolen the light; now the machine takes it down into the earth.
+  - **One fixed shaft.** The colossal machine stands on the surface at the start; its armoured body comes down the shaft to the drill head, always in view. The painted depth scrolls past as you go.
+  - **The head is the weapon.** It swings (each depth with its own rhythm, like Hearth's skies) and a tap fires a bolt of the stolen light.
+  - **Seams** (rock split with molten light) burst open and the machine **lurches deeper**; **veins** of crystallised light recharge you and **drive the ooze back**. Hit dead centre for more.
+  - **The ooze** re-formed above you and fills the shaft, coming down. **Every miss cracks the walls**: it seeps in and gathers momentum; it churns faster and its edge burns hotter. Veins calm it. Let it reach the head and the light is buried.
+  - Deeper depths: smaller targets, faster swings, hard rock that takes two blows.
+- Under the hood this is the **world kit**: one engine for "something moves, targets wait, a tap commits, a chaser closes in", so later worlds (the Wheel's cogs) are a definition and an art pass.
+- Checked on an iPhone simulator.
+
 ## Build 71 — Closer, calmer (prototype, internal)
 
 - **Bigger.** The Descent's world is drawn 1.6× closer, so the machine, the head and the oil fill the screen; the camera keeps the head centred.

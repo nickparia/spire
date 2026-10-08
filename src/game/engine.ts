@@ -77,7 +77,9 @@ import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
 import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
-import { Drill, DRILL_FLOOR, DRILL_ZOOM, drawDrill, VIEW_Y } from "./drill";
+import { Rite, type Shot } from "./kit/rite";
+import { DESCENT_FLOOR, descentWorld } from "./kit/descent";
+import { DescentView } from "./kit/descent-view";
 import {
   BOMB_RGB,
   drawBomb,
@@ -255,11 +257,6 @@ const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
 /** Floors behind the tip the climbers are held within, however fast you build. */
 const DESCENT_REACH = 5;
-/** The drill: its swing (radians each way), seconds per swing at the first depth, and the oil's pace. */
-const DRILL_SWING = 1.75;
-const DRILL_PERIOD = 4.4;
-const DRILL_OIL = 34;
-const DRILL_OIL_ACCEL = 0.9;
 /** Floors of earth a sloppy blow on the hardest rock shakes loose behind you. */
 const CAVE_SHAKE = 0.9;
 /** The bored hole's half width (of a starting slab), its crater's depth (px), and the rock texture's size (px). */
@@ -836,8 +833,9 @@ export class SpireEngine {
   private oil: HTMLVideoElement | null = null;
   private lightReach = 0.6;
   private rockShake = 0;
-  /** The Descent's drill run, when a depth is being bored (not stacked). */
-  private drill: Drill | null = null;
+  /** A world-kit run (the Descent), and how it's drawn. */
+  private rite: Rite | null = null;
+  private riteView = new DescentView();
   /** Seconds until the drill's HUD (depth, the oil's gap) is sent again. */
   private emitCooldown = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
@@ -998,11 +996,11 @@ export class SpireEngine {
       this.breakTop();
       return;
     }
-    if (this.drill) {
+    if (this.rite) {
       if (this.phase === "ready") this.phase = "play";
       this.hint = false;
-      const shot = this.drill.fire();
-      if (shot) this.drilled(shot);
+      const shot = this.rite.fire();
+      if (shot) this.riteShot(shot);
       return;
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
@@ -1330,17 +1328,11 @@ export class SpireEngine {
     this.loadSourceArt();
     this.loadDarkArt();
     this.resetRun("ready", true);
-    this.drill = null;
+    this.rite = null;
     const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
     if (level?.descent) {
-      const tier = level.tier ?? 0;
-      this.drill = new Drill({
-        floors: level.floors,
-        swing: DRILL_SWING,
-        period: Math.max(1.6, DRILL_PERIOD - tier * 0.15),
-        oil: DRILL_OIL + tier * 2,
-        oilAccel: DRILL_OIL_ACCEL,
-      });
+      this.rite = new Rite(descentWorld(level.tier ?? 0, level.floors));
+      this.riteView = new DescentView();
       this.hint = true;
     }
     this.music.setTrack(this.theme.track);
@@ -3028,7 +3020,7 @@ export class SpireEngine {
 
   /** Floors of tower still above the Dark. */
   private darkGap(): number {
-    if (this.drill) return this.drill.gap / DRILL_FLOOR;
+    if (this.rite) return this.rite.gap / DESCENT_FLOOR;
     return (this.crownY() - this.dark) / SLAB_H;
   }
 
@@ -4293,7 +4285,12 @@ export class SpireEngine {
       }
       if (steps === 5) this.acc = 0;
     }
-    this.render();
+    // One bad frame must never stop the game: keep the loop alive whatever happens.
+    try {
+      this.render();
+    } catch (err) {
+      console.error(err);
+    }
     this.raf = requestAnimationFrame(this.frame);
   };
 
@@ -4306,8 +4303,8 @@ export class SpireEngine {
     }
     this.curtain = Math.max(0, this.curtain - dt / 0.32);
     this.pulse = Math.max(0, this.pulse - dt * 2.2);
-    if (this.drill && this.phase !== "menu") {
-      this.stepDrill(dt);
+    if (this.rite && this.phase !== "menu") {
+      this.stepRite(dt);
       return;
     }
 
@@ -4504,14 +4501,7 @@ export class SpireEngine {
   /* -------------------------------------------------------------- render */
 
   private worldToScreen = (x: number, yBottom: number): { x: number; y: number } => {
-    if (this.drill) {
-      const p = this.drill.toScreen(x, yBottom, this.vw, this.vh);
-      // The drill view is magnified about the head's anchor.
-      return {
-        x: this.vw / 2 + (p.x - this.vw / 2) * DRILL_ZOOM,
-        y: this.vh * VIEW_Y + (p.y - this.vh * VIEW_Y) * DRILL_ZOOM,
-      };
-    }
+    if (this.rite) return this.riteView.to(x, yBottom, this.vw, this.vh);
     if (this.plan.descent) {
       // Built down: the world is mirrored, so higher means further down the
       // screen. Offset by a slab so anything drawn up from its bottom edge
@@ -4765,7 +4755,7 @@ export class SpireEngine {
    * time, its sting plays before the climb can start.
    */
   private beginAscent(fresh: boolean): void {
-    this.drill = null;
+    this.rite = null;
     this.ascent = true;
     this.plan = {
       ...this.plan,
@@ -4862,16 +4852,16 @@ export class SpireEngine {
     return level?.paint ?? this.theme.id;
   }
 
-  /** One frame of a drill run: the run itself, its effects, and how it ends. */
-  private stepDrill(dt: number): void {
-    const d = this.drill!;
+  /** One frame of a world-kit run: the rite, its view, its effects, how it ends. */
+  private stepRite(dt: number): void {
+    const r = this.rite!;
     this.fx.down = -1;
     if (this.phase === "play") {
       this.runTime += dt;
-      const end = d.step(dt, this.vw, this.vh);
-      this.floors = d.floors;
+      const end = r.step(dt);
+      this.floors = Math.floor(r.progress / DESCENT_FLOOR);
       if (end === "caught") {
-        this.float("THE LIGHT IS BURIED", d.head.x, d.head.y - 40, false, 24);
+        this.float("THE LIGHT IS BURIED", 0, -60, false, 24);
         this.taken = true;
         this.sfx.fail();
         this.trauma = 1;
@@ -4880,26 +4870,29 @@ export class SpireEngine {
         this.keepGhost();
         this.emit();
       } else if (end === "through") {
-        this.float("BROKEN THROUGH", d.head.x, d.head.y - 50, true, 28);
-        this.fx.rayBurst(d.head.x, d.head.y, [255, 200, 130], 220, 18);
+        this.float("BROKEN THROUGH", 0, -70, true, 28);
+        this.fx.rayBurst(0, 40, [255, 200, 130], 220, 18);
         if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.beginAscent(true);
         else this.win();
       }
-      // The score: tension from the oil's nearness and how deep you are.
+      // The score follows the race: how deep, and how close the ooze.
+      const danger = clamp01(1 - r.gap / 260);
+      this.strain = Math.max(this.strain * 0.95, danger);
       this.music.setClimb({
-        progress: clamp01(d.floors / Math.max(1, d.tune.floors)),
-        danger: clamp01(1 - d.gap / (DRILL_FLOOR * 8)),
+        progress: clamp01(r.progress / r.world.goal),
+        danger,
         streak: this.streak,
         landings: 2,
       });
     } else if (this.phase === "ready") {
-      // Before the first shot only the drill swings: the oil and the clock wait.
-      d.step(dt, this.vw, this.vh);
-      d.oil = -420;
-      d.time = 0;
+      // Before the first shot only the head swings: the ooze and the clock wait.
+      r.step(dt);
+      r.gap = r.world.chaser.start;
+      r.time = 0;
     } else if (this.phase === "fall") {
       this.fallAge += dt;
     }
+    this.riteView.step(dt, r);
     for (let i = this.floaters.length - 1; i >= 0; i--) {
       const f = this.floaters[i]!;
       f.y -= f.vy * dt;
@@ -4917,81 +4910,82 @@ export class SpireEngine {
   }
 
   /** What a shot did: the burst, the sound, the score. */
-  private drilled(shot: {
-    kind: "seam" | "ore" | "miss";
-    perfect: boolean;
-    x: number;
-    y: number;
-  }): void {
+  private riteShot(shot: Shot): void {
     this.drops += 1;
     const rock = this.rockRgb();
-    if (shot.kind === "miss") {
+    if (!shot.hit) {
+      // A miss cracks the wall: the ooze seeps in and gathers momentum.
       this.streak = 0;
       this.accuracySum += 0.3;
-      this.fx.burst(shot.x, shot.y, rock, 12, 150);
+      this.fx.burst(shot.x, shot.y, rock, 14, 160);
+      this.fx.blood(shot.x, shot.y, [14, 8, 22], 10, 90, false);
       this.sfx.rubble();
-      this.trauma = Math.min(1, this.trauma + 0.14);
-      // A careless shot breaks into the oil-soaked rock: more of the Dark pours in.
-      this.float("IT SEEPS IN", shot.x, shot.y - 30, false, 18);
+      this.sfx.quicken();
+      this.trauma = Math.min(1, this.trauma + 0.12);
       haptics.medium();
       this.emit();
+      return;
+    }
+    const t = shot.target;
+    if (!shot.broke) {
+      // Hard rock: it cracks but holds.
+      this.fx.burst(t.x, t.y, rock, 16, 180);
+      this.sfx.slice();
+      this.trauma = Math.min(1, this.trauma + 0.08);
+      haptics.light();
       return;
     }
     this.streak = shot.perfect ? this.streak + 1 : 0;
     this.bestStreak = Math.max(this.bestStreak, this.streak);
     if (shot.perfect) this.perfects += 1;
     this.accuracySum += shot.perfect ? 1 : 0.8;
-    if (shot.kind === "ore") {
-      this.fx.burst(shot.x, shot.y, [255, 214, 110], 26, 260);
-      this.fx.sparkle(shot.x, shot.y, 40, [255, 230, 160], 18);
+    if (t.kind === "vein") {
+      this.fx.burst(t.x, t.y, [255, 226, 150], 28, 260);
+      this.fx.sparkle(t.x, t.y, 40, [255, 236, 180], 20);
       this.sfx.perfect(this.streak);
-      this.flash = Math.max(this.flash, 0.25);
+      this.flash = Math.max(this.flash, 0.3);
     } else {
-      this.fx.burst(shot.x, shot.y, rock, shot.perfect ? 30 : 18, shot.perfect ? 320 : 200);
-      if (shot.perfect) this.fx.burst(shot.x, shot.y, [255, 200, 130], 12, 240);
-      if (shot.perfect) this.sfx.perfect(this.streak);
-      else this.sfx.drop();
+      this.fx.burst(t.x, t.y, rock, shot.perfect ? 34 : 20, shot.perfect ? 320 : 220);
+      this.fx.burst(t.x, t.y, [255, 170, 90], shot.perfect ? 16 : 8, 260);
+      this.sfx.boom();
     }
-    this.trauma = Math.min(1, this.trauma + (shot.perfect ? 0.12 : 0.06));
+    this.trauma = Math.min(1, this.trauma + (shot.perfect ? 0.16 : 0.1));
     if (shot.perfect && this.streak > 0 && this.streak % STREAK_SPOKEN === 0) {
-      this.float(`PERFECT ×${this.streak}`, shot.x, shot.y - 40, true, 26);
+      this.float(`PERFECT ×${this.streak}`, t.x, t.y - 40, true, 26);
     }
     haptics.light();
     this.emit();
   }
 
-  /** The drill's world: earth, tunnel, oil, targets, head; then the usual overlays. */
-  private renderDrill(ctx: CanvasRenderingContext2D, ox: number, oy: number): void {
-    const key = this.paintKey();
-    let tex = this.rockArts.get(key);
-    if (!tex) {
-      tex = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
-      this.rockArts.set(key, tex);
-    }
+  /** The Descent's view, then the usual overlays. */
+  private renderRite(ctx: CanvasRenderingContext2D, ox: number, oy: number): void {
+    const img = (name: string, src: string): HTMLImageElement => {
+      let i = this.sprites.get(name);
+      if (!i) {
+        i = Object.assign(new Image(), { src });
+        this.sprites.set(name, i);
+      }
+      return i;
+    };
+    const sky = this.paintedSky();
+    const oozeV = this.oilVideo();
     ctx.save();
     ctx.translate(ox, oy);
-    let head = this.sprites.get("drill-head");
-    if (!head) {
-      head = Object.assign(new Image(), { src: "art/sprites/drill-head.webp" });
-      this.sprites.set("drill-head", head);
-    }
-    const oilV = this.oilVideo();
-    const oil = oilV ? this.frameOf(oilV, "art/oil.jpg") : null;
-    let rig = this.sprites.get("drill-rig");
-    if (!rig) {
-      rig = Object.assign(new Image(), { src: "art/drill-rig.webp" });
-      this.sprites.set("drill-rig", rig);
-    }
-    drawDrill(
+    this.riteView.draw(
       ctx,
-      this.drill!,
+      this.rite!,
+      {
+        depth: sky ? this.frameOf(sky.video, sky.video.poster) : null,
+        ooze: oozeV ? this.frameOf(oozeV, "art/oil.jpg") : null,
+        rig: img("drill-rig", "art/drill-rig.webp"),
+        column: img("kit-column", "art/kit/column.webp"),
+        head: img("drill-head", "art/sprites/drill-head.webp"),
+        seam: img("kit-seam", "art/kit/seam.webp"),
+        vein: img("kit-vein", "art/kit/vein.webp"),
+      },
       this.vw,
       this.vh,
       this.reduceMotion ? 0 : this.clock,
-      tex,
-      head,
-      oil,
-      rig,
     );
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
@@ -5356,8 +5350,8 @@ export class SpireEngine {
       reduceMotion: this.reduceMotion,
     };
 
-    if (this.drill) {
-      this.renderDrill(ctx, ox, oy);
+    if (this.rite) {
+      this.renderRite(ctx, ox, oy);
       return;
     }
 

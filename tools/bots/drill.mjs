@@ -42,7 +42,7 @@ await page.evaluate(
     e.startLevel(Number(level));
     let last = 0;
     const loop = () => {
-      const d = e.drill;
+      const d = e.rite;
       if (
         d &&
         !d.bore &&
@@ -52,7 +52,7 @@ await page.evaluate(
         const a = d.aimed();
         const want = careless
           ? Math.random() < 0.04
-          : a && a.perfect && (a.target.kind === "seam" || d.gap < 160);
+          : a && a.perfect && (a.target.kind === "seam" || d.gap < 160 || d.momentum > 0.6);
         if (want) {
           e.tap();
           last = performance.now();
@@ -70,12 +70,12 @@ for (let i = 0; i < 45; i++) {
   await wait(2000);
   const s = await page.evaluate(() => {
     const e = window.__spire;
-    const d = e.drill;
+    const d = e.rite;
     return {
       phase: e.phase,
-      floors: d?.floors,
+      floors: e.floors,
       gap: d ? Math.round(d.gap) : null,
-      volume: d?.volume.toFixed(2),
+      momentum: d?.momentum.toFixed(2),
       light: d?.light.toFixed(2),
       t: e.runTime.toFixed(1),
     };
