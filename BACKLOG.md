@@ -34,6 +34,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 63 Demo deadlock: `runDemo` lined up only single slabs, so a split course's demo never dropped and taps stayed blocked. Split checks both halves (`splitOffsets`, within half tolerance); any demo steps aside after `DEMO_MAX` s (`demoWait`). Bot `split.mjs`.
 - 62 Painted videos are `VIDEO_BEHIND` (full-size, z -1 behind the opaque game root) instead of 1 px hidden (iOS pauses "hidden" muted video, e.g. after an interruption). The Dark draws its video while live, else `art/sprites/dark-hearth.jpg` (8×7 sheet, `DARK_FRAMES` 52 @ `DARK_FPS` 8). Violet edge lines removed (Dark → smoke haze; climbers → none); `inkSplash` droplets only (`fx.blood(..., stain=false)`), sized by width; near-Dark motes are embers.
 - 61 `frameOf(video, still)`: draws a video only while it is really playing (not paused, readyState ≥ 2, currentTime > 0), else its still (`art/dark-hearth.jpg`, `art/blind.jpg`, `art/source.jpg`, the sky's poster). Dark/blind/source/sky draw whenever their element exists, not only once "ready". Bot: `NOPLAY=1 node tools/bots/dark.mjs` blocks video playback.
 - 60 Summit band on iOS: beacon sheet frames had haze to their edges; rebuilt with a baked edge fade (`geq` mask: sides, top, below the foot). `drawPaintedGround` is a radial pool under the tower. Verified in the iOS simulator by a temp main.tsx hook (needs `__spire`, which is DEV-only: expose it temporarily in spire-game.tsx).

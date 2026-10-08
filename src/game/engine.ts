@@ -280,6 +280,8 @@ const SPOKEN =
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
 const DEMO_TIME = 0.5;
+/** The longest a demo may hold your taps before it steps aside, in seconds. */
+const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
 /** Climbers drawn at the front. */
 const CLIMBERS = 20;
@@ -827,6 +829,8 @@ export class SpireEngine {
    * ghostly, and it drops itself perfectly. Taps wait until it has.
    */
   private demo = false;
+  /** Seconds the demo has been waiting to line up. */
+  private demoWait = 0;
   /** Set while the demo makes its own drop, so the tap gets through. */
   private demoing = false;
   /**
@@ -1661,6 +1665,7 @@ export class SpireEngine {
         this.save.tips[seen] = 1;
         storeSave(this.save);
         this.demo = true;
+        this.demoWait = 0;
       }
       if (this.mode === "endless") {
         // A new course brings a new sky, anchored where the camera is now.
@@ -4822,8 +4827,21 @@ export class SpireEngine {
       if (this.phase !== "pick") this.demo = false;
       return;
     }
+    // Never hold the player's taps for long: if the move hasn't lined up in
+    // time, the demo steps aside.
+    this.demoWait += STEP;
+    if (this.demoWait > DEMO_MAX) {
+      this.demo = false;
+      return;
+    }
     const p = this.probe();
-    if (p.blocked || Math.abs(p.offset) > p.tol * 0.3) return;
+    if (p.blocked) return;
+    const prev = this.peak();
+    // A split slab is two halves on two clocks: both must sit over their sides.
+    const lined = this.mover.split
+      ? this.splitOffsets(prev).every((o) => Math.abs(o) <= this.tol * 0.5)
+      : Math.abs(p.offset) <= p.tol * 0.3;
+    if (!lined) return;
     this.demoing = true;
     this.tap();
     this.demoing = false;

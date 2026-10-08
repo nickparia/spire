@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 63 — Split, unstuck (internal)
+
+- **Fixed: the split slab couldn't be dropped.** The first time a new rule appears, a ghost slab shows the move once and your taps wait for it; for the split slab it never lined up, so it waited forever. It now lines the split up properly, and no demo ever holds your taps for more than a few seconds.
+
 ## Build 62 — The Dark, moving and clean (internal)
 
 - **The Dark keeps moving.** On iPhone its video stopped after a while (iOS pauses videos it thinks are hidden, and ours were) and it froze on a still. Every painted video is now a real full-size element behind the game, so iOS keeps it playing; and if it stops the Dark's anyway, the Dark carries on from a painted sprite sheet of the same loop rather than freezing.

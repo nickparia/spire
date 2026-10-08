@@ -1,8 +1,7 @@
 {
-  "build": 62,
-  "title": "The Dark, moving and clean",
+  "build": 63,
+  "title": "Split, unstuck",
   "notes": [
-    "The Dark keeps moving: its video stays playing on iPhone, and if iOS stops it anyway it carries on from a painted sprite sheet instead of freezing.",
-    "The violet line along the Dark and the violet splash rings are gone; things fall into it with a spray of black ink."
+    "Fixed: when the split slab first appeared in Apex, nothing you did would drop it."
   ]
 }
