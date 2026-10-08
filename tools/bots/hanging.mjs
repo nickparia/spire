@@ -27,7 +27,7 @@ await page.evaluate((err) => {
   };
   loop();
 }, err);
-for (let i = 0; i < 4; i++) {
+for (let i = 0; i < 7; i++) {
   await wait(4000);
   await page.screenshot({ path: `${out}/hg-${i}.png` });
   console.log(
@@ -36,10 +36,11 @@ for (let i = 0; i < 4; i++) {
         state,
         stones: stones.length - 1,
         theta: theta.toFixed(2),
-        ooze: Math.round(ooze),
-        len: length(),
+        wire: Math.round((drag / SNAP) * 100) + "%",
+        held: Math.round(coat() / SLAB_H),
       }),
     ),
   );
+  if (await page.evaluate(() => state === "over")) break;
 }
 await browser.close();
