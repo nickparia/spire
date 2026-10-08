@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 67 — The bore (internal)
+
+- **A real hole.** Solid rock fills the screen and the Spire sits in the shaft it has bored, its walls ragged and organic. Each blow lands in a crater under the tip and drives cracks out into the stone; a perfect makes the rock jump and the light at the bottom flare.
+- **The Spire is a drill down here**: bronze-bound boring segments with cutting teeth, not Hearth's stone.
+- **The Dark follows as oil.** Black, glossy, violet-sheened oil pours into the hole behind you, clinging to the walls and running down them in drips, burying the drill as it comes. The soil around it dies as it passes: drained of colour and blackened.
+- Checked on an iPhone simulator with real taps.
+
 ## Build 66 — Breaking through (internal)
 
 - **The Descent, rebuilt.** You drive the Spire down through solid rock so Hearth's light can follow you to the roots. It's the same tap and groove as Hearth:

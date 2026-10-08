@@ -238,10 +238,7 @@ const SKY_STONES: readonly string[] = [
   "glacier",
   "eclipse",
   "apex",
-  "roots",
-  "ossuary",
-  "drowned",
-  "crystal",
+  "drill",
 ];
 /** Room cut above and below a sky's stone (tools/cutslab.mjs pads 12% of its height each side). */
 const STONE_PAD = 0.12 / 1.24;
@@ -259,8 +256,10 @@ const SLAB_MID = 0.07;
 const DESCENT_REACH = 5;
 /** Floors of earth a sloppy blow on the hardest rock shakes loose behind you. */
 const CAVE_SHAKE = 0.9;
-/** How far down the cave-in band its ragged edge falls, as a share of its height. */
-const CAVE_EDGE = 0.66;
+/** The bored hole's half width (of a starting slab), its crater's depth (px), and the rock texture's size (px). */
+const BORE_HALF = 0.68;
+const BORE_CRATER = 22;
+const BORE_TEX = 260;
 /** Each depth's rock, for the chips its blows throw up. */
 const ROCK_RGB: Record<string, RGB> = {
   roots: [92, 70, 48],
@@ -828,7 +827,7 @@ export class SpireEngine {
   private ascentSting = 0;
   /** The Descent: each depth's rock texture, the cave-in's front, how far the light reaches, the last blow's shudder. */
   private rockArts = new Map<string, HTMLImageElement>();
-  private caveArt = Object.assign(new Image(), { src: "art/rock/cavein.webp" });
+  private oil: HTMLVideoElement | null = null;
   private lightReach = 0.6;
   private rockShake = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
@@ -4860,62 +4859,24 @@ export class SpireEngine {
   }
 
   /**
-   * The Descent's rock face: solid stone below the tip, its top cracked by
-   * each blow. The tower is driven into it.
-   */
-  private drawRockFace(ctx: CanvasRenderingContext2D): void {
-    const top = this.worldToScreen(0, this.crownY() + SLAB_H).y - VISUAL_H;
-    if (top > this.vh + 40) return;
-    const key = this.paintKey();
-    let tex = this.rockArts.get(key);
-    if (!tex) {
-      tex = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
-      this.rockArts.set(key, tex);
-    }
-    const shake = this.reduceMotion ? 0 : this.rockShake * 3 * Math.sin(this.clock * 60);
-    ctx.save();
-    ctx.translate(0, shake);
-    if (tex.complete && tex.naturalWidth > 0) {
-      const pattern = ctx.createPattern(tex, "repeat");
-      if (pattern) {
-        const size = 220;
-        pattern.setTransform(
-          new DOMMatrix().translate(-this.camX * 0.0, top).scale(size / tex.naturalWidth),
-        );
-        ctx.fillStyle = pattern;
-      } else ctx.fillStyle = "rgb(40,30,26)";
-    } else ctx.fillStyle = "rgb(40,30,26)";
-    // A ragged top edge, where the last blow landed.
-    ctx.beginPath();
-    ctx.moveTo(-40, this.vh + 40);
-    for (let x = -40; x <= this.vw + 40; x += 16) {
-      const n = Math.sin(x * 0.13 + this.floors * 1.7) * 4 + Math.sin(x * 0.051) * 3;
-      ctx.lineTo(x, top + n);
-    }
-    ctx.lineTo(this.vw + 40, this.vh + 40);
-    ctx.closePath();
-    ctx.fill();
-    // Shadow down into the stone, and the lip lit by the light above.
-    const g = ctx.createLinearGradient(0, top, 0, top + 160);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(0,0,0,0.7)");
-    ctx.fillStyle = g;
-    ctx.fillRect(-40, top, this.vw + 80, this.vh - top + 40);
-    ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = `rgba(255,190,120,${0.18 + 0.25 * this.lightReach})`;
-    ctx.fillRect(-40, top - 2, this.vw + 80, 3);
-    ctx.restore();
-  }
-
-  /**
    * The light from Hearth following you down: a soft column from the top of
    * the view to the tip, stronger the cleaner you've been breaking through.
    */
   private drawLightShaft(ctx: CanvasRenderingContext2D): void {
+    // The hole is dark inside; only the light that follows you lights it.
+    const bore = this.borePath();
+    ctx.save();
+    ctx.clip(bore.path);
+    const inside = ctx.createLinearGradient(0, 0, 0, bore.tip);
+    inside.addColorStop(0, "rgba(6,4,6,0.85)");
+    inside.addColorStop(1, "rgba(14,9,7,0.6)");
+    ctx.fillStyle = inside;
+    ctx.fillRect(-60, -60, this.vw + 120, bore.tip + 120);
+    ctx.restore();
     const tip = this.worldToScreen(0, this.crownY()).y;
     const cx = this.worldToScreen(this.peak().x + this.peak().w / 2, 0).x;
-    const w = this.startW * 1.15;
-    const a = 0.05 + 0.12 * this.lightReach;
+    const w = this.startW * 1.0;
+    const a = 0.04 + 0.08 * this.lightReach;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
@@ -4926,50 +4887,222 @@ export class SpireEngine {
     ctx.fillRect(cx - w / 2, 0, w, tip);
     // Brightest where it reaches the rock.
     const pool = ctx.createRadialGradient(cx, tip, 0, cx, tip, w);
-    pool.addColorStop(0, `rgba(255,190,120,${a * 1.6})`);
+    pool.addColorStop(0, `rgba(255,190,120,${a * 0.9})`);
     pool.addColorStop(1, "rgba(255,190,120,0)");
     ctx.fillStyle = pool;
     ctx.fillRect(cx - w, tip - w, w * 2, w * 2);
     ctx.restore();
   }
 
+  /** Screen y of a world height while building down. */
+  private boreY(world: number): number {
+    return this.worldToScreen(0, world).y;
+  }
+
+  /** World height at a screen y while building down. */
+  private boreWorld(screenY: number): number {
+    return screenY - this.boreY(0);
+  }
+
   /**
-   * The cave-in: the shaft you've opened filling back in from above, a
-   * ragged front of falling earth with the packed rubble behind it. Where
-   * the Dark would be.
+   * The hole the Spire has bored: its walls wander organically (fixed to the
+   * rock, so they scroll with it), and it ends in a rough crater under the tip.
    */
-  private drawCaveIn(ctx: CanvasRenderingContext2D): void {
-    const front = this.worldToScreen(0, this.darkShown).y;
-    if (front < -60) return;
-    const art = this.caveArt;
-    ctx.save();
-    // Packed rubble behind the front, all the way up.
-    ctx.fillStyle = "rgb(22,16,14)";
-    const w = this.vw * 1.25;
-    const h = art.naturalWidth > 0 ? w * (art.naturalHeight / art.naturalWidth) * 1.5 : 200;
-    // The band's ragged edge (where its painting ends) sits on the front.
-    const top = front - h * CAVE_EDGE;
-    ctx.fillRect(-40, -40, this.vw + 80, top + 40 + 12);
-    if (art.complete && art.naturalWidth > 0) {
-      // A slow judder as it settles.
-      const j = this.reduceMotion ? 0 : Math.sin(this.clock * 7) * 1.5;
-      ctx.drawImage(art, (this.vw - w) / 2, top + j, w, h);
+  private borePath(): { path: Path2D; cx: number; tip: number; hw: number } {
+    const base = this.stack[0]!;
+    const cx = this.worldToScreen(base.x + base.w / 2, 0).x;
+    const hw = this.startW * BORE_HALF;
+    const tip = this.boreY(this.crownY() + SLAB_H) - VISUAL_H;
+    const wall = (side: number, y: number): number => {
+      const w = this.boreWorld(y);
+      const n =
+        Math.sin(w * 0.045 + side) * 7 +
+        Math.sin(w * 0.017 + 2 + side * 3) * 11 +
+        Math.sin(w * 0.13) * 2.5;
+      return cx + side * (hw + n);
+    };
+    const top = Math.max(-40, this.boreY(0));
+    const path = new Path2D();
+    path.moveTo(wall(-1, top), top);
+    for (let y = top; y < tip - 8; y += 10) path.lineTo(wall(-1, y), y);
+    // The crater: a ragged bowl where the blows land.
+    const depth = BORE_CRATER + this.rockShake * 10;
+    const steps = 14;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const x = wall(-1, tip - 8) + (wall(1, tip - 8) - wall(-1, tip - 8)) * t;
+      const bowl = Math.sin(Math.PI * t) * depth;
+      const rough = Math.sin(t * 23 + this.floors * 1.3) * 3;
+      path.lineTo(x, tip - 8 + bowl + rough);
     }
+    for (let y = tip - 8; y > top; y -= 10) path.lineTo(wall(1, y), y);
+    path.lineTo(wall(1, top), top);
+    path.closePath();
+    return { path, cx, tip, hw };
+  }
+
+  private oilVideo(): HTMLVideoElement | null {
+    if (typeof document === "undefined") return null;
+    if (!this.oil) {
+      const v = document.createElement("video");
+      v.src = "art/oil.mp4";
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      v.setAttribute("playsinline", "");
+      v.style.cssText = VIDEO_BEHIND;
+      document.body.appendChild(v);
+      v.load();
+      this.oil = v;
+    }
+    if (this.oil.paused) void this.oil.play().catch(() => undefined);
+    return this.oil;
+  }
+
+  /**
+   * The Descent around the tower: the Dark pouring into the hole behind you
+   * like oil, the rock walls in front of it (dead where it has passed), the
+   * crater under the tip and the cracks the blows have driven into the stone.
+   */
+  private drawBore(ctx: CanvasRenderingContext2D): void {
+    const { path, cx, tip, hw } = this.borePath();
+    const front = this.boreY(this.darkShown);
+    // 1. The oil, filling the hole from above down to its front. Its edge
+    // clings to the walls and runs down them in drips; the painted oil
+    // fills the drips too.
+    if (front > -40) {
+      const v = this.oilVideo();
+      const frame = v ? this.frameOf(v, "art/oil.jpg") : null;
+      const clock = this.reduceMotion ? 0 : this.clock;
+      const w = hw * 2.8;
+      const edge = new Path2D();
+      edge.moveTo(cx - w / 2, -60);
+      for (let x = cx - w / 2; x <= cx + w / 2; x += 6) {
+        const u = (x - cx) / hw;
+        const cling = Math.max(0, Math.abs(u) - 0.55) * 46;
+        const drip = Math.max(0, Math.sin(x * 0.21 + 1.3) * Math.sin(x * 0.057 + clock * 0.4)) * 26;
+        edge.lineTo(x, front + cling + drip + Math.sin(x * 0.09 + clock * 1.5) * 2);
+      }
+      edge.lineTo(cx + w / 2, -60);
+      edge.closePath();
+      ctx.save();
+      ctx.clip(path);
+      ctx.clip(edge);
+      const bottom = front + 70;
+      if (frame) {
+        const h = Math.max(bottom + 60, w * 1.78);
+        ctx.drawImage(frame, cx - w / 2, bottom - h, w, h);
+      } else {
+        ctx.fillStyle = "rgb(8,5,12)";
+        ctx.fillRect(cx - w / 2, -60, w, bottom + 60);
+      }
+      // Darker toward its lip, where it thins over the stone.
+      const lip = ctx.createLinearGradient(0, front - 40, 0, bottom);
+      lip.addColorStop(0, "rgba(6,4,10,0)");
+      lip.addColorStop(1, "rgba(6,4,10,0.55)");
+      ctx.fillStyle = lip;
+      ctx.fillRect(cx - w / 2, front - 40, w, bottom - front + 40);
+      ctx.restore();
+      ctx.save();
+      ctx.clip(path);
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(130,90,200,0.3)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke(edge);
+      ctx.restore();
+    }
+    // 2. The rock all around the hole.
+    const walls = new Path2D();
+    walls.rect(-60, Math.max(-60, this.boreY(0)), this.vw + 120, this.vh + 120);
+    walls.addPath(path);
+    const key = this.paintKey();
+    let tex = this.rockArts.get(key);
+    if (!tex) {
+      tex = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
+      this.rockArts.set(key, tex);
+    }
+    const shake = this.reduceMotion ? 0 : this.rockShake * 2.5 * Math.sin(this.clock * 60);
+    ctx.save();
+    ctx.translate(0, shake);
+    let fill: string | CanvasPattern = "rgb(40,30,26)";
+    if (tex.complete && tex.naturalWidth > 0) {
+      const pattern = ctx.createPattern(tex, "repeat");
+      if (pattern) {
+        const k = BORE_TEX / tex.naturalWidth;
+        pattern.setTransform(new DOMMatrix().translate(cx, this.boreY(0)).scale(k));
+        fill = pattern;
+      }
+    }
+    ctx.fillStyle = fill;
+    ctx.fill(walls, "evenodd");
+    ctx.save();
+    ctx.clip(walls, "evenodd");
+    // Darker away from the light of the hole.
+    const side = ctx.createRadialGradient(cx, tip, hw, cx, tip, this.vw * 0.9);
+    side.addColorStop(0, "rgba(0,0,0,0)");
+    side.addColorStop(1, "rgba(0,0,0,0.6)");
+    ctx.fillStyle = side;
+    ctx.fillRect(-60, -60, this.vw + 120, this.vh + 120);
+    // 3. Where the oil has passed, the soil dies: drained of colour, blackened.
+    if (front > -40) {
+      const dead = Math.min(this.vh + 60, front + 40);
+      ctx.globalCompositeOperation = "saturation";
+      ctx.fillStyle = "rgb(128,128,128)";
+      ctx.fillRect(-60, -60, this.vw + 120, dead + 60);
+      ctx.globalCompositeOperation = "multiply";
+      const g = ctx.createLinearGradient(0, front - 120, 0, dead);
+      g.addColorStop(0, "rgb(70,50,90)");
+      g.addColorStop(1, "rgb(255,255,255)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-60, -60, this.vw + 120, dead + 60);
+      ctx.globalCompositeOperation = "source-over";
+    }
+    // 4. Cracks driven into the rock from the crater.
+    this.drawCracks(ctx, cx, tip + BORE_CRATER * 0.6);
     ctx.restore();
-    // A haze of dust below the front, and stones falling off it toward you.
-    const dust = ctx.createLinearGradient(0, front, 0, front + 90);
-    dust.addColorStop(0, "rgba(120,96,80,0.35)");
-    dust.addColorStop(1, "rgba(120,96,80,0)");
-    ctx.fillStyle = dust;
-    ctx.fillRect(-40, front, this.vw + 80, 90);
-    if (!this.reduceMotion && this.phase === "play" && Math.random() < 0.6) {
+    // The hole's rim, lit from inside by the light that follows you.
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(255,180,110,${0.12 + 0.25 * this.lightReach})`;
+    ctx.lineWidth = 2;
+    ctx.stroke(path);
+    ctx.restore();
+    // Stones and earth crumbling off the oil's front.
+    if (!this.reduceMotion && this.phase === "play" && front > 0 && Math.random() < 0.35) {
       this.fx.burst(
-        this.camX + (Math.random() - 0.5) * this.vw,
-        this.darkShown - 4,
+        this.camX + (Math.random() - 0.5) * hw * 2,
+        this.darkShown,
         this.rockRgb(),
-        3,
-        90,
+        2,
+        70,
       );
+    }
+  }
+
+  /** Jagged cracks running out from the crater, longer for harder rock and harder blows. */
+  private drawCracks(ctx: CanvasRenderingContext2D, x0: number, y0: number): void {
+    const n = 6;
+    const reach = 50 + 80 * this.hardness() + 40 * this.rockShake;
+    for (let i = 0; i < n; i++) {
+      const seed = this.floors * 7.13 + i * 1.91;
+      const a = Math.PI * (0.15 + 0.7 * (i / (n - 1))) + Math.sin(seed) * 0.15;
+      ctx.beginPath();
+      let x = x0;
+      let y = y0;
+      ctx.moveTo(x, y);
+      const segs = 5;
+      for (let k = 1; k <= segs; k++) {
+        const r = (reach * (0.6 + 0.4 * Math.abs(Math.sin(seed * 3)))) / segs;
+        x += Math.cos(a) * r + Math.sin(seed * k) * 6;
+        y += Math.sin(a) * r * 0.8 + Math.cos(seed * k) * 4;
+        ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = "rgba(8,5,4,0.85)";
+      ctx.lineWidth = 3 - (i % 2);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255,170,90,${0.08 + 0.2 * this.rockShake})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
   }
 
@@ -5052,7 +5185,6 @@ export class SpireEngine {
     this.fx.down = this.plan.descent ? -1 : 1;
     if (this.plan.descent && !this.ascent && this.phase !== "menu") {
       this.drawLightShaft(ctx);
-      this.drawRockFace(ctx);
     }
     if (this.plan.descent) this.drawCeiling(ctx);
     else if (this.paintedSky()) this.drawPaintedGround(ctx);
@@ -5082,7 +5214,7 @@ export class SpireEngine {
     const live = aiming && this.phase !== "menu";
     // Once the sky is won the Dark is gone: the pull-back must not reveal it.
     if (this.plan.darkRate > 0 && this.phase !== "menu" && this.phase !== "won" && !this.escape) {
-      if (this.plan.descent) this.drawCaveIn(ctx);
+      if (this.plan.descent) this.drawBore(ctx);
       else if (this.ascent && this.blindArt) this.drawBlind(ctx);
       else this.drawDark(ctx);
     }
@@ -5981,7 +6113,10 @@ export class SpireEngine {
     if (w < 0.5 || h < 0.5) return;
     const sy = Number.isFinite(scaleY) ? Math.max(0.2, scaleY) : 1;
     const key = this.paintKey();
-    const stone = STONE_FOR[key] ?? (SKY_STONES.includes(key) ? key : "foundry");
+    // Down the Descent the Spire is a drill: bronze-bound boring segments.
+    const stone = this.plan.descent
+      ? "drill"
+      : (STONE_FOR[key] ?? (SKY_STONES.includes(key) ? key : "foundry"));
     let art = this.slabArts.get(stone);
     if (!art) {
       art = Object.assign(new Image(), { src: `art/slabs/${stone}.webp` });
