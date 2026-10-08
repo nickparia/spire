@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 64 — The title answers at once (internal)
+
+- **Fixed (again): tapping the title did nothing until its button appeared.** Build 62 started the game's painted videos behind the title, which got in the way of the first taps on iPhone. They now start only when a sky does, and the title goes in the moment your finger touches it. Checked with real taps on an iPhone 17 Pro Max simulator, at 1 and 2.5 seconds, before the button shows. From now on every build is checked on the simulator before it ships.
+
 ## Build 63 — Split, unstuck (internal)
 
 - **Fixed: the split slab couldn't be dropped.** The first time a new rule appears, a ghost slab shows the move once and your taps wait for it; for the split slab it never lined up, so it waited forever. It now lines the split up properly, and no demo ever holds your taps for more than a few seconds.

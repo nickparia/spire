@@ -1,7 +1,7 @@
 {
-  "build": 63,
-  "title": "Split, unstuck",
+  "build": 64,
+  "title": "The title answers at once",
   "notes": [
-    "Fixed: when the split slab first appeared in Apex, nothing you did would drop it."
+    "Fixed (again): tapping the title did nothing until its button appeared. Checked with real taps on an iPhone simulator."
   ]
 }

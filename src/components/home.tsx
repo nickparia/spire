@@ -56,6 +56,7 @@ export function TitleSplash({ onEnter, onAwaken }: { onEnter: () => void; onAwak
       onClick={enter}
       // On iPhone a tap on the title's video could be swallowed before it became
       // a click; going in as the finger lifts doesn't wait for one.
+      onPointerDown={enter}
       onPointerUp={enter}
       role="button"
       aria-label="Enter"

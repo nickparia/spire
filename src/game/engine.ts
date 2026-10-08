@@ -914,8 +914,6 @@ export class SpireEngine {
     this.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.fx.calm = this.reduceMotion;
     this.save = loadSave();
-    this.loadSourceArt();
-    this.loadDarkArt();
     this.rig.setMusic(this.save.music);
     this.rig.setSfx(this.save.sfx);
     this.music = new Music(this.rig, this.theme.track);
@@ -1329,6 +1327,9 @@ export class SpireEngine {
   }
 
   private begin(): void {
+    // The painted videos start only when a sky does, never behind the title.
+    this.loadSourceArt();
+    this.loadDarkArt();
     this.resetRun("ready", true);
     this.music.setTrack(this.theme.track);
     this.music.setMood("play");
@@ -2592,7 +2593,7 @@ export class SpireEngine {
 
   /** Loads the painted Dark quietly; the drawn gradient stands in until then. */
   private loadDarkArt(): void {
-    if (typeof document === "undefined") return;
+    if (typeof document === "undefined" || this.darkArt) return;
     const v = document.createElement("video");
     v.src = "art/dark-hearth.mp4";
     v.muted = true;
@@ -2683,7 +2684,7 @@ export class SpireEngine {
   }
 
   private loadSourceArt(): void {
-    if (typeof document === "undefined") return;
+    if (typeof document === "undefined" || this.sourceArt) return;
     const v = document.createElement("video");
     v.src = "art/source.mp4";
     v.muted = true;
@@ -4656,7 +4657,8 @@ export class SpireEngine {
    */
   private paintedSky(): { video: HTMLVideoElement; fg: HTMLImageElement } | null {
     const id = this.paintKey();
-    if (!PAINTED_SKIES.includes(id) || typeof document === "undefined") {
+    // Behind the menus nothing of the game is seen: no sky video there.
+    if (this.phase === "menu" || !PAINTED_SKIES.includes(id) || typeof document === "undefined") {
       return null;
     }
     let sky = this.skies.get(id);
