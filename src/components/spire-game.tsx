@@ -481,7 +481,9 @@ export function SpireGame() {
           </p>
         ) : null}
 
-        {running && hud.hint && !hud.paused ? <p className="tap-hint">Tap to drop</p> : null}
+        {running && hud.hint && !hud.paused ? (
+          <p className="tap-hint">{hud.descent ? "Tap to fire the drill" : "Tap to drop"}</p>
+        ) : null}
 
         {hud.phase === "pick" ? (
           <PickPanel hud={hud} onChoose={(i) => engineRef.current?.choose(i)} />

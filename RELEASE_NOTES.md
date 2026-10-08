@@ -3,6 +3,16 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 68 — The drill (prototype, internal)
+
+- **A new way to play the Descent** (Depth 1 for now; the other depths use the same, untuned). Simple placeholder visuals: this is to judge the feel before the Higgsfield art.
+  - **The drill head swings** back and forth like a pendulum, its aim a beam of light.
+  - **Targets each have a groove**: a seam below (a glowing fissure) takes you deeper; veins of gold ore to either side feed your light and drive the oil back up the tunnel. The aim brightens when it's in a target's groove; dead centre is a perfect.
+  - **Tap fires the drill** along its aim, and it bores straight to what it was pointing at. Your tunnel is the path you've cut.
+  - **The oil follows down your tunnel.** Fire at nothing and the drill breaks into oil-soaked rock: **a leak opens** and more of the Dark pours in, and more Dark runs faster. The wilder the shot, the bigger the leak. Leaks stay open.
+  - Reach the bottom and you've **broken through**; let the oil reach the drill and **the light is buried**.
+- Checked on an iPhone simulator.
+
 ## Build 67 — The bore (internal)
 
 - **A real hole.** Solid rock fills the screen and the Spire sits in the shaft it has bored, its walls ragged and organic. Each blow lands in a crater under the tip and drives cracks out into the stone; a perfect makes the rock jump and the light at the bottom flare.

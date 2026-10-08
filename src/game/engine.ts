@@ -77,6 +77,7 @@ import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
 import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
+import { Drill, DRILL_FLOOR, drawDrill } from "./drill";
 import {
   BOMB_RGB,
   drawBomb,
@@ -244,7 +245,7 @@ const SKY_STONES: readonly string[] = [
 const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
-  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
 /** A streak is only called out at these milestones. */
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
@@ -254,6 +255,11 @@ const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
 /** Floors behind the tip the climbers are held within, however fast you build. */
 const DESCENT_REACH = 5;
+/** The drill: its swing (radians each way), seconds per swing at the first depth, and the oil's pace. */
+const DRILL_SWING = 1.75;
+const DRILL_PERIOD = 2.8;
+const DRILL_OIL = 62;
+const DRILL_OIL_ACCEL = 1.8;
 /** Floors of earth a sloppy blow on the hardest rock shakes loose behind you. */
 const CAVE_SHAKE = 0.9;
 /** The bored hole's half width (of a starting slab), its crater's depth (px), and the rock texture's size (px). */
@@ -830,6 +836,10 @@ export class SpireEngine {
   private oil: HTMLVideoElement | null = null;
   private lightReach = 0.6;
   private rockShake = 0;
+  /** The Descent's drill run, when a depth is being bored (not stacked). */
+  private drill: Drill | null = null;
+  /** Seconds until the drill's HUD (depth, the oil's gap) is sent again. */
+  private emitCooldown = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
   private slabLookNow: SlabLook | null = null;
   /** Sprite sheets (public/art/sprites/<name>.webp), one row of square frames. */
@@ -986,6 +996,13 @@ export class SpireEngine {
     }
     if (this.escape) {
       this.breakTop();
+      return;
+    }
+    if (this.drill) {
+      if (this.phase === "ready") this.phase = "play";
+      this.hint = false;
+      const shot = this.drill.fire();
+      if (shot) this.drilled(shot);
       return;
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
@@ -1313,6 +1330,19 @@ export class SpireEngine {
     this.loadSourceArt();
     this.loadDarkArt();
     this.resetRun("ready", true);
+    this.drill = null;
+    const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
+    if (level?.descent) {
+      const tier = level.tier ?? 0;
+      this.drill = new Drill({
+        floors: level.floors,
+        swing: DRILL_SWING,
+        period: Math.max(1.6, DRILL_PERIOD - tier * 0.15),
+        oil: DRILL_OIL + tier * 2,
+        oilAccel: DRILL_OIL_ACCEL,
+      });
+      this.hint = true;
+    }
     this.music.setTrack(this.theme.track);
     this.music.setMood("play");
     this.music.setTension(0);
@@ -2998,6 +3028,7 @@ export class SpireEngine {
 
   /** Floors of tower still above the Dark. */
   private darkGap(): number {
+    if (this.drill) return this.drill.gap / DRILL_FLOOR;
     return (this.crownY() - this.dark) / SLAB_H;
   }
 
@@ -4275,6 +4306,10 @@ export class SpireEngine {
     }
     this.curtain = Math.max(0, this.curtain - dt / 0.32);
     this.pulse = Math.max(0, this.pulse - dt * 2.2);
+    if (this.drill && this.phase !== "menu") {
+      this.stepDrill(dt);
+      return;
+    }
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
     const prev = this.peak();
@@ -4469,6 +4504,7 @@ export class SpireEngine {
   /* -------------------------------------------------------------- render */
 
   private worldToScreen = (x: number, yBottom: number): { x: number; y: number } => {
+    if (this.drill) return this.drill.toScreen(x, yBottom, this.vw, this.vh);
     if (this.plan.descent) {
       // Built down: the world is mirrored, so higher means further down the
       // screen. Offset by a slab so anything drawn up from its bottom edge
@@ -4722,6 +4758,7 @@ export class SpireEngine {
    * time, its sting plays before the climb can start.
    */
   private beginAscent(fresh: boolean): void {
+    this.drill = null;
     this.ascent = true;
     this.plan = {
       ...this.plan,
@@ -4816,6 +4853,131 @@ export class SpireEngine {
   private paintKey(): string {
     const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
     return level?.paint ?? this.theme.id;
+  }
+
+  /** One frame of a drill run: the run itself, its effects, and how it ends. */
+  private stepDrill(dt: number): void {
+    const d = this.drill!;
+    this.fx.down = -1;
+    if (this.phase === "play") {
+      this.runTime += dt;
+      const end = d.step(dt, this.vw, this.vh);
+      this.floors = d.floors;
+      if (end === "caught") {
+        this.float("THE LIGHT IS BURIED", d.head.x, d.head.y - 40, false, 24);
+        this.taken = true;
+        this.sfx.fail();
+        this.trauma = 1;
+        this.phase = "fall";
+        this.fallAge = 0;
+        this.keepGhost();
+        this.emit();
+      } else if (end === "through") {
+        this.float("BROKEN THROUGH", d.head.x, d.head.y - 50, true, 28);
+        this.fx.rayBurst(d.head.x, d.head.y, [255, 200, 130], 220, 18);
+        if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.beginAscent(true);
+        else this.win();
+      }
+      // The score: tension from the oil's nearness and how deep you are.
+      this.music.setClimb({
+        progress: clamp01(d.floors / Math.max(1, d.tune.floors)),
+        danger: clamp01(1 - d.gap / (DRILL_FLOOR * 8)),
+        streak: this.streak,
+        landings: 2,
+      });
+    } else if (this.phase === "ready") {
+      // Before the first shot only the drill swings: the oil and the clock wait.
+      d.step(dt, this.vw, this.vh);
+      d.oil = -230;
+      d.time = 0;
+    } else if (this.phase === "fall") {
+      this.fallAge += dt;
+    }
+    for (let i = this.floaters.length - 1; i >= 0; i--) {
+      const f = this.floaters[i]!;
+      f.y -= f.vy * dt;
+      f.life -= dt;
+      if (f.life <= 0) this.floaters.splice(i, 1);
+    }
+    this.fx.step(dt);
+    this.trauma = Math.max(0, this.trauma - dt * 1.7);
+    this.flash = Math.max(0, this.flash - dt * 1.8);
+    this.emitCooldown -= dt;
+    if (this.emitCooldown <= 0) {
+      this.emitCooldown = 0.1;
+      this.emit();
+    }
+  }
+
+  /** What a shot did: the burst, the sound, the score. */
+  private drilled(shot: {
+    kind: "seam" | "ore" | "miss";
+    perfect: boolean;
+    x: number;
+    y: number;
+  }): void {
+    this.drops += 1;
+    const rock = this.rockRgb();
+    if (shot.kind === "miss") {
+      this.streak = 0;
+      this.accuracySum += 0.3;
+      this.fx.burst(shot.x, shot.y, rock, 12, 150);
+      this.sfx.rubble();
+      this.trauma = Math.min(1, this.trauma + 0.3);
+      // A careless shot breaks into the oil-soaked rock: more of the Dark pours in.
+      this.float("IT SEEPS IN", shot.x, shot.y - 30, false, 18);
+      haptics.medium();
+      this.emit();
+      return;
+    }
+    this.streak = shot.perfect ? this.streak + 1 : 0;
+    this.bestStreak = Math.max(this.bestStreak, this.streak);
+    if (shot.perfect) this.perfects += 1;
+    this.accuracySum += shot.perfect ? 1 : 0.8;
+    if (shot.kind === "ore") {
+      this.fx.burst(shot.x, shot.y, [255, 214, 110], 26, 260);
+      this.fx.sparkle(shot.x, shot.y, 40, [255, 230, 160], 18);
+      this.sfx.perfect(this.streak);
+      this.flash = Math.max(this.flash, 0.25);
+    } else {
+      this.fx.burst(shot.x, shot.y, rock, shot.perfect ? 30 : 18, shot.perfect ? 320 : 200);
+      if (shot.perfect) this.fx.burst(shot.x, shot.y, [255, 200, 130], 12, 240);
+      if (shot.perfect) this.sfx.perfect(this.streak);
+      else this.sfx.drop();
+    }
+    this.trauma = Math.min(1, this.trauma + (shot.perfect ? 0.22 : 0.12));
+    if (shot.perfect && this.streak > 0 && this.streak % STREAK_SPOKEN === 0) {
+      this.float(`PERFECT ×${this.streak}`, shot.x, shot.y - 40, true, 26);
+    }
+    haptics.light();
+    this.emit();
+  }
+
+  /** The drill's world: earth, tunnel, oil, targets, head; then the usual overlays. */
+  private renderDrill(ctx: CanvasRenderingContext2D, ox: number, oy: number): void {
+    const key = this.paintKey();
+    let tex = this.rockArts.get(key);
+    if (!tex) {
+      tex = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
+      this.rockArts.set(key, tex);
+    }
+    ctx.save();
+    ctx.translate(ox, oy);
+    drawDrill(ctx, this.drill!, this.vw, this.vh, this.reduceMotion ? 0 : this.clock, tex);
+    this.fx.draw(ctx, this.worldToScreen);
+    ctx.restore();
+    this.drawFloaters(ctx);
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.fx.drawScreen(ctx);
+    this.drawVignette(ctx);
+    if (this.flash > 0) {
+      ctx.fillStyle = `rgba(255,230,190,${this.flash * 0.22})`;
+      ctx.fillRect(0, 0, this.viewW, this.viewH);
+    }
+    if (this.curtain > 0) {
+      ctx.fillStyle = `rgba(8,6,5,${this.curtain})`;
+      ctx.fillRect(0, 0, this.viewW, this.viewH);
+    }
   }
 
   /** How hard the rock is at this depth, 0 (earth) to 1 (the floor of the world). */
@@ -5164,6 +5326,11 @@ export class SpireEngine {
       flare: this.flare,
       reduceMotion: this.reduceMotion,
     };
+
+    if (this.drill) {
+      this.renderDrill(ctx, ox, oy);
+      return;
+    }
 
     // The sky takes a third of the shake: it is far away.
     ctx.save();

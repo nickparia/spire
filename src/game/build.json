@@ -1,8 +1,7 @@
 {
-  "build": 67,
-  "title": "The bore",
+  "build": 68,
+  "title": "The drill (prototype)",
   "notes": [
-    "The Descent looks like drilling now: the Spire is a bronze-bound boring machine in a hole it cuts through solid rock, each blow landing in a crater under the tip and cracking the stone.",
-    "The Dark follows you down as black oil, pouring into the hole behind you and running down its walls; the soil it passes dies."
+    "Prototype: the Descent is now played with a drill. It swings like a pendulum; tap to fire it at whatever it points at: a seam to go deeper, or ore to feed the light and push the oil back. Missed shots tear leaks and let more of the Dark in."
   ]
 }
