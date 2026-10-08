@@ -12,7 +12,7 @@ import {
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ShadeMark, type Rival } from "./shade";
 import { sendChallenge, type Challenge, type SendResult } from "@/game/board";
-import { isBoss, skyNumber, WORLDS, worldOf } from "@/game/worlds";
+import { isBoss, skyNumber, skyWord, WORLDS, worldOf } from "@/game/worlds";
 import type { Shade } from "@/game/board";
 import { fetchBoard, fetchPlayer, type Entry } from "@/game/board";
 import type { Ghost } from "@/game/logic";
@@ -106,7 +106,7 @@ export function LevelSelect({
         <IconButton label="Back" onPress={onBack}>
           <ChevronLeft size={20} strokeWidth={2.2} />
         </IconButton>
-        <p className="kicker">Skies</p>
+        <p className="kicker">{world.id === "descent" ? "Depths" : "Skies"}</p>
         <p className="kicker menu-stars">
           <StarIcon on size={13} /> {worldStars} / {world.levelIds.length * 3}
         </p>
@@ -301,7 +301,9 @@ export function BoardScreen({
           <ChevronLeft size={18} strokeWidth={2.4} />
         </IconButton>
         <h2 className="sheet-title">
-          <small>Sky {levelIndex + 1}</small>
+          <small>
+            {skyWord(level.id)} {skyNumber(level.id)}
+          </small>
           {level.name}
         </h2>
         <IconButton

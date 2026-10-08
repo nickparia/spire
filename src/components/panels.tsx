@@ -40,7 +40,7 @@ import { Post } from "./post";
 import { FeatToasts, Journey } from "./journey";
 import { ThrowShade } from "./shade";
 import type { FeatId } from "@/game/feats";
-import { skyNumber, worldOf } from "@/game/worlds";
+import { skyNumber, skyWord, worldOf } from "@/game/worlds";
 import { GiftCards } from "./gifts";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
@@ -232,11 +232,11 @@ export function RunHud({
         {hud.darkGap !== null && started ? (
           <>
             <p className="kicker mt-2">
-              {hud.ascent ? "It rises" : hud.descent ? "They climb" : "The Dark"}
+              {hud.ascent ? "It rises" : hud.descent ? "The cave-in" : "The Dark"}
             </p>
             <p className={"stat-num dark-gap" + (hud.darkGap <= 3 ? " dark-near" : "")}>
               {hud.darkGap} {hud.darkGap === 1 ? "floor" : "floors"}{" "}
-              {hud.descent ? "away" : "below"}
+              {hud.descent && !hud.ascent ? "above" : "below"}
             </p>
           </>
         ) : null}
@@ -346,7 +346,15 @@ export function OverPanel({
   const armed = useArmed();
   return (
     <section className="panel panel-in" aria-live="polite" data-armed={armed || undefined}>
-      <p className="kicker">{hud.taken ? "Taken by the Dark" : "The spire fell"}</p>
+      <p className="kicker">
+        {hud.taken
+          ? hud.ascent
+            ? "It caught you"
+            : hud.descent
+              ? "The light is buried"
+              : "Taken by the Dark"
+          : "The spire fell"}
+      </p>
       {level ? (
         <p className="score mt-1">
           {hud.floors}
@@ -460,14 +468,16 @@ export function ResultsPanel({
     <section className="panel panel-won" aria-live="polite" data-ui data-armed={armed || undefined}>
       <div className="won-head">
         <p className="kicker">
-          Sky {skyNumber(level.id)} · {level.name}
+          {skyWord(level.id)} {skyNumber(level.id)} · {level.name}
         </p>
         <h2 className="sheet-title">
           {result.boss
             ? worldOf(level.id).id === "descent"
               ? "Out of the deep"
               : "The light escapes"
-            : "Relit"}
+            : skyWord(level.id) === "Depth"
+              ? "Broken through"
+              : "Relit"}
         </h2>
         {result.boss ? <p className="revelation">{worldOf(level.id).revelation}</p> : null}
       </div>

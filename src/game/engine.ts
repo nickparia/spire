@@ -155,7 +155,7 @@ const DARK_ROWS = 7;
 const DARK_FRAMES = 52;
 const DARK_FPS = 8;
 /** Down the screen the Descent's tip sits, as a share of the view. */
-const DESCENT_SEAT = 0.42;
+const DESCENT_SEAT = 0.58;
 /** The near scenery: its size, how fast it leaves as you climb, and how solid it is. */
 const FG_SCALE = 0.7;
 const FG_PARALLAX = 1.9;
@@ -217,34 +217,6 @@ const FLARE_GLINT_FRAMES = 4;
 const FLARE_BIG_EVERY = 5;
 /** Bedrock's buttress steps either side of the foundation. */
 const BEDROCK_STEPS = 3;
-type ClimberKind = "swarm" | "mite" | "brute" | "lantern";
-/** Size, in px, of each kind of climber at the front. */
-const CLIMBER_SIZE: Record<ClimberKind, number> = { swarm: 84, mite: 50, brute: 116, lantern: 86 };
-/** Frames per second of each kind's crawl. */
-const CLIMBER_FPS: Record<ClimberKind, number> = { swarm: 9, mite: 15, brute: 6, lantern: 11 };
-/** Seconds a crushed climber stays flattened, and before another takes its place. */
-const CLIMBER_SQUASH = 0.45;
-const CLIMBER_RESPAWN = 3;
-
-/** One climber in the swarm, fixed by its index: where it is, what it is. */
-function climber(i: number): {
-  kind: ClimberKind;
-  x: number;
-  depth: number;
-  r: number;
-  flip: boolean;
-} {
-  const h = (n: number) => {
-    const v = Math.sin(i * 12.9898 + n * 78.233) * 43758.5453;
-    return v - Math.floor(v);
-  };
-  const kind: ClimberKind =
-    i % 13 === 12 ? "lantern" : i % 9 === 8 ? "brute" : i % 5 === 3 ? "mite" : "swarm";
-  return { kind, x: h(1), depth: h(2), r: h(3), flip: h(4) < 0.5 };
-}
-/** What spills when a climber is crushed. */
-const BLOOD_RGB: RGB = [150, 18, 24];
-const BLOOD_DEEP_RGB: RGB = [70, 6, 12];
 /** What the Dark throws up when something falls into it. */
 const INK_RGB: RGB = [26, 12, 40];
 /** The painted slab's end caps and centre mark, as shares of its width. */
@@ -275,7 +247,7 @@ const SKY_STONES: readonly string[] = [
 const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
-  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THEY REACH YOU|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THEY QUICKEN|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
 /** A streak is only called out at these milestones. */
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
@@ -283,10 +255,23 @@ const DEMO_TIME = 0.5;
 /** The longest a demo may hold your taps before it steps aside, in seconds. */
 const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
-/** Climbers drawn at the front. */
-const CLIMBERS = 20;
 /** Floors behind the tip the climbers are held within, however fast you build. */
-const DESCENT_REACH = 7;
+const DESCENT_REACH = 5;
+/** Floors of earth a sloppy blow on the hardest rock shakes loose behind you. */
+const CAVE_SHAKE = 0.9;
+/** How far down the cave-in band its ragged edge falls, as a share of its height. */
+const CAVE_EDGE = 0.66;
+/** Each depth's rock, for the chips its blows throw up. */
+const ROCK_RGB: Record<string, RGB> = {
+  roots: [92, 70, 48],
+  ossuary: [200, 190, 170],
+  drowned: [50, 66, 62],
+  crystal: [150, 110, 200],
+  furnace: [230, 110, 40],
+  quiet: [130, 128, 124],
+  hollow: [60, 46, 70],
+  floor: [120, 90, 150],
+};
 /** The ascent: floors to climb out, its pace (px/s, and per second more), and how far behind it may fall. */
 const ASCENT_FLOORS = 30;
 const ASCENT_RATE = 36;
@@ -301,9 +286,6 @@ const ASCENT_PERIOD = 0.72;
 const ASCENT_STING = 3.5;
 /** How far down the blind thing's painting its reaching hands are. */
 const BLIND_SURFACE = 0.34;
-/** Floors a cut-off piece knocks the climbers back, plus more for a wide one. */
-const SQUASH_PUSH = 0.6;
-const SQUASH_PER_WIDTH = 1.6;
 const ESCAPE_STING = 5;
 /** Seconds between slabs in a chain of perfects going off. */
 const ESCAPE_CHAIN_STEP = 0.07;
@@ -844,14 +826,15 @@ export class SpireEngine {
   private blindMask: HTMLCanvasElement | null = null;
   /** Seconds left of the door's sting before the climb can start. */
   private ascentSting = 0;
+  /** The Descent: each depth's rock texture, the cave-in's front, how far the light reaches, the last blow's shudder. */
+  private rockArts = new Map<string, HTMLImageElement>();
+  private caveArt = Object.assign(new Image(), { src: "art/rock/cavein.webp" });
+  private lightReach = 0.6;
+  private rockShake = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
   private slabLookNow: SlabLook | null = null;
   /** Sprite sheets (public/art/sprites/<name>.webp), one row of square frames. */
   private sprites = new Map<string, HTMLImageElement>();
-  /** Brutes whose stone back has taken one blow already. */
-  private climberCracked = new Set<number>();
-  /** Climbers crushed, by index, with the clock when it happened. */
-  private climberDead = new Map<number, number>();
   /** Each sky's painted stone (public/art/slabs/<theme>.webp), cut so it fits any width. */
   private slabArts = new Map<string, HTMLImageElement>();
   /** The Descent's painted shaft, behind everything when building down. */
@@ -1438,6 +1421,7 @@ export class SpireEngine {
     this.rime = 0;
     this.bolts = [];
     this.flares = [];
+    this.lightReach = 0.6;
     this.bursts = [];
     this.trace = [0];
     this.ghost = null;
@@ -2969,7 +2953,7 @@ export class SpireEngine {
       this.quickStep = step;
       const top = this.peak();
       this.float(
-        this.plan.descent ? "THEY QUICKEN" : "THE DARK QUICKENS",
+        this.plan.descent ? "THE SHAFT GROANS" : "THE DARK QUICKENS",
         top.x + top.w / 2,
         this.dark + 70,
         false,
@@ -3004,49 +2988,6 @@ export class SpireEngine {
     this.sfx.hiss();
   }
 
-  /** A cut-off piece lands on the climbers: they are knocked back down the shaft. */
-  private squash(x: number, w: number): void {
-    const at = this.climbersY();
-    let braced = false;
-    // Those under it die: the near ones within the slab's reach.
-    const sx = x - this.camX + this.vw / 2;
-    for (let i = 0; i < CLIMBERS; i++) {
-      const c = this.climberAt(i);
-      const cx = c.x * (this.vw + 40) - 20;
-      if (c.depth < 0.45 && Math.abs(cx - sx) < w / 2 + 18 && !this.climberDead.has(i)) {
-        // A brute's stone back takes the first blow: it cracks, and holds the line.
-        if (c.kind === "brute" && !this.climberCracked.has(i)) {
-          this.climberCracked.add(i);
-          braced = true;
-          this.fx.burst(cx + this.camX - this.vw / 2, at, [150, 130, 110], 24, 260);
-        } else {
-          this.climberDead.set(i, this.clock);
-          this.climberCracked.delete(i);
-        }
-      }
-    }
-    // A cracked brute in the way halves the knock-back.
-    const push =
-      SLAB_H * (SQUASH_PUSH + SQUASH_PER_WIDTH * Math.min(1, w / this.startW)) * (braced ? 0.5 : 1);
-    this.dark = Math.max(DARK_START, this.dark - push);
-    // The crunch: blood flung out and down, pale chips of them, a stain, a
-    // beat of hit-stop and a shove of the camera.
-    this.fx.blood(x, at, BLOOD_RGB, 80, 340);
-    this.fx.blood(x, at, BLOOD_DEEP_RGB, 18, 180);
-    this.fx.burst(x, at, [200, 192, 214], 12, 240);
-    this.float(
-      "SQUASHED",
-      Math.max(60, Math.min(this.vw - 60, x - this.camX + this.vw / 2)) + this.camX - this.vw / 2,
-      at - 30,
-      true,
-      22,
-    );
-    this.sfx.squash();
-    this.freeze = Math.max(this.freeze, this.reduceMotion ? 0.02 : 0.07);
-    this.trauma = Math.min(1, this.trauma + 0.32);
-    haptics.heavy();
-  }
-
   /** Light pushes the Dark down, never below where it started. */
   private pushDark(px: number): void {
     if (this.plan.darkRate <= 0 || px <= 0) return;
@@ -3067,6 +3008,7 @@ export class SpireEngine {
    */
   private riseDark(dt: number): void {
     this.breather = Math.max(0, this.breather - dt);
+    this.rockShake = Math.max(0, this.rockShake - dt * 5);
     this.rime = Math.max(0, this.rime - dt);
     if (this.bedrock >= 0 && this.bedrock < 1) this.bedrock = Math.min(1, this.bedrock + dt * 1.4);
     for (let i = this.bursts.length - 1; i >= 0; i--) {
@@ -3116,7 +3058,11 @@ export class SpireEngine {
       if (this.dark >= seat - SLAB_H * 0.5) {
         this.dark = seat - SLAB_H * 0.5;
         this.float(
-          this.ascent ? "IT HAS YOU" : this.plan.descent ? "THEY REACH YOU" : "TAKEN BY THE DARK",
+          this.ascent
+            ? "IT HAS YOU"
+            : this.plan.descent
+              ? "THE LIGHT IS BURIED"
+              : "TAKEN BY THE DARK",
           top.x + top.w / 2,
           seat + 40,
           false,
@@ -3586,6 +3532,8 @@ export class SpireEngine {
       }
     }
     this.pushDark(push);
+    // The Descent: every slab is a blow on the rock below.
+    if (this.plan.descent && !this.ascent) this.strike(cx, result.perfect);
     // The ascent: a perfect vaults you clear of it, further on a streak.
     if (this.ascent && result.perfect) {
       const vault = ASCENT_VAULT + (this.streak >= 3 ? ASCENT_VAULT_STREAK : 0);
@@ -4446,10 +4394,12 @@ export class SpireEngine {
         // Down here what is cut off falls away from the ceiling, onto them.
         s.vy += 1400 * dt;
         s.y += s.vy * dt;
-        if (!s.squashed && s.y >= this.climbersY() && this.phase === "play") {
+        if (!s.squashed && s.y >= this.crownY() + SLAB_H) {
+          // It strikes the rock face below the tip and breaks up.
           s.squashed = true;
-          s.life = Math.min(s.life, 0.25);
-          this.squash(s.x + s.w / 2, s.w);
+          s.life = Math.min(s.life, 0.15);
+          this.fx.burst(s.x + s.w / 2, this.crownY() + SLAB_H, this.rockRgb(), 14, 200);
+          this.sfx.rubble();
         }
       } else {
         s.vy -= 1400 * dt;
@@ -4535,11 +4485,6 @@ export class SpireEngine {
     };
   };
 
-  /** Where the climbers' front is, in world height: as far past the tip as the Dark is below it. */
-  private climbersY(): number {
-    return 2 * this.crownY() - this.darkShown;
-  }
-
   /** The painted shaft, falling past slowly as the spire goes down. */
   private drawShaft(ctx: CanvasRenderingContext2D, view: BackdropView): void {
     const img = (this.shaftArt ??= Object.assign(new Image(), { src: "art/bg-descent.jpg" }));
@@ -4555,84 +4500,6 @@ export class SpireEngine {
     // Held back so the slabs read first.
     ctx.fillStyle = "rgba(6,3,10,0.38)";
     ctx.fillRect(0, 0, view.w, view.h);
-  }
-
-  /**
-   * What climbs: a seething front of pale shapes coming up the shaft at the
-   * spire's tip, the deep black beneath them. Where the Dark would be.
-   */
-  private drawClimbers(ctx: CanvasRenderingContext2D): void {
-    const front = this.worldToScreen(0, this.climbersY()).y - VISUAL_H;
-    if (front > this.vh + 60) return;
-    const clock = this.reduceMotion ? 0 : this.clock;
-    // The deep: black rising under them.
-    const g = ctx.createLinearGradient(0, front - 10, 0, front + 160);
-    g.addColorStop(0, "rgba(6,3,10,0)");
-    g.addColorStop(0.35, "rgba(6,3,10,0.82)");
-    g.addColorStop(1, "rgba(4,2,8,0.97)");
-    ctx.fillStyle = g;
-    ctx.fillRect(-120, front - 10, this.vw + 240, this.vh - front + 200);
-    // The climbers: painted things crawling up the shaft, far ones fading into the black.
-    const order = [...Array(CLIMBERS).keys()].sort(
-      (a, b) => this.climberAt(b).depth - this.climberAt(a).depth,
-    );
-    // In the Hollow there is no light: only the lantern-bearers' glow shows.
-    const dark = this.mover.course === "eclipse";
-    for (const i of order) {
-      const c = this.climberAt(i);
-      const sheet = this.sprite(c.kind);
-      if (!sheet) continue;
-      const dead = this.climberDead.get(i);
-      let squash = 1;
-      let alpha = 1 - c.depth * 0.45;
-      if (dead) {
-        const age = this.clock - dead;
-        if (age < CLIMBER_SQUASH) {
-          // Crushed flat against the slab, then gone.
-          squash = 0.25 + 0.75 * (1 - age / CLIMBER_SQUASH) ** 3;
-          alpha *= 1 - age / CLIMBER_SQUASH;
-        } else if (age < CLIMBER_RESPAWN) continue;
-        else if (age < CLIMBER_RESPAWN + 1) alpha *= age - CLIMBER_RESPAWN;
-        else this.climberDead.delete(i);
-      }
-      if (dark && c.kind !== "lantern") alpha *= 0.12;
-      const x = c.x * (this.vw + 40) - 20;
-      const size = CLIMBER_SIZE[c.kind] * (1 - c.depth * 0.4);
-      if (c.kind === "lantern") {
-        const yy = front + 8 + size * 0.4 + c.depth ** 1.4 * 170;
-        const pulse = 0.6 + 0.4 * Math.sin(clock * 3 + i);
-        const g = ctx.createRadialGradient(x, yy, 0, x, yy, size * 0.9);
-        g.addColorStop(0, `rgba(180,110,255,${0.4 * pulse * alpha})`);
-        g.addColorStop(1, "rgba(180,110,255,0)");
-        ctx.save();
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = g;
-        ctx.fillRect(x - size, yy - size, size * 2, size * 2);
-        ctx.restore();
-      }
-      const y =
-        front + 8 + size * 0.4 + c.depth ** 1.4 * 170 + Math.sin(clock * (3 + c.r * 3) + i) * 3;
-      const fps = CLIMBER_FPS[c.kind];
-      const frame = Math.floor(clock * fps + c.r * sheet.frames) % sheet.frames;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, alpha);
-      ctx.translate(x, y);
-      // Side-on crawlers turned a quarter: they scale the shaft head first.
-      ctx.rotate(Math.PI / 2 + (c.r - 0.5) * 0.35);
-      ctx.scale(squash, c.flip ? -1 : 1);
-      ctx.drawImage(
-        sheet.img,
-        frame * sheet.cell,
-        0,
-        sheet.cell,
-        sheet.cell,
-        -size / 2,
-        -size / 2,
-        size,
-        size,
-      );
-      ctx.restore();
-    }
   }
 
   /** Slabs from the top that burn: a streak of four sets the top alight, and it spreads. */
@@ -4946,18 +4813,164 @@ export class SpireEngine {
     }
   }
 
-  /** One climber in the swarm, as this sky's kinds allow. */
-  private climberAt(i: number): ReturnType<typeof climber> {
-    const c = climber(i);
-    const kinds = this.mode === "level" ? LEVELS[this.levelIndex]!.climbers : undefined;
-    if (!kinds || kinds.length === 0 || kinds.includes(c.kind)) return c;
-    return { ...c, kind: kinds[i % kinds.length]! };
-  }
-
   /** The art the current sky is painted with: its own, or its theme's. */
   private paintKey(): string {
     const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
     return level?.paint ?? this.theme.id;
+  }
+
+  /** How hard the rock is at this depth, 0 (earth) to 1 (the floor of the world). */
+  private hardness(): number {
+    const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
+    return level?.descent ? Math.min(1, (level.tier ?? 0) / 7) : 0;
+  }
+
+  /** The colour of the rock being broken, for its chips and dust. */
+  private rockRgb(): RGB {
+    return ROCK_RGB[this.paintKey()] ?? [110, 92, 80];
+  }
+
+  /**
+   * A slab driven into the rock below the tip. A perfect bursts it apart:
+   * rock flies, the light pours further down, and the cave-in is held back.
+   * Anything else cracks it, and on hard rock shakes loose earth above.
+   */
+  private strike(cx: number, perfect: boolean): void {
+    const at = this.crownY() + SLAB_H;
+    const rock = this.rockRgb();
+    this.rockShake = 1;
+    if (perfect) {
+      this.fx.burst(cx, at, rock, 30, 340);
+      this.fx.burst(cx, at, [255, 210, 150], 12, 260);
+      this.fx.sparkle(cx, at, this.startW, [255, 220, 170], 14);
+      this.lightReach = Math.min(1, this.lightReach + 0.25);
+      this.trauma = Math.min(1, this.trauma + 0.18);
+      this.sfx.boom();
+      return;
+    }
+    this.fx.burst(cx, at, rock, 12, 160);
+    this.lightReach = Math.max(0.3, this.lightReach - 0.1);
+    const hard = this.hardness();
+    if (hard > 0.2) {
+      // Hard rock fights back: the blow shakes earth loose behind you.
+      this.dark += SLAB_H * CAVE_SHAKE * hard;
+      this.trauma = Math.min(1, this.trauma + 0.25 * hard);
+      this.sfx.rubble();
+    }
+  }
+
+  /**
+   * The Descent's rock face: solid stone below the tip, its top cracked by
+   * each blow. The tower is driven into it.
+   */
+  private drawRockFace(ctx: CanvasRenderingContext2D): void {
+    const top = this.worldToScreen(0, this.crownY() + SLAB_H).y - VISUAL_H;
+    if (top > this.vh + 40) return;
+    const key = this.paintKey();
+    let tex = this.rockArts.get(key);
+    if (!tex) {
+      tex = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
+      this.rockArts.set(key, tex);
+    }
+    const shake = this.reduceMotion ? 0 : this.rockShake * 3 * Math.sin(this.clock * 60);
+    ctx.save();
+    ctx.translate(0, shake);
+    if (tex.complete && tex.naturalWidth > 0) {
+      const pattern = ctx.createPattern(tex, "repeat");
+      if (pattern) {
+        const size = 220;
+        pattern.setTransform(
+          new DOMMatrix().translate(-this.camX * 0.0, top).scale(size / tex.naturalWidth),
+        );
+        ctx.fillStyle = pattern;
+      } else ctx.fillStyle = "rgb(40,30,26)";
+    } else ctx.fillStyle = "rgb(40,30,26)";
+    // A ragged top edge, where the last blow landed.
+    ctx.beginPath();
+    ctx.moveTo(-40, this.vh + 40);
+    for (let x = -40; x <= this.vw + 40; x += 16) {
+      const n = Math.sin(x * 0.13 + this.floors * 1.7) * 4 + Math.sin(x * 0.051) * 3;
+      ctx.lineTo(x, top + n);
+    }
+    ctx.lineTo(this.vw + 40, this.vh + 40);
+    ctx.closePath();
+    ctx.fill();
+    // Shadow down into the stone, and the lip lit by the light above.
+    const g = ctx.createLinearGradient(0, top, 0, top + 160);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,0.7)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-40, top, this.vw + 80, this.vh - top + 40);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = `rgba(255,190,120,${0.18 + 0.25 * this.lightReach})`;
+    ctx.fillRect(-40, top - 2, this.vw + 80, 3);
+    ctx.restore();
+  }
+
+  /**
+   * The light from Hearth following you down: a soft column from the top of
+   * the view to the tip, stronger the cleaner you've been breaking through.
+   */
+  private drawLightShaft(ctx: CanvasRenderingContext2D): void {
+    const tip = this.worldToScreen(0, this.crownY()).y;
+    const cx = this.worldToScreen(this.peak().x + this.peak().w / 2, 0).x;
+    const w = this.startW * 1.15;
+    const a = 0.05 + 0.12 * this.lightReach;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+    g.addColorStop(0, "rgba(255,170,90,0)");
+    g.addColorStop(0.5, `rgba(255,180,100,${a})`);
+    g.addColorStop(1, "rgba(255,170,90,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - w / 2, 0, w, tip);
+    // Brightest where it reaches the rock.
+    const pool = ctx.createRadialGradient(cx, tip, 0, cx, tip, w);
+    pool.addColorStop(0, `rgba(255,190,120,${a * 1.6})`);
+    pool.addColorStop(1, "rgba(255,190,120,0)");
+    ctx.fillStyle = pool;
+    ctx.fillRect(cx - w, tip - w, w * 2, w * 2);
+    ctx.restore();
+  }
+
+  /**
+   * The cave-in: the shaft you've opened filling back in from above, a
+   * ragged front of falling earth with the packed rubble behind it. Where
+   * the Dark would be.
+   */
+  private drawCaveIn(ctx: CanvasRenderingContext2D): void {
+    const front = this.worldToScreen(0, this.darkShown).y;
+    if (front < -60) return;
+    const art = this.caveArt;
+    ctx.save();
+    // Packed rubble behind the front, all the way up.
+    ctx.fillStyle = "rgb(22,16,14)";
+    const w = this.vw * 1.25;
+    const h = art.naturalWidth > 0 ? w * (art.naturalHeight / art.naturalWidth) * 1.5 : 200;
+    // The band's ragged edge (where its painting ends) sits on the front.
+    const top = front - h * CAVE_EDGE;
+    ctx.fillRect(-40, -40, this.vw + 80, top + 40 + 12);
+    if (art.complete && art.naturalWidth > 0) {
+      // A slow judder as it settles.
+      const j = this.reduceMotion ? 0 : Math.sin(this.clock * 7) * 1.5;
+      ctx.drawImage(art, (this.vw - w) / 2, top + j, w, h);
+    }
+    ctx.restore();
+    // A haze of dust below the front, and stones falling off it toward you.
+    const dust = ctx.createLinearGradient(0, front, 0, front + 90);
+    dust.addColorStop(0, "rgba(120,96,80,0.35)");
+    dust.addColorStop(1, "rgba(120,96,80,0)");
+    ctx.fillStyle = dust;
+    ctx.fillRect(-40, front, this.vw + 80, 90);
+    if (!this.reduceMotion && this.phase === "play" && Math.random() < 0.6) {
+      this.fx.burst(
+        this.camX + (Math.random() - 0.5) * this.vw,
+        this.darkShown - 4,
+        this.rockRgb(),
+        3,
+        90,
+      );
+    }
   }
 
   /** A sprite sheet once loaded: frames are square, side by side. */
@@ -5037,6 +5050,10 @@ export class SpireEngine {
     }
 
     this.fx.down = this.plan.descent ? -1 : 1;
+    if (this.plan.descent && !this.ascent && this.phase !== "menu") {
+      this.drawLightShaft(ctx);
+      this.drawRockFace(ctx);
+    }
     if (this.plan.descent) this.drawCeiling(ctx);
     else if (this.paintedSky()) this.drawPaintedGround(ctx);
     else this.drawGround(ctx);
@@ -5065,7 +5082,7 @@ export class SpireEngine {
     const live = aiming && this.phase !== "menu";
     // Once the sky is won the Dark is gone: the pull-back must not reveal it.
     if (this.plan.darkRate > 0 && this.phase !== "menu" && this.phase !== "won" && !this.escape) {
-      if (this.plan.descent) this.drawClimbers(ctx);
+      if (this.plan.descent) this.drawCaveIn(ctx);
       else if (this.ascent && this.blindArt) this.drawBlind(ctx);
       else this.drawDark(ctx);
     }
@@ -5282,7 +5299,7 @@ export class SpireEngine {
     this.drawMarker(
       ctx,
       y,
-      this.plan.descent ? "THE DEPTH" : "SUMMIT",
+      this.plan.descent ? "BREAK THROUGH" : "SUMMIT",
       rgbCss(this.theme.accent, 0.6 * beat),
       rgbCss(this.theme.accent, 0.95 * beat),
     );

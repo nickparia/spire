@@ -28,8 +28,15 @@ export function Journey({
     world ?? (ignite !== undefined && LEVELS[ignite] ? worldOf(LEVELS[ignite].id) : WORLDS[0]!);
   const skies = levelsOf(shown);
   const lit = skies.filter((l) => save.levels[l.id]?.clear).length;
+  // Skies are relit; depths are broken through.
+  const down = shown.id === "descent";
+  const noun = down ? "depths" : "skies";
+  const verb = down ? "broken through" : "relit";
   return (
-    <div className={"journey journey-" + size} aria-label={`${lit} of ${skies.length} skies relit`}>
+    <div
+      className={"journey journey-" + size}
+      aria-label={`${lit} of ${skies.length} ${noun} ${verb}`}
+    >
       <span className="journey-row" aria-hidden="true">
         {skies.map((level, i) => {
           const on = Boolean(save.levels[level.id]?.clear);
@@ -55,10 +62,12 @@ export function Journey({
       {caption ? (
         <span className="kicker journey-caption">
           {lit === 0
-            ? "No skies relit yet"
+            ? `No ${noun} ${verb} yet`
             : lit === skies.length
-              ? "Every sky relit"
-              : `${lit} of ${skies.length} skies relit`}
+              ? down
+                ? "Every depth broken through"
+                : "Every sky relit"
+              : `${lit} of ${skies.length} ${noun} ${verb}`}
         </span>
       ) : null}
     </div>

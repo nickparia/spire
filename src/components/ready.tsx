@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
-import { skyNumber } from "@/game/worlds";
+import { skyNumber, skyWord } from "@/game/worlds";
 
 /**
  * Said before each climb, over the sky, clear of the stack: the sky's line
@@ -26,7 +26,9 @@ export function ReadyCard({ hud }: { hud: Hud }) {
   return (
     <div className={"ready" + (fading ? " ready-out" : "")} aria-live="polite">
       <p className="ready-kicker">
-        {hud.ascent ? "The way back up" : `Sky ${skyNumber(level.id)} · ${level.name}`}
+        {hud.ascent
+          ? "The way back up"
+          : `${skyWord(level.id)} ${skyNumber(level.id)} · ${level.name}`}
       </p>
       <p className="ready-line">
         {hud.ascent

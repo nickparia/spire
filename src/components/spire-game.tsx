@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { SpireEngine, type Hud } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { BUILD } from "@/game/version";
-import { isBoss, worldDone, worldOf, WORLDS } from "@/game/worlds";
+import { isBoss, skyWord, worldDone, worldOf, WORLDS } from "@/game/worlds";
 import { nextSkyIn } from "@/game/progress";
 import { StarMap } from "./star-map";
 import { WorldEnd } from "./world-end";
@@ -505,7 +505,11 @@ export function SpireGame() {
                 ? next
                 : null
             }
-            nextLabel={isBoss(LEVELS[hud.result.levelIndex]!.id) ? "The sky" : "Next sky"}
+            nextLabel={
+              isBoss(LEVELS[hud.result.levelIndex]!.id)
+                ? "The sky"
+                : `Next ${skyWord(LEVELS[hud.result.levelIndex]!.id).toLowerCase()}`
+            }
             onRetry={retry}
             onQuit={quit}
             save={save}

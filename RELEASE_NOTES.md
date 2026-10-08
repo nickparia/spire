@@ -3,6 +3,17 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 66 — Breaking through (internal)
+
+- **The Descent, rebuilt.** You drive the Spire down through solid rock so Hearth's light can follow you to the roots. It's the same tap and groove as Hearth:
+  - **Every slab is a blow** on the rock face below the tip: stone chips and dust.
+  - **A perfect bursts through**: rock flies, and the light pouring down the shaft behind you grows stronger.
+  - **The shaft caves in behind you**: a wall of rubble comes down the hole you've dug, closing over the light. Build steadily to stay ahead; if it reaches you, _the light is buried_.
+  - **The rock gets harder** the deeper you go (each depth has its own: roots, bone, wet slate, crystal, magma, carved stone…). On hard rock a sloppy blow shakes more earth loose behind you; strike it true.
+- **The creatures are gone.**
+- **Depths, not skies.** "Depth 1 · The Roots", "Depth 3 of 8", "Next depth", and finishing one says **Broken through**. The way back up (the boss) is unchanged.
+- Checked on an iPhone simulator with real taps.
+
 ## Build 65 — Chapter II (internal)
 
 - **Chapter II · What Was Buried.** Relight the Descent and the story goes on: the builders followed the Spire's roots down, found a door no one had built, and painted what it showed them — many worlds, each with a dark thing above it, all turning around one black centre. Then they stopped. Four pages, each over its own living painting (lanterns down the stairs, the door breathing violet, the mural of the worlds, a hall of builders lying in rows). Read it again any time from **Story**. Checked on an iPhone simulator with real taps.

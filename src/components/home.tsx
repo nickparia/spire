@@ -332,8 +332,14 @@ function WorldPanel({
         <p className="wpanel-name">{world.name}</p>
         <p className="wpanel-blurb">{world.blurb}</p>
         <p className="wpanel-meta">
-          {done ? "Every sky relit" : `Sky ${next + 1} of ${levels.length}`} ·{" "}
-          <StarIcon on size={12} /> {stars}/{levels.length * 3}
+          {world.id === "descent"
+            ? done
+              ? "Every depth broken through"
+              : `Depth ${next + 1} of ${levels.length}`
+            : done
+              ? "Every sky relit"
+              : `Sky ${next + 1} of ${levels.length}`}{" "}
+          · <StarIcon on size={12} /> {stars}/{levels.length * 3}
         </p>
         {open && save.tester ? (
           <button

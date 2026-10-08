@@ -39,12 +39,7 @@ export type LevelDef = {
   descent?: boolean;
   /** Its own painting and stone (art/sky/<paint>.mp4, art/slabs/<paint>.webp); defaults to the theme's. */
   paint?: string;
-  /** What climbs in the Descent: the kinds that come up the shaft here. */
-  climbers?: ClimberKind[];
 };
-
-/** The things that climb the Descent's shaft. */
-export type ClimberKind = "swarm" | "mite" | "brute" | "lantern";
 
 /** Every level opens with a few plain floors so the new rhythm is a reveal. */
 export const WARMUP_FLOORS = 3;
@@ -183,7 +178,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "roots",
     name: "The Roots",
-    blurb: "Build down. Something is climbing up.",
+    blurb: "Drive the Spire down. The light follows.",
     line: "Down here the stone is older than the tower. It was never asked.",
     theme: "foundry",
     floors: 20,
@@ -197,13 +192,12 @@ export const LEVELS: LevelDef[] = [
     tier: 0,
     descent: true,
     paint: "roots",
-    climbers: ["swarm"],
   },
   {
     id: "ossuary",
     name: "The Ossuary",
     blurb: "The groove walks. The dead keep count.",
-    line: "They laid the builders here, in rows, facing up. Some of them are climbing.",
+    line: "They laid the builders here, in rows, facing up. Break through them gently.",
     theme: "foundry",
     floors: 26,
     courses: ["sway"],
@@ -216,13 +210,12 @@ export const LEVELS: LevelDef[] = [
     tier: 1,
     descent: true,
     paint: "ossuary",
-    climbers: ["swarm", "mite"],
   },
   {
     id: "drowned",
     name: "The Drowned Halls",
     blurb: "It rests, then it jumps. Count it in.",
-    line: "The water came down after the light went. It has been falling ever since.",
+    line: "The water came down after the light went. Break through before it fills the shaft.",
     theme: "foundry",
     floors: 26,
     courses: ["beat"],
@@ -235,13 +228,12 @@ export const LEVELS: LevelDef[] = [
     tier: 2,
     descent: true,
     paint: "drowned",
-    climbers: ["mite", "swarm"],
   },
   {
     id: "crystal",
     name: "Crystal Veins",
     blurb: "It bursts through the centre.",
-    line: "The stone here grew light of its own once. It remembers how, a little.",
+    line: "The stone here grew light of its own once. It is hard. Strike it true.",
     theme: "foundry",
     floors: 28,
     courses: ["rush"],
@@ -254,7 +246,6 @@ export const LEVELS: LevelDef[] = [
     tier: 3,
     descent: true,
     paint: "crystal",
-    climbers: ["swarm", "mite", "brute"],
   },
   {
     id: "furnace",
@@ -273,7 +264,6 @@ export const LEVELS: LevelDef[] = [
     tier: 4,
     descent: true,
     paint: "furnace",
-    climbers: ["brute", "swarm", "mite"],
   },
   {
     id: "quiet",
@@ -292,7 +282,6 @@ export const LEVELS: LevelDef[] = [
     tier: 5,
     descent: true,
     paint: "quiet",
-    climbers: ["swarm", "mite", "brute"],
   },
   {
     id: "hollow",
@@ -311,7 +300,6 @@ export const LEVELS: LevelDef[] = [
     tier: 6,
     descent: true,
     paint: "hollow",
-    climbers: ["lantern", "swarm"],
   },
   {
     id: "floor",
@@ -330,7 +318,6 @@ export const LEVELS: LevelDef[] = [
     tier: 7,
     descent: true,
     paint: "floor",
-    climbers: ["swarm", "mite", "brute", "lantern"],
   },
 ];
 

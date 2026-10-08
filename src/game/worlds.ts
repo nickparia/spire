@@ -44,7 +44,7 @@ export const WORLDS: WorldDef[] = [
   {
     id: "descent",
     name: "The Descent",
-    blurb: "Build down. Something is climbing up.",
+    blurb: "Drive the Spire down through the earth. The light follows.",
     concept: "The Spire's roots, hung down a shaft into stone older than the tower.",
     levelIds: ["roots", "ossuary", "drowned", "crystal", "furnace", "quiet", "hollow", "floor"],
     revelation: "They stopped. That is all. The builders stopped.",
@@ -73,6 +73,11 @@ export function levelsOf(world: WorldDef): LevelDef[] {
 
 export function worldOf(levelId: string): WorldDef {
   return WORLDS.find((w) => w.levelIds.includes(levelId)) ?? WORLDS[0]!;
+}
+
+/** What a world's stretches are called: skies up in Hearth, depths down the Descent. */
+export function skyWord(levelId: string): "Sky" | "Depth" {
+  return worldOf(levelId).id === "descent" ? "Depth" : "Sky";
 }
 
 /** A sky's number within its own world, from 1. */
