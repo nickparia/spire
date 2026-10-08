@@ -1,7 +1,8 @@
 {
-  "build": 61,
-  "title": "Painted, always",
+  "build": 62,
+  "title": "The Dark, moving and clean",
   "notes": [
-    "If your phone won't play the painted videos (Low Power Mode, say), the game now shows their painted stills instead of nothing: the Dark, the skies, the bosses."
+    "The Dark keeps moving: its video stays playing on iPhone, and if iOS stops it anyway it carries on from a painted sprite sheet instead of freezing.",
+    "The violet line along the Dark and the violet splash rings are gone; things fall into it with a spray of black ink."
   ]
 }

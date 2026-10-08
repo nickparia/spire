@@ -88,7 +88,7 @@ export class Fx {
    * Something crushed: dark blood sprayed out under gravity, a few heavy
    * gobbets, and a stain that lingers where it burst.
    */
-  blood(x: number, y: number, rgb: RGB, n: number, speed: number): void {
+  blood(x: number, y: number, rgb: RGB, n: number, speed: number, stain = true): void {
     for (let i = this.count(n); i > 0; i--) {
       const a = Math.random() * TAU;
       const s = speed * (0.3 + Math.random() * 0.9);
@@ -108,6 +108,7 @@ export class Fx {
         glow: false,
       });
     }
+    if (!stain) return;
     const blobs = this.calm ? 3 : 7;
     for (let i = 0; i < blobs; i++) {
       this.splats.push({

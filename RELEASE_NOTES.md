@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 62 — The Dark, moving and clean (internal)
+
+- **The Dark keeps moving.** On iPhone its video stopped after a while (iOS pauses videos it thinks are hidden, and ours were) and it froze on a still. Every painted video is now a real full-size element behind the game, so iOS keeps it playing; and if it stops the Dark's anyway, the Dark carries on from a painted sprite sheet of the same loop rather than freezing.
+- **No more violet line.** The Dark's edge is its own painted surface, with a low haze of smoke off it so you can still read it up close. The Descent's climbers lose their line too.
+- **Cleaner splashes.** Things falling into the Dark throw up black ink droplets, scaled to their size; no violet ring, no flat stains. Motes rising off a near Dark are embers.
+
 ## Build 61 — Painted, always (internal)
 
 - **Fixed: the Dark showed only its line, with nothing underneath.** When the phone won't play a painted video (Low Power Mode does this), iOS draws nothing for it at all. Now each painted video falls back to a painted still of itself: the Dark, the skies, the Hearth source and the Descent's blind thing. If Low Power Mode is on, you'll see them still rather than moving.

@@ -141,7 +141,19 @@ const ESCAPE_OFFBEAT = 0.34;
 const ESCAPE_LUNGE = 6;
 /** Seconds the summit sting plays, when it is there. */
 /** How far down the painted Dark its surface lies, as a share of its height. */
+/**
+ * Where the painted videos live in the page: full size, just behind the game
+ * (whose own background hides them). iOS pauses a video it thinks can't be
+ * seen, as it did the old 1-pixel hidden ones; these count as on screen.
+ */
+const VIDEO_BEHIND =
+  "position:fixed;left:0;top:0;width:100vw;height:100vh;object-fit:cover;pointer-events:none;z-index:-1";
 const DARK_ART_SURFACE = 0.2;
+/** The Dark's sprite sheet: an 8×7 grid, 52 frames of its 6.6 s loop at 8 fps. */
+const DARK_COLS = 8;
+const DARK_ROWS = 7;
+const DARK_FRAMES = 52;
+const DARK_FPS = 8;
 /** Down the screen the Descent's tip sits, as a share of the view. */
 const DESCENT_SEAT = 0.42;
 /** The near scenery: its size, how fast it leaves as you climb, and how solid it is. */
@@ -2583,8 +2595,7 @@ export class SpireEngine {
     v.playsInline = true;
     v.preload = "auto";
     v.setAttribute("playsinline", "");
-    v.style.cssText =
-      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+    v.style.cssText = VIDEO_BEHIND;
     const ready = () => {
       if (v.readyState >= 2) this.darkArtReady = true;
     };
@@ -2605,15 +2616,26 @@ export class SpireEngine {
    * The painted Dark: its surface (a fifth of the way down the painting) at
    * the Dark's line, the night above it faded out so only the smoke lifts off.
    */
-  private drawDarkArt(ctx: CanvasRenderingContext2D, surface: number): void {
-    const v = this.darkArt!;
-    if (v.paused) void v.play().catch(() => undefined);
-    const frame = this.frameOf(v, "art/dark-hearth.jpg");
-    if (!frame) return;
+  private drawDarkArt(ctx: CanvasRenderingContext2D, surface: number): boolean {
+    // A sprite sheet, not a video: iOS paused the hidden video to save power and
+    // the Dark froze on its still. An image it can't pause.
+    let sheet = this.sprites.get("dark-hearth");
+    if (!sheet) {
+      sheet = Object.assign(new Image(), { src: "art/sprites/dark-hearth.jpg" });
+      this.sprites.set("dark-hearth", sheet);
+    }
+    const v = this.darkArt;
+    if (v?.paused) void v.play().catch(() => undefined);
+    // Its video while it really plays, at full quality; the sheet when iOS won't.
+    const live = v && !v.paused && v.readyState >= 2 && v.currentTime > 0 ? v : null;
+    if (!live && (!sheet.complete || sheet.naturalWidth === 0)) return false;
+    const cw = live ? live.videoWidth : sheet.naturalWidth / DARK_COLS;
+    const ch = live ? live.videoHeight : sheet.naturalHeight / DARK_ROWS;
+    const f = Math.floor((this.reduceMotion ? 0 : this.clock) * DARK_FPS) % DARK_FRAMES;
     const w = this.vw * 1.1;
-    const h = w * (v.videoHeight / Math.max(1, v.videoWidth) || 16 / 9);
+    const h = w * (ch / cw);
     const top = surface - h * DARK_ART_SURFACE;
-    if (top > this.vh) return;
+    if (top > this.vh) return true;
     const mask = (this.darkMask ??= document.createElement("canvas"));
     const mw = Math.ceil(w);
     const mh = Math.ceil(h);
@@ -2624,7 +2646,19 @@ export class SpireEngine {
     const m = mask.getContext("2d")!;
     m.globalCompositeOperation = "source-over";
     m.clearRect(0, 0, mw, mh);
-    m.drawImage(frame, 0, 0, mw, mh);
+    if (live) m.drawImage(live, 0, 0, mw, mh);
+    else
+      m.drawImage(
+        sheet,
+        (f % DARK_COLS) * cw,
+        Math.floor(f / DARK_COLS) * ch,
+        cw,
+        ch,
+        0,
+        0,
+        mw,
+        mh,
+      );
     m.globalCompositeOperation = "destination-in";
     const fade = m.createLinearGradient(0, 0, 0, mh);
     fade.addColorStop(0, "rgba(0,0,0,0)");
@@ -2640,6 +2674,7 @@ export class SpireEngine {
       ctx.fillStyle = "rgb(4,2,8)";
       ctx.fillRect(-120, bottom, this.vw + 240, this.vh - bottom + 160);
     }
+    return true;
   }
 
   private loadSourceArt(): void {
@@ -2652,8 +2687,7 @@ export class SpireEngine {
     v.preload = "auto";
     v.setAttribute("playsinline", "");
     // In the page but invisible: iOS will not decode frames for a detached video.
-    v.style.cssText =
-      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+    v.style.cssText = VIDEO_BEHIND;
     const ready = () => {
       if (v.readyState >= 2) this.sourceArtReady = true;
     };
@@ -2943,9 +2977,11 @@ export class SpireEngine {
 
   /** Something falls into the Dark: black ink thrown up with violet glints, a ripple, a gloop. */
   private inkSplash(x: number, y: number, w: number): void {
-    this.fx.blood(x, y, INK_RGB, 34, 260);
-    this.fx.blood(x, y, [120, 60, 190], 10, 200);
-    this.fx.ring(x, y, [150, 80, 220], 50 + w * 0.4, 3);
+    // A whole slab throws up more than a sliver.
+    const size = Math.min(1.6, 0.5 + w / Math.max(1, this.startW));
+    // Droplets only: a stain on the Dark's surface reads as a flat blot.
+    this.fx.blood(x, y, INK_RGB, Math.round(30 * size), 200 + 80 * size, false);
+    this.fx.blood(x, y, [70, 40, 34], Math.round(8 * size), 180, false);
     this.sfx.splash();
   }
 
@@ -3548,7 +3584,7 @@ export class SpireEngine {
     if (this.ascent && result.perfect) {
       const vault = ASCENT_VAULT + (this.streak >= 3 ? ASCENT_VAULT_STREAK : 0);
       this.dark -= SLAB_H * vault;
-      this.fx.burst(cx, this.dark + SLAB_H * 2, [200, 170, 255], 20, 260);
+      this.fx.burst(cx, this.dark + SLAB_H * 2, [220, 200, 180], 20, 260);
       this.trauma = Math.min(1, this.trauma + 0.15);
     }
     // The gifts at work.
@@ -4591,19 +4627,6 @@ export class SpireEngine {
       );
       ctx.restore();
     }
-    // The edge stays readable whatever they look like.
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = "rgba(150,80,220,0.35)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let x = -40; x <= this.vw + 40; x += 12) {
-      const y = front + Math.sin(x * 0.021 + clock * 1.1) * 5;
-      if (x === -40) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.restore();
   }
 
   /** Slabs from the top that burn: a streak of four sets the top alight, and it spreads. */
@@ -4641,8 +4664,7 @@ export class SpireEngine {
       video.playsInline = true;
       video.preload = "auto";
       video.setAttribute("playsinline", "");
-      video.style.cssText =
-        "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+      video.style.cssText = VIDEO_BEHIND;
       const made = {
         video,
         fg: Object.assign(new Image(), { src: `art/sky/${id}-fg.webp` }),
@@ -4853,8 +4875,7 @@ export class SpireEngine {
     v.playsInline = true;
     v.preload = "auto";
     v.setAttribute("playsinline", "");
-    v.style.cssText =
-      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0";
+    v.style.cssText = VIDEO_BEHIND;
     const ready = () => {
       if (v.readyState >= 2) this.blindReady = true;
     };
@@ -5155,9 +5176,7 @@ export class SpireEngine {
     const surface = this.worldToScreen(0, this.darkShown).y;
     if (surface < -120) return;
     const clock = this.reduceMotion ? 0 : this.clock;
-    if (this.darkArt) {
-      this.drawDarkArt(ctx, surface);
-    } else {
+    if (!this.drawDarkArt(ctx, surface)) {
       const soft = 70;
       const g = ctx.createLinearGradient(0, surface - soft, 0, surface + 30);
       g.addColorStop(0, "rgba(14,6,26,0)");
@@ -5166,27 +5185,14 @@ export class SpireEngine {
       ctx.fillStyle = g;
       ctx.fillRect(-120, surface - soft, this.vw + 240, this.vh - surface + soft + 160);
     }
-    // The edge: a few slow waves of violet light along the surface.
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    for (let band = 0; band < 2; band++) {
-      ctx.beginPath();
-      const amp = 6 + band * 4;
-      const lift = band * 9;
-      for (let x = -40; x <= this.vw + 40; x += 12) {
-        const y =
-          surface -
-          lift +
-          Math.sin(x * 0.021 + clock * (1.1 + band * 0.4)) * amp +
-          Math.sin(x * 0.053 - clock * 0.7) * 3;
-        if (x === -40) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = `rgba(150,80,220,${0.35 - band * 0.12})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-    ctx.restore();
+    // The edge is the painting's own; a low haze of smoke off it keeps it
+    // readable when it's close, in the painting's colours, not a drawn line.
+    const haze = ctx.createLinearGradient(0, surface - 46, 0, surface + 8);
+    haze.addColorStop(0, "rgba(20,12,16,0)");
+    haze.addColorStop(0.7, `rgba(20,12,16,${0.32 + 0.08 * Math.sin(clock * 0.9)})`);
+    haze.addColorStop(1, "rgba(20,12,16,0)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(-120, surface - 46, this.vw + 240, 54);
     if (this.boss) this.drawEyes(ctx, surface);
     if (this.rime > 0) this.drawRime(ctx, surface);
     // Motes drifting up off it when it is close to the top.
@@ -5195,7 +5201,7 @@ export class SpireEngine {
         this.camX + (Math.random() - 0.5) * this.vw * 0.6,
         this.darkShown + 10,
         40,
-        [150, 80, 220],
+        [255, 150, 70],
         1,
       );
     }
