@@ -77,9 +77,8 @@ import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
 import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
-import { Rite, type Shot } from "./kit/rite";
-import { DESCENT_FLOOR, descentWorld } from "./kit/descent";
-import { DescentView } from "./kit/descent-view";
+import { Hang, hangTune, type HangEvent, STONE_H } from "./hang";
+import { HangView } from "./hang-view";
 import {
   BOMB_RGB,
   drawBomb,
@@ -252,11 +251,6 @@ const SPOKEN =
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
 const DEMO_TIME = 0.5;
-/** The Descent's chain: how high the stone rises at the ends of its arc, the chain's length, and a heating chain's limit (s). */
-const CHAIN_LIFT = 46;
-const CHAIN_LEN = 240;
-const HEAT_HOLD = 2.6;
-const isChain = (c: CourseId): boolean => c === "pendulum" || c === "winch" || c === "heat";
 /** The longest a demo may hold your taps before it steps aside, in seconds. */
 const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
@@ -414,6 +408,8 @@ export type Hud = {
   coins: number;
   /** Floors between the Dark and the top of the stack; null when it isn't rising. */
   darkGap: number | null;
+  /** The Descent's fight: the wire's strain (0..100) and the stones the Dark holds. */
+  wire: { strain: number; held: number } | null;
   /** Built down: the Dark is the climbers. */
   descent: boolean;
   /** The Descent's boss: climbing back up; and whether the door's sting is playing. */
@@ -573,8 +569,6 @@ type Mover = {
   /** Width lost since the last chunk broke off, and which end breaks next. */
   crumb: number;
   crumbSide: number;
-  /** A heating chain: seconds this stone has been held. */
-  heat?: number;
   /** Split: the slab is two halves. `x` is the left half; these drive the right. */
   split: boolean;
   u2: number;
@@ -840,9 +834,9 @@ export class SpireEngine {
   private oil: HTMLVideoElement | null = null;
   private lightReach = 0.6;
   private rockShake = 0;
-  /** A world-kit run (the Descent), and how it's drawn. */
-  private rite: Rite | null = null;
-  private riteView = new DescentView();
+  /** The Descent's fight on the wire, and how it's drawn. */
+  private hang: Hang | null = null;
+  private hangView = new HangView();
   /** Seconds until the drill's HUD (depth, the oil's gap) is sent again. */
   private emitCooldown = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
@@ -1003,11 +997,11 @@ export class SpireEngine {
       this.breakTop();
       return;
     }
-    if (this.rite) {
+    if (this.hang) {
+      if (this.hang.fall >= 0) return;
       if (this.phase === "ready") this.phase = "play";
       this.hint = false;
-      const shot = this.rite.fire();
-      if (shot) this.riteShot(shot);
+      this.hangEvent(this.hang.tap());
       return;
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
@@ -1335,11 +1329,11 @@ export class SpireEngine {
     this.loadSourceArt();
     this.loadDarkArt();
     this.resetRun("ready", true);
-    this.rite = null;
+    this.hang = null;
     const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
     if (level?.descent) {
-      this.rite = new Rite(descentWorld(level.tier ?? 0, level.floors));
-      this.riteView = new DescentView();
+      this.hang = new Hang(hangTune(level.tier ?? 0));
+      this.hangView = new HangView();
       this.hint = true;
     }
     this.music.setTrack(this.theme.track);
@@ -1904,13 +1898,8 @@ export class SpireEngine {
       this.seat = { x: top.x + top.w / 2, y: this.seatY() };
     }
     if ((this.phase === "play" || this.phase === "ready") && this.mover.fallT < 0) {
-      // The held slab rides two floors above the settled top; on a chain it
-      // rises toward the ends of its arc.
-      let want = this.seat.y + SLAB_H * 2;
-      if (isChain(this.mover.course)) {
-        const u = this.mover.u;
-        want += CHAIN_LIFT * (1 - Math.sqrt(Math.max(0, 1 - u * u)));
-      }
+      // The held slab rides two floors above the settled top.
+      const want = this.seat.y + SLAB_H * 2;
       this.mover.y += (want - this.mover.y) * Math.min(1, dt * 6);
     }
     if (this.phase === "play") {
@@ -3032,7 +3021,7 @@ export class SpireEngine {
 
   /** Floors of tower still above the Dark. */
   private darkGap(): number {
-    if (this.rite) return this.rite.gap / DESCENT_FLOOR;
+    if (this.hang) return this.hang.drag / STONE_H;
     return (this.crownY() - this.dark) / SLAB_H;
   }
 
@@ -3255,17 +3244,6 @@ export class SpireEngine {
           }
           m.crumb = 0;
         }
-      }
-    }
-    // A heating chain: hold the stone too long and it's let go for you.
-    if (m.course === "heat" && this.phase === "play") {
-      m.heat = (m.heat ?? 0) + dt;
-      if (m.heat > HEAT_HOLD) {
-        m.heat = 0;
-        this.fx.burst(m.x + m.w / 2, m.y, [255, 120, 50], 18, 200);
-        this.sfx.hiss();
-        this.place();
-        return;
       }
     }
     const rate = travelRate(m.course, m.dir, m.wind, m.u, m.period, this.clock);
@@ -4259,6 +4237,7 @@ export class SpireEngine {
           ? Math.max(0, Math.floor(this.darkGap()))
           : null,
       descent: !!this.plan.descent,
+      wire: this.hang ? { strain: Math.round(this.hang.strain * 100), held: this.hang.held } : null,
       ascent: this.ascent ? { sting: this.ascentSting > 0 } : null,
       accent: rgbCss(this.theme.accent),
       result: this.result,
@@ -4326,8 +4305,8 @@ export class SpireEngine {
     }
     this.curtain = Math.max(0, this.curtain - dt / 0.32);
     this.pulse = Math.max(0, this.pulse - dt * 2.2);
-    if (this.rite && this.phase !== "menu") {
-      this.stepRite(dt);
+    if (this.hang && this.phase !== "menu") {
+      this.stepHang(dt);
       return;
     }
 
@@ -4524,7 +4503,7 @@ export class SpireEngine {
   /* -------------------------------------------------------------- render */
 
   private worldToScreen = (x: number, yBottom: number): { x: number; y: number } => {
-    if (this.rite) return this.riteView.to(x, yBottom, this.vw, this.vh);
+    if (this.hang) return this.hangView.to(x, yBottom, this.vw);
     if (this.plan.descent) {
       // Built down: the world is mirrored, so higher means further down the
       // screen. Offset by a slab so anything drawn up from its bottom edge
@@ -4778,7 +4757,7 @@ export class SpireEngine {
    * time, its sting plays before the climb can start.
    */
   private beginAscent(fresh: boolean): void {
-    this.rite = null;
+    this.hang = null;
     this.ascent = true;
     this.plan = {
       ...this.plan,
@@ -4875,24 +4854,18 @@ export class SpireEngine {
     return level?.paint ?? this.theme.id;
   }
 
-  /** One frame of a world-kit run: the rite, its view, its effects, how it ends. */
-  private stepRite(dt: number): void {
-    const r = this.rite!;
+  /** One frame of the Descent's fight: the tower, its view, its effects, how it ends. */
+  private stepHang(dt: number): void {
+    const h = this.hang!;
     this.fx.down = -1;
     if (this.phase === "play") {
       this.runTime += dt;
-      const crewBefore = r.actors.filter((x) => x.kind === "miner" && x.state !== "dead").length;
-      const end = r.step(dt);
-      this.floors = Math.floor(r.progress / DESCENT_FLOOR);
-      const crewAfter = r.actors.filter((x) => x.kind === "miner" && x.state !== "dead").length;
-      if (crewAfter < crewBefore) {
-        // A miner taken: their lamp goes out, the deep gets darker.
-        this.sfx.taken();
-        this.trauma = Math.min(1, this.trauma + 0.35);
-        haptics.heavy();
-      }
-      if (end === "caught") {
-        this.float("THE LIGHT IS BURIED", 0, -60, false, 24);
+      const { events, end } = h.step(dt);
+      for (const e of events) this.hangEvent(e);
+      this.floors = h.stones.length - 1;
+      if (end === "lost") {
+        const tp = h.tip();
+        this.float("THE LIGHT IS BURIED", tp.x, tp.y + 60, false, 24);
         this.taken = true;
         this.sfx.fail();
         this.trauma = 1;
@@ -4900,30 +4873,29 @@ export class SpireEngine {
         this.fallAge = 0;
         this.keepGhost();
         this.emit();
-      } else if (end === "through") {
-        this.float("BROKEN THROUGH", 0, -70, true, 28);
-        this.fx.rayBurst(0, 40, [255, 200, 130], 220, 18);
+      } else if (end === "won") {
         if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.beginAscent(true);
         else this.win();
       }
-      // The score follows the race: how deep, and how close the ooze.
-      const danger = clamp01(1 - r.gap / 260);
+      // The score follows the fight: the wire's strain against the Dark's hold.
+      const danger = clamp01(h.held / Math.max(1, h.stones.length));
       this.strain = Math.max(this.strain * 0.95, danger);
       this.music.setClimb({
-        progress: clamp01(r.progress / r.world.goal),
+        progress: h.strain,
         danger,
         streak: this.streak,
         landings: 2,
       });
     } else if (this.phase === "ready") {
-      // Before the first shot only the head swings: the ooze and the clock wait.
-      r.step(dt);
-      r.gap = r.world.chaser.start;
-      r.time = 0;
+      // Before the first catch the tower only swings: the Dark waits.
+      const drag = h.drag;
+      h.step(dt);
+      h.drag = drag;
+      h.time = 0;
     } else if (this.phase === "fall") {
       this.fallAge += dt;
     }
-    this.riteView.step(dt, r);
+    this.hangView.step(dt, h, this.vh);
     for (let i = this.floaters.length - 1; i >= 0; i--) {
       const f = this.floaters[i]!;
       f.y -= f.vy * dt;
@@ -4940,91 +4912,101 @@ export class SpireEngine {
     }
   }
 
-  /** What a shot did: the burst, the sound, the score. */
-  private riteShot(shot: Shot): void {
-    this.drops += 1;
+  /** What happened on the wire: the burst, the sound, the score. */
+  private hangEvent(e: HangEvent): void {
+    const h = this.hang!;
+    const tp = h.tip();
     const rock = this.rockRgb();
-    if (!shot.hit) {
-      // A miss cracks the wall: the ooze seeps in and gathers momentum.
-      this.streak = 0;
-      this.accuracySum += 0.3;
-      this.fx.burst(shot.x, shot.y, rock, 14, 160);
-      this.fx.blood(shot.x, shot.y, [14, 8, 22], 10, 90, false);
-      this.sfx.rubble();
-      this.sfx.quicken();
-      this.trauma = Math.min(1, this.trauma + 0.12);
-      haptics.medium();
-      this.emit();
-      return;
+    switch (e.kind) {
+      case "true": {
+        this.drops += 1;
+        this.streak += 1;
+        this.bestStreak = Math.max(this.bestStreak, this.streak);
+        this.perfects += 1;
+        this.accuracySum += 1;
+        this.hangView.flash = 1;
+        this.fx.sparkle(tp.x, tp.y, h.tune.stoneW, [255, 230, 170], 16);
+        this.sfx.perfect(this.streak);
+        this.flash = Math.max(this.flash, 0.15);
+        if (this.streak % STREAK_SPOKEN === 0)
+          this.float(`PERFECT ×${this.streak}`, tp.x, tp.y + 50, true, 26);
+        haptics.light();
+        break;
+      }
+      case "off":
+        this.drops += 1;
+        this.streak = 0;
+        this.accuracySum += Math.max(0.4, 1 - Math.abs(e.rel) / h.tune.stoneW);
+        this.fx.burst(tp.x, tp.y, rock, 10, 140);
+        this.sfx.drop();
+        this.trauma = Math.min(1, this.trauma + 0.1);
+        haptics.light();
+        break;
+      case "lost":
+        this.drops += 1;
+        this.streak = 0;
+        this.accuracySum += 0.2;
+        this.fx.burst(h.stoneX(), tp.y + STONE_H * 1.5, rock, 16, 200);
+        this.sfx.fall();
+        this.sfx.quicken();
+        this.hangView.shake = 0.6;
+        haptics.medium();
+        break;
+      case "crack":
+        this.fx.burst(tp.x, tp.y, rock, 24, 260);
+        this.sfx.rubble();
+        this.hangView.shake = 1;
+        this.trauma = Math.min(1, this.trauma + 0.3);
+        haptics.heavy();
+        break;
+      case "surge":
+        this.sfx.quicken();
+        this.hangView.shake = 0.5;
+        break;
+      case "snap":
+        this.float("THE WIRE SNAPS", tp.x, tp.y - 40, true, 28);
+        this.fx.rayBurst(0, 40, [255, 200, 130], 220, 18);
+        this.sfx.boom();
+        this.hangView.shake = 1;
+        this.flash = Math.max(this.flash, 0.5);
+        haptics.heavy();
+        break;
     }
-    const t = shot.target;
-    if (!shot.broke) {
-      // Hard rock: it cracks but holds.
-      this.fx.burst(t.x, t.y, rock, 16, 180);
-      this.sfx.slice();
-      this.trauma = Math.min(1, this.trauma + 0.08);
-      haptics.light();
-      return;
-    }
-    this.streak = shot.perfect ? this.streak + 1 : 0;
-    this.bestStreak = Math.max(this.bestStreak, this.streak);
-    if (shot.perfect) this.perfects += 1;
-    this.accuracySum += shot.perfect ? 1 : 0.8;
-    if (t.kind === "creature") {
-      // Struck in the lamp's light: it bursts, and the miner lives.
-      this.fx.blood(t.x, t.y, [70, 60, 80], 30, 280, false);
-      this.fx.burst(t.x, t.y, [255, 220, 170], 14, 220);
-      this.sfx.squash();
-      this.flash = Math.max(this.flash, 0.2);
-    } else if (t.kind === "vein") {
-      this.fx.burst(t.x, t.y, [255, 226, 150], 28, 260);
-      this.fx.sparkle(t.x, t.y, 40, [255, 236, 180], 20);
-      this.sfx.perfect(this.streak);
-      this.flash = Math.max(this.flash, 0.3);
-    } else {
-      this.fx.burst(t.x, t.y, rock, shot.perfect ? 34 : 20, shot.perfect ? 320 : 220);
-      this.fx.burst(t.x, t.y, [255, 170, 90], shot.perfect ? 16 : 8, 260);
-      this.sfx.boom();
-    }
-    this.trauma = Math.min(1, this.trauma + (shot.perfect ? 0.16 : 0.1));
-    if (shot.perfect && this.streak > 0 && this.streak % STREAK_SPOKEN === 0) {
-      this.float(`PERFECT ×${this.streak}`, t.x, t.y - 40, true, 26);
-    }
-    haptics.light();
     this.emit();
   }
 
   /** The Descent's view, then the usual overlays. */
-  private renderRite(ctx: CanvasRenderingContext2D, ox: number, oy: number): void {
-    const img = (name: string, src: string): HTMLImageElement => {
-      let i = this.sprites.get(name);
-      if (!i) {
-        i = Object.assign(new Image(), { src });
-        this.sprites.set(name, i);
-      }
-      return i;
-    };
+  private renderHang(ctx: CanvasRenderingContext2D, ox: number, oy: number): void {
     const sky = this.paintedSky();
-    const oozeV = this.oilVideo();
+    const darkV = this.oilVideo();
+    let rig = this.sprites.get("drill-rig");
+    if (!rig) {
+      rig = Object.assign(new Image(), { src: "art/drill-rig.webp" });
+      this.sprites.set("drill-rig", rig);
+    }
     ctx.save();
     ctx.translate(ox, oy);
-    this.riteView.draw(
+    this.hangView.draw(
       ctx,
-      this.rite!,
+      this.hang!,
       {
         depth: sky ? this.frameOf(sky.video, sky.video.poster) : null,
-        ooze: oozeV ? this.frameOf(oozeV, "art/oil.jpg") : null,
-        rig: img("drill-rig", "art/drill-rig.webp"),
-        column: img("kit-column", "art/kit/column.webp"),
-        head: img("drill-head", "art/sprites/drill-head.webp"),
-        seam: img("kit-seam", "art/kit/seam.webp"),
-        vein: img("kit-vein", "art/kit/vein.webp"),
-        miner: img("kit-miner", "art/sprites/miner.webp"),
-        creature: img("kit-creature", "art/sprites/creature.webp"),
+        dark: darkV ? this.frameOf(darkV, "art/oil.jpg") : null,
+        rig,
       },
       this.vw,
       this.vh,
       this.reduceMotion ? 0 : this.clock,
+      (c, x, yBottom, w, hh, held, hot) => {
+        const rgb = held ? ([40, 26, 56] as RGB) : this.slabColor(this.floors + 1);
+        this.slabLookNow = hot ? this.slabLook(null, this.burning() > 0) : null;
+        this.paintSlab(c, x, yBottom, w, hh, rgb, 1, 0, hot);
+        this.slabLookNow = null;
+        if (held) {
+          c.fillStyle = "rgba(20,10,34,0.55)";
+          c.fillRect(x, yBottom - hh, w, hh);
+        }
+      },
     );
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
@@ -5389,8 +5371,8 @@ export class SpireEngine {
       reduceMotion: this.reduceMotion,
     };
 
-    if (this.rite) {
-      this.renderRite(ctx, ox, oy);
+    if (this.hang) {
+      this.renderHang(ctx, ox, oy);
       return;
     }
 
@@ -6063,51 +6045,7 @@ export class SpireEngine {
     this.paintSlab(ctx, s.x, s.y, slab.w, VISUAL_H, body, scaleY, slab.rot, hotGroove);
   }
 
-  /** The chain the stone hangs from, up to a pivot high above the stack. */
-  private drawChain(ctx: CanvasRenderingContext2D): void {
-    const m = this.mover;
-    if (!isChain(m.course) || m.fallT >= 0) return;
-    const hold = this.worldToScreen(m.x + m.w / 2, m.y + VISUAL_H);
-    const pivot = this.worldToScreen(m.center, this.seat.y + SLAB_H * 2 + CHAIN_LEN);
-    const hot = m.course === "heat" ? Math.min(1, (m.heat ?? 0) / HEAT_HOLD) : 0;
-    ctx.save();
-    ctx.lineCap = "round";
-    // Links: a dashed heavy line, glowing as it heats.
-    ctx.strokeStyle = `rgb(${Math.round(90 + 165 * hot)},${Math.round(70 + 40 * hot)},${Math.round(50 - 20 * hot)})`;
-    ctx.lineWidth = 4;
-    ctx.setLineDash([7, 4]);
-    ctx.beginPath();
-    ctx.moveTo(pivot.x, pivot.y);
-    ctx.lineTo(hold.x, hold.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    // The two short chains to the stone's ends.
-    const l = this.worldToScreen(m.x + 6, m.y + VISUAL_H);
-    const r = this.worldToScreen(m.x + m.w - 6, m.y + VISUAL_H);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(l.x, l.y);
-    ctx.lineTo(hold.x, hold.y - 14);
-    ctx.lineTo(r.x, r.y);
-    ctx.stroke();
-    if (hot > 0.5) {
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = `rgba(255,120,40,${(hot - 0.5) * 1.4})`;
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.moveTo(pivot.x, pivot.y);
-      ctx.lineTo(hold.x, hold.y);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "rgb(150,110,60)";
-    ctx.beginPath();
-    ctx.arc(pivot.x, pivot.y, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
   private drawMover(ctx: CanvasRenderingContext2D, inZone: boolean): void {
-    this.drawChain(ctx);
     const m = this.mover;
     const accent = this.theme.accent;
     const phase = beatPhase(this.clock, m.period);

@@ -3,6 +3,17 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 76 — The tug of war (internal)
+
+- **The Descent, rebuilt around one fight.** The Spire's roots hang from the machine on a wire, down into the Dark, which grips the tower from above and hauls on it.
+  - A stone slides below the tip; **tap to fix it to the tip**.
+  - **A true catch drags the tower down a step**, out of the Dark. **A miss lets the Dark suck it back up**, and it coats the stones it holds. An off-centre stone hangs over, leans the tower and widens its swing; a stone caught against the swing throws it.
+  - Swing wide enough to strike the shaft walls and the bottom stone breaks off. The Dark also pulls gently all the time, so you can't wait it out.
+  - **The wire is the gauge:** it reddens and frays as you win. At 100% it **snaps** and the roots fall through to the next depth. Let the Dark haul the whole tower up, and the light is buried.
+  - All eight depths play it; the deeper ones are tighter (narrower shafts, longer swings, a harder pull), the Ossuary's Dark heaves in surges, and the Quiet's machine sways on its mount. The way back up (the boss) is unchanged.
+- The drill, the crew and the pendulum chain are gone.
+- Checked on an iPhone simulator.
+
 ## Build 75 — The pendulum (rough test, internal)
 
 - **The Descent's first three depths are back on Hearth's engine**, with one dial changed: **the stone swings on a chain** from a pivot above, fastest through the bottom of its arc, hanging and rising at the ends. Tap to let it go; it drops onto the tower with Hearth's physics (landings, gifts, fire on a streak, the Dark below).

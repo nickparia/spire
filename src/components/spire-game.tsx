@@ -54,6 +54,7 @@ const INITIAL: Hud = {
   coins: 0,
   darkGap: null,
   descent: false,
+  wire: null,
   ascent: null,
   rescue: null,
   taken: false,
@@ -482,7 +483,7 @@ export function SpireGame() {
         ) : null}
 
         {running && hud.hint && !hud.paused ? (
-          <p className="tap-hint">{hud.descent ? "Tap to fire the drill" : "Tap to drop"}</p>
+          <p className="tap-hint">{hud.descent ? "Tap to catch the stone" : "Tap to drop"}</p>
         ) : null}
 
         {hud.phase === "pick" ? (

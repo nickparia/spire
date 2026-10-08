@@ -229,14 +229,18 @@ export function RunHud({
               : "Tap on the pulse"}
           </p>
         ) : null}
-        {hud.darkGap !== null && started ? (
+        {hud.wire !== null && started ? (
           <>
-            <p className="kicker mt-2">
-              {hud.ascent ? "It rises" : hud.descent ? "The oil" : "The Dark"}
+            <p className="kicker mt-2">The wire</p>
+            <p className={"stat-num dark-gap" + (hud.wire.held > 0 ? " dark-near" : "")}>
+              {hud.wire.strain}%{hud.wire.held > 0 ? ` · ${hud.wire.held} held` : ""}
             </p>
+          </>
+        ) : hud.darkGap !== null && started ? (
+          <>
+            <p className="kicker mt-2">{hud.ascent ? "It rises" : "The Dark"}</p>
             <p className={"stat-num dark-gap" + (hud.darkGap <= 3 ? " dark-near" : "")}>
-              {hud.darkGap} {hud.darkGap === 1 ? "floor" : "floors"}{" "}
-              {hud.descent && !hud.ascent ? "behind" : "below"}
+              {hud.darkGap} {hud.darkGap === 1 ? "floor" : "floors"} below
             </p>
           </>
         ) : null}
