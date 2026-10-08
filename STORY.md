@@ -50,6 +50,7 @@ The worlds are the planets of one system, each with its Spire and its sky, and e
 
 - Prologue: the skies went out one by one.
 - I · Hearth: what the foundry remembered; "it was never the Dark below."
+- II · The Descent: what was buried. The builders followed the roots down and found a door no one built; through it, something showed them the whole system (many worlds, a dark one above each, all turning round a black centre). They stopped, and lay down. The climbers were the ones who stopped waiting. "They stopped. That is all. The builders stopped."
 - Later chapters reveal, world by world: there are many of them; they came from the centre; the builders stopped because they understood; the black hole is a door.
 - Chapters are four paragraphs, each over its own living painting (`src/game/story.ts`, art in `public/art/story/`).
 

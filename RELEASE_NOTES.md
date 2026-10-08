@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 65 — Chapter II (internal)
+
+- **Chapter II · What Was Buried.** Relight the Descent and the story goes on: the builders followed the Spire's roots down, found a door no one had built, and painted what it showed them — many worlds, each with a dark thing above it, all turning around one black centre. Then they stopped. Four pages, each over its own living painting (lanterns down the stairs, the door breathing violet, the mural of the worlds, a hall of builders lying in rows). Read it again any time from **Story**. Checked on an iPhone simulator with real taps.
+
 ## Build 64 — The title answers at once (internal)
 
 - **Fixed (again): tapping the title did nothing until its button appeared.** Build 62 started the game's painted videos behind the title, which got in the way of the first taps on iPhone. They now start only when a sky does, and the title goes in the moment your finger touches it. Checked with real taps on an iPhone 17 Pro Max simulator, at 1 and 2.5 seconds, before the button shows. From now on every build is checked on the simulator before it ships.

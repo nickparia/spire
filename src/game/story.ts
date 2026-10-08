@@ -52,6 +52,29 @@ export const CHAPTERS: Chapter[] = [
       },
     ],
   },
+  {
+    id: "descent",
+    world: "descent",
+    title: "II · What Was Buried",
+    pages: [
+      {
+        text: "The Spire had roots, and the roots went down through stone older than the tower. When the skies began to go out, the builders followed them.",
+        art: "d1",
+      },
+      {
+        text: "At the bottom was a door no one had built. On the other side, something was listening.",
+        art: "d2",
+      },
+      {
+        text: "They painted what it showed them: many worlds, each with its tower and its sky, and one dark thing above each. All of them turning around the same black centre.",
+        art: "d3",
+      },
+      {
+        text: "So they stopped. They laid their tools down and lay down beside them. The things you crushed on your way down were the ones who stopped waiting.",
+        art: "d4",
+      },
+    ],
+  },
 ];
 
 export function chapterFor(world: string): Chapter | undefined {
