@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 77 — The battle (internal)
+
+- **The Dark has a face.** It's painted now (a mass of violet eyes, tendrils reaching down the shaft) and it never quite lets go of the machine. When it holds stones its tendrils wrap over them; when you drag it off, it clings — strands stretch and part as the line is pulled back. Miss, and its eyes flare.
+- **Weight.** A true catch jolts the tower down with sparks off the winch; misses and the Dark's surges shake rubble off the shaft walls; embers drift off the machine; dust and the odd stone fall past all the time.
+- **A floor to break.** A seam of the depth's rock seals the shaft below the tower and nears as the wire strains, cracking and glowing from beneath. At 100% the wire parts and the roots go through it: rock and light burst up, thunder, and the tower falls through the hole to the next depth.
+- Checked on an iPhone simulator.
+
 ## Build 76 — The tug of war (internal)
 
 - **The Descent, rebuilt around one fight.** The Spire's roots hang from the machine on a wire, down into the Dark, which grips the tower from above and hauls on it.

@@ -1,7 +1,9 @@
 {
-  "build": 76,
-  "title": "The tug of war",
+  "build": 77,
+  "title": "The battle",
   "notes": [
-    "The Descent, rebuilt around one fight: the Spire's roots hang from the machine into the Dark's grip. Catch each stone true and the tower is dragged down a step; miss and the Dark sucks it back up. Drag it far enough and the wire snaps, dropping you through to the next depth."
+    "The Dark is painted: a mass of eyes and tendrils that clings to the machine, wraps the stones it holds, and flares when you miss.",
+    "A true catch jolts the tower down with sparks; misses shake rubble off the walls.",
+    "A seam of rock seals the shaft below. It cracks as the wire strains, and at 100% you break through it."
   ]
 }

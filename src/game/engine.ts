@@ -832,6 +832,7 @@ export class SpireEngine {
   /** The Descent: each depth's rock texture, the cave-in's front, how far the light reaches, the last blow's shudder. */
   private rockArts = new Map<string, HTMLImageElement>();
   private oil: HTMLVideoElement | null = null;
+  private dDark: HTMLVideoElement | null = null;
   private lightReach = 0.6;
   private rockShake = 0;
   /** The Descent's fight on the wire, and how it's drawn. */
@@ -4896,6 +4897,12 @@ export class SpireEngine {
       this.fallAge += dt;
     }
     this.hangView.step(dt, h, this.vh);
+    // The shaft is alive: dust and the odd stone falling past, embers off the machine.
+    if (this.phase === "play" && !this.reduceMotion) {
+      if (Math.random() < dt * 0.7) this.rubble(h, 1);
+      if (Math.random() < dt * 1.5)
+        this.fx.sparkle(h.pivotX + (Math.random() - 0.5) * 160, 0, 20, [255, 150, 70], 1);
+    }
     for (let i = this.floaters.length - 1; i >= 0; i--) {
       const f = this.floaters[i]!;
       f.y -= f.vy * dt;
@@ -4919,6 +4926,10 @@ export class SpireEngine {
     const rock = this.rockRgb();
     switch (e.kind) {
       case "true": {
+        // The tower lurches down: a jolt, and sparks off the machine as the winch pays out.
+        this.hangView.jolt = 9;
+        this.fx.sparkle(h.pivotX, 40, 60, [255, 200, 120], 10);
+        this.sfx.slice();
         this.drops += 1;
         this.streak += 1;
         this.bestStreak = Math.max(this.bestStreak, this.streak);
@@ -4943,6 +4954,8 @@ export class SpireEngine {
         haptics.light();
         break;
       case "lost":
+        this.hangView.menace = 1;
+        this.rubble(h, 2);
         this.drops += 1;
         this.streak = 0;
         this.accuracySum += 0.2;
@@ -4961,28 +4974,53 @@ export class SpireEngine {
         break;
       case "surge":
         this.sfx.quicken();
+        this.hangView.menace = 1;
         this.hangView.shake = 0.5;
+        this.rubble(h, 2);
         break;
-      case "snap":
-        this.float("THE WIRE SNAPS", tp.x, tp.y - 40, true, 28);
-        this.fx.rayBurst(0, 40, [255, 200, 130], 220, 18);
+      case "snap": {
+        // The wire parts and the roots go through the floor: rock everywhere, light pouring up.
+        const floor = this.hangView.floorY(h, 0);
+        this.float("BROKEN THROUGH", tp.x, floor - 30, true, 28);
+        this.fx.burst(0, floor, rock, 60, 420);
+        this.fx.burst(0, floor, [255, 200, 130], 24, 300);
+        this.fx.rayBurst(0, floor, [255, 200, 130], 260, 18);
         this.sfx.boom();
+        this.sfx.thunder();
         this.hangView.shake = 1;
-        this.flash = Math.max(this.flash, 0.5);
+        this.flash = Math.max(this.flash, 0.6);
+        this.trauma = 1;
         haptics.heavy();
         break;
+      }
     }
     this.emit();
+  }
+
+  /** Rubble shaken off the shaft walls, falling past: dark, the rock in shadow. */
+  private rubble(h: Hang, n: number): void {
+    const r = this.rockRgb();
+    const rock: RGB = [r[0] * 0.5, r[1] * 0.5, r[2] * 0.5];
+    for (let i = 0; i < n; i++) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      this.fx.burst(side * (h.tune.shaft - 10), h.coat - 40 + Math.random() * 160, rock, 3, 70);
+    }
   }
 
   /** The Descent's view, then the usual overlays. */
   private renderHang(ctx: CanvasRenderingContext2D, ox: number, oy: number): void {
     const sky = this.paintedSky();
-    const darkV = this.oilVideo();
+    const darkV = this.descentDark();
     let rig = this.sprites.get("drill-rig");
     if (!rig) {
       rig = Object.assign(new Image(), { src: "art/drill-rig.webp" });
       this.sprites.set("drill-rig", rig);
+    }
+    const key = this.paintKey();
+    let rock = this.rockArts.get(key);
+    if (!rock) {
+      rock = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
+      this.rockArts.set(key, rock);
     }
     ctx.save();
     ctx.translate(ox, oy);
@@ -4991,8 +5029,9 @@ export class SpireEngine {
       this.hang!,
       {
         depth: sky ? this.frameOf(sky.video, sky.video.poster) : null,
-        dark: darkV ? this.frameOf(darkV, "art/oil.jpg") : null,
+        dark: darkV ? this.frameOf(darkV, "art/dark-descent.jpg") : null,
         rig,
+        rock,
       },
       this.vw,
       this.vh,
@@ -5145,6 +5184,26 @@ export class SpireEngine {
     path.lineTo(wall(1, top), top);
     path.closePath();
     return { path, cx, tip, hw };
+  }
+
+  /** The Descent's Dark: the thing that was buried, grasping down the shaft. */
+  private descentDark(): HTMLVideoElement | null {
+    if (typeof document === "undefined") return null;
+    if (!this.dDark) {
+      const v = document.createElement("video");
+      v.src = "art/dark-descent.mp4";
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      v.setAttribute("playsinline", "");
+      v.style.cssText = VIDEO_BEHIND;
+      document.body.appendChild(v);
+      v.load();
+      this.dDark = v;
+    }
+    if (this.dDark.paused) void this.dDark.play().catch(() => undefined);
+    return this.dDark;
   }
 
   private oilVideo(): HTMLVideoElement | null {
