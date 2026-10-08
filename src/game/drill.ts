@@ -48,7 +48,7 @@ export type DrillTuning = {
   oilAccel: number;
 };
 
-const SEAM_R = 26;
+const SEAM_R = 30;
 /** How far below the head a seam opens, px, and the spread. */
 const SEAM_NEAR = 62;
 const SEAM_SPREAD = 36;
@@ -286,6 +286,10 @@ export function drawDrill(
   rock: HTMLImageElement | null,
   /** The painted drill head's spin, frames side by side; the drawn head stands in without it. */
   head: HTMLImageElement | null = null,
+  /** The painted oil (a playing video, or its still), for the Dark in the tunnel. */
+  oil: CanvasImageSource | null = null,
+  /** The painted machine on the surface. */
+  rig: HTMLImageElement | null = null,
 ): void {
   const at = (x: number, y: number) => d.toScreen(x, y, w, h);
   const shake = d.shake * 2.5 * Math.sin(clock * 70);
@@ -330,6 +334,45 @@ export function drawDrill(
   line(46, "rgba(120,90,70,0.55)");
   line(40, "rgb(14,9,9)");
 
+  // The machine's body, run down the tunnel behind the head: a ribbed brass
+  // spine, with mechanical tendrils driven into the walls as it went.
+  drawSpine(ctx, pts, clock);
+  drawTendrils(ctx, d, at, clock);
+  // The machine itself, squatting on the surface over the hole.
+  if (rig && rig.complete && rig.naturalWidth > 0) {
+    const s0 = at(0, 0);
+    const rw = Math.min(w * 0.95, 360);
+    const rh = rw * (rig.naturalHeight / rig.naturalWidth);
+    ctx.drawImage(rig, s0.x - rw / 2, s0.y - rh * RIG_BASE, rw, rh);
+  }
+
+  // The oil, while it's still above the view: it drips in from the top edge,
+  // heavier as it nears, so you always know it's coming.
+  {
+    const front = alongPath(
+      d.path.map((p) => at(p.x, p.y)),
+      d.oil + 30,
+    ).pop();
+    const above = front ? front.y < 0 : true;
+    if (above) {
+      const near = Math.max(0, Math.min(1, 1 - d.gap / 700));
+      const h = 18 + near * 70;
+      const g = ctx.createLinearGradient(0, -shake, 0, h - shake);
+      g.addColorStop(0, "rgba(6,3,12,0.95)");
+      g.addColorStop(1, "rgba(6,3,12,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-40, -shake - 2, w + 80, h);
+      ctx.fillStyle = "rgba(8,4,14,0.92)";
+      for (let i = 0; i < 9; i++) {
+        const x = ((i + 0.5) / 9) * w + Math.sin(i * 7.1) * 18;
+        const len = (10 + near * 46) * (0.6 + 0.4 * Math.sin(clock * 1.4 + i * 2.3));
+        ctx.beginPath();
+        ctx.ellipse(x, -shake + len * 0.5, 3 + near * 3, len * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
   // The leaks: black ooze welling out of the rock where careless shots broke in.
   for (const l of d.leaks) {
     const s = at(l.x, l.y);
@@ -363,27 +406,44 @@ export function drawDrill(
     ctx.globalCompositeOperation = "source-over";
   }
 
-  // The oil, as far down the tunnel as it has run.
+  // The oil, as far down the tunnel as it has run: the painted oil, seen
+  // through the shape of the tunnel it fills (a chain of discs along its run).
   const oilPts = alongPath(pts, d.oil + 30);
   if (oilPts.length > 1) {
-    ctx.beginPath();
-    oilPts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    // Thicker the more of it is pouring in.
-    ctx.lineWidth = Math.min(30, 20 + d.volume * 4);
-    ctx.strokeStyle = "rgb(8,5,14)";
-    ctx.stroke();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = `rgba(140,90,220,${0.25 + 0.1 * Math.sin(clock * 3)})`;
-    ctx.stroke();
-    ctx.globalCompositeOperation = "source-over";
+    const r = Math.min(23, 17 + d.volume * 2);
+    const shape = new Path2D();
+    const first = oilPts[0]!;
+    shape.rect(first.x - r, first.y - 80, r * 2, 80);
+    for (let k = 1; k < oilPts.length; k++) {
+      const a = oilPts[k - 1]!;
+      const b = oilPts[k]!;
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const n = Math.max(1, Math.ceil(len / 6));
+      for (let q = 0; q <= n; q++) {
+        const t = q / n;
+        const cx = a.x + (b.x - a.x) * t;
+        const cy = a.y + (b.y - a.y) * t;
+        shape.moveTo(cx + r, cy);
+        shape.arc(cx, cy, r, 0, Math.PI * 2);
+      }
+    }
     const front = oilPts[oilPts.length - 1]!;
-    ctx.fillStyle = "rgb(8,5,14)";
-    ctx.beginPath();
-    ctx.arc(front.x, front.y, 15 + Math.sin(clock * 5) * 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    shape.moveTo(front.x + r + 4, front.y);
+    shape.arc(front.x, front.y, r + 4 + Math.sin(clock * 5) * 2, 0, Math.PI * 2);
+    ctx.save();
+    ctx.clip(shape);
+    if (oil) {
+      // The painted oil, pouring: it scrolls down so it flows.
+      const ow = w + 80;
+      const oh = ow * 1.78;
+      const flow = (clock * 40) % oh;
+      ctx.drawImage(oil, -40, -40 + flow - oh, ow, oh);
+      ctx.drawImage(oil, -40, -40 + flow, ow, oh);
+    } else {
+      ctx.fillStyle = "rgb(8,5,14)";
+      ctx.fillRect(-40, -40, w + 80, h + 80);
+    }
+    ctx.restore();
   }
 
   // The targets, lit when the aim is in their groove.
@@ -394,6 +454,39 @@ export function drawDrill(
     const grow = Math.min(1, t.age / 0.35);
     if (t.kind === "seam") drawSeam(ctx, s.x, s.y, t.r * grow, on, clock);
     else drawOre(ctx, s.x, s.y, t.r * grow, on, clock);
+    // What it does, under it: plain words, brighter when it's the one in your sights.
+    ctx.save();
+    ctx.globalAlpha = (on ? 1 : 0.62) * grow;
+    ctx.font = '800 10px "Nunito Variable", system-ui, sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.75)";
+    const label = t.kind === "seam" ? "SEAM ▾ deeper" : "ORE ✦ light, oil back";
+    ctx.strokeText(label, s.x, s.y + t.r + 6);
+    ctx.fillStyle = t.kind === "seam" ? "rgb(255,190,120)" : "rgb(255,226,140)";
+    ctx.fillText(label, s.x, s.y + t.r + 6);
+    ctx.restore();
+  }
+
+  // In a groove: the tunnel you'd cut, ghosted in, and a ring on the target.
+  if (aim && !d.bore) {
+    const from = hd;
+    const to = at(aim.target.x, aim.target.y);
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineWidth = 40;
+    ctx.strokeStyle = `rgba(255,200,140,${aim.perfect ? 0.16 : 0.1})`;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = aim.perfect ? "rgba(255,236,190,0.95)" : "rgba(255,200,140,0.7)";
+    ctx.beginPath();
+    ctx.arc(to.x, to.y, aim.target.r + 8 + Math.sin(clock * 8) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // The aim: a beam of light along the heading, brighter in a groove.
@@ -423,6 +516,108 @@ export function drawDrill(
   ctx.restore();
 }
 
+/** Where the machine's base sits in its painting, as a share of its height. */
+const RIG_BASE = 0.975;
+
+/** The spine: a ribbed brass trunk following the tunnel down to the head. */
+function drawSpine(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+  clock: number,
+): void {
+  if (pts.length < 2) return;
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  const trace = (): void => {
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y - 20) : ctx.lineTo(p.x, p.y)));
+  };
+  trace();
+  ctx.lineWidth = 18;
+  ctx.strokeStyle = "rgb(46,30,18)";
+  ctx.stroke();
+  trace();
+  ctx.lineWidth = 12;
+  ctx.strokeStyle = "rgb(120,82,40)";
+  ctx.stroke();
+  // Its ribs, rolling down it as the machine feeds the drill.
+  trace();
+  ctx.lineWidth = 14;
+  ctx.setLineDash([3, 9]);
+  ctx.lineDashOffset = -clock * 30;
+  ctx.strokeStyle = "rgb(210,160,80)";
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Violet light pulsing down its core.
+  trace();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([14, 40]);
+  ctx.lineDashOffset = -clock * 120;
+  ctx.strokeStyle = "rgba(170,110,255,0.7)";
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Tendrils: at each bend of the tunnel the machine has driven jointed
+ * mechanical arms out into the rock either side, gripping; the newest one is
+ * still reaching.
+ */
+function drawTendrils(
+  ctx: CanvasRenderingContext2D,
+  d: Drill,
+  at: (x: number, y: number) => { x: number; y: number },
+  clock: number,
+): void {
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (let i = 1; i < d.path.length; i++) {
+    const a = d.path[i - 1]!;
+    const b = d.path[i]!;
+    const p = at(b.x, b.y);
+    const dir = Math.atan2(b.y - a.y, b.x - a.x);
+    const newest = i === d.path.length - 1;
+    const reach = newest ? Math.min(1, (d.time % 9999) * 0 + 1) : 1;
+    for (const side of [-1, 1]) {
+      const seed = i * 2.17 + side;
+      const out = dir + side * (Math.PI / 2) + Math.sin(seed) * 0.4;
+      const len = (34 + Math.abs(Math.sin(seed * 3)) * 22) * reach;
+      const sway = Math.sin(clock * 1.3 + seed) * 0.06;
+      const j1 = {
+        x: p.x + Math.cos(out + sway) * len * 0.55,
+        y: p.y + Math.sin(out + sway) * len * 0.55,
+      };
+      const j2 = {
+        x: j1.x + Math.cos(out + 0.5 * side + sway) * len * 0.5,
+        y: j1.y + Math.sin(out + 0.5 * side + sway) * len * 0.5,
+      };
+      ctx.strokeStyle = "rgb(40,26,16)";
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(j1.x, j1.y);
+      ctx.lineTo(j2.x, j2.y);
+      ctx.stroke();
+      ctx.strokeStyle = "rgb(150,104,52)";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      // The joint and the claw bitten into the stone.
+      ctx.fillStyle = "rgb(190,140,70)";
+      ctx.beginPath();
+      ctx.arc(j1.x, j1.y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(170,110,255,0.8)";
+      ctx.beginPath();
+      ctx.arc(j2.x, j2.y, 2.2 + Math.sin(clock * 3 + seed) * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 /** Points along a polyline from its start, out to `dist` px. */
 function alongPath(pts: { x: number; y: number }[], dist: number): { x: number; y: number }[] {
   if (dist <= 0 || pts.length === 0) return [];
@@ -443,7 +638,11 @@ function alongPath(pts: { x: number; y: number }[], dist: number): { x: number; 
   return out;
 }
 
-/** A seam: a glowing fissure in the rock that opens the way down. */
+/**
+ * A seam: a crack in the rock with molten light inside, the way down. It's
+ * drawn as a split in the stone (a dark jagged gap with light in its depths)
+ * so it reads as something a blow would burst open.
+ */
 function drawSeam(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -454,22 +653,49 @@ function drawSeam(
 ): void {
   ctx.save();
   ctx.translate(x, y);
-  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.8);
-  glow.addColorStop(0, `rgba(255,150,60,${on ? 0.55 : 0.25})`);
-  glow.addColorStop(1, "rgba(255,150,60,0)");
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2);
+  glow.addColorStop(0, `rgba(255,140,50,${on ? 0.5 : 0.28})`);
+  glow.addColorStop(1, "rgba(255,140,50,0)");
   ctx.fillStyle = glow;
-  ctx.fillRect(-r * 2, -r * 2, r * 4, r * 4);
-  ctx.strokeStyle = on ? "rgba(255,220,160,0.95)" : "rgba(255,170,90,0.75)";
-  ctx.lineWidth = on ? 3 : 2;
+  ctx.fillRect(-r * 2.2, -r * 2.2, r * 4.4, r * 4.4);
+  // The split: a jagged lens of dark, wider in the middle.
+  const half = r * 1.35;
+  const open = on ? 1.25 : 1;
+  const edge = (side: number) => {
+    const pts: [number, number][] = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      const px = (t - 0.5) * half * 2;
+      const width = Math.sin(Math.PI * t) * r * 0.32 * open;
+      const jag = Math.sin(t * 31 + side * 2) * r * 0.08;
+      pts.push([px, side * (width + jag)]);
+    }
+    return pts;
+  };
+  const top = edge(-1);
+  const bot = edge(1).reverse();
   ctx.beginPath();
-  for (let i = 0; i <= 8; i++) {
-    const t = i / 8;
-    const px = (t - 0.5) * r * 2;
-    const py = Math.sin(t * 9 + 1) * r * 0.18 + Math.sin(clock * 2 + t * 5) * (on ? 1.5 : 0.5);
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
+  [...top, ...bot].forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+  ctx.closePath();
+  const inside = ctx.createLinearGradient(0, -r * 0.4, 0, r * 0.4);
+  inside.addColorStop(0, "rgb(20,8,4)");
+  inside.addColorStop(0.5, `rgb(${on ? 255 : 230},${on ? 170 : 120},${on ? 80 : 50})`);
+  inside.addColorStop(1, "rgb(20,8,4)");
+  ctx.fillStyle = inside;
+  ctx.fill();
+  ctx.strokeStyle = "rgba(10,5,3,0.9)";
+  ctx.lineWidth = 2;
   ctx.stroke();
+  // Hairline cracks running off its ends.
+  ctx.strokeStyle = `rgba(255,170,90,${on ? 0.8 : 0.45})`;
+  ctx.lineWidth = 1;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(s * half, 0);
+    ctx.lineTo(s * (half + r * 0.5), r * 0.25 * Math.sin(clock + s));
+    ctx.lineTo(s * (half + r * 0.9), -r * 0.15);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -509,7 +735,7 @@ function drawOre(
 
 /** Frames in the painted head's spin, and its height on screen, px. */
 export const HEAD_FRAMES = 24;
-const HEAD_H = 92;
+const HEAD_H = 120;
 /** Where the drill's tip is in its painting, as a share of its height from the top. */
 const HEAD_TIP = 0.96;
 

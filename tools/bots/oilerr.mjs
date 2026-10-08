@@ -1,0 +1,15 @@
+import puppeteer from "puppeteer-core";
+const browser = await puppeteer.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: "new", args: ["--mute-audio", "--autoplay-policy=no-user-gesture-required"] });
+const page = await browser.newPage();
+page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") console.log("console:", m.text().slice(0, 200)); });
+page.on("pageerror", (e) => console.log("pageerror:", String(e).slice(0, 300)));
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+await page.goto("http://localhost:8080/", { waitUntil: "networkidle0" });
+await page.evaluate(() => localStorage.setItem("spire-v2", JSON.stringify({ v: 2, music: false, sfx: false, levels: {}, endless: { best: 0, bestFloors: 0 }, tips: {}, coins: 0, tracks: {}, levels2: {}, weapon: "buttress", ghosts: {}, name: "", feats: {}, whatsNewSeen: 99, storySeen: true, savedAt: 5, tester: true })));
+await page.reload({ waitUntil: "networkidle0" });
+await page.evaluate(() => { const e = window.__spire; e.startLevel(8); e.tap(); });
+await new Promise((r) => setTimeout(r, 2500));
+console.log(await page.evaluate(() => { const d = window.__spire.drill; d.oil = d.length - 20; const v = window.__spire.oil; return JSON.stringify({ len: d.length, oil: d.oil, vid: v ? [v.readyState, v.paused, v.currentTime] : null }); }));
+await new Promise((r) => setTimeout(r, 300));
+await page.screenshot({ path: process.argv[2] });
+await browser.close();

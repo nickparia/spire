@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 70 — The machine (prototype, internal)
+
+- **The machine.** A colossal clawed engine of brass, bone and violet eyes squats on the surface over the hole. Its ribbed brass spine runs down the tunnel behind the drill, and at every turn it drives jointed mechanical tendrils into the walls. Only the drill head swings. The head is bigger.
+- **The oil, painted.** The Dark fills the tunnel with the animated Higgsfield oil, thicker the more leaks you've let in; when it's still above the view, it drips in from the top edge.
+- **Clear targets.** Each says what it does: _SEAM ▾ deeper_ (a molten crack that a blow bursts open) and _ORE ✦ light, oil back_. When your aim is in a target's groove, a ring locks onto it and the tunnel you'd cut is ghosted in.
+- Checked on an iPhone simulator.
+
 ## Build 69 — The drill head (prototype, internal)
 
 - **The drill is painted** (Higgsfield): a steampunk cosmic horror of brass and blackened iron, its spiral crown of fang-teeth spinning, bone claws gripping its collar, violet eyes glowing in its portholes. It spins faster as it bores. It pivots at the end of the tunnel to aim, so while you aim sideways it swings out across the rock.

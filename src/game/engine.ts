@@ -4968,7 +4968,24 @@ export class SpireEngine {
       head = Object.assign(new Image(), { src: "art/sprites/drill-head.webp" });
       this.sprites.set("drill-head", head);
     }
-    drawDrill(ctx, this.drill!, this.vw, this.vh, this.reduceMotion ? 0 : this.clock, tex, head);
+    const oilV = this.oilVideo();
+    const oil = oilV ? this.frameOf(oilV, "art/oil.jpg") : null;
+    let rig = this.sprites.get("drill-rig");
+    if (!rig) {
+      rig = Object.assign(new Image(), { src: "art/drill-rig.webp" });
+      this.sprites.set("drill-rig", rig);
+    }
+    drawDrill(
+      ctx,
+      this.drill!,
+      this.vw,
+      this.vh,
+      this.reduceMotion ? 0 : this.clock,
+      tex,
+      head,
+      oil,
+      rig,
+    );
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
     this.drawFloaters(ctx);
