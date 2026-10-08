@@ -3,6 +3,15 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 75 — The pendulum (rough test, internal)
+
+- **The Descent's first three depths are back on Hearth's engine**, with one dial changed: **the stone swings on a chain** from a pivot above, fastest through the bottom of its arc, hanging and rising at the ends. Tap to let it go; it drops onto the tower with Hearth's physics (landings, gifts, fire on a streak, the Dark below).
+  - **Depth 1 · The Roots:** the plain pendulum.
+  - **Depth 2 · The Ossuary:** the winch pays out and reels in: the swing's pace keeps changing.
+  - **Depth 3 · The Drowned Halls:** the chain heats as it swings (it glows); hold too long and the stone is let go for you.
+- Rough on purpose: no new art, built up not down, and Hearth's Dark for now. It's to judge whether the pendulum has Hearth's feel. Depths 4–8 are still the old drill.
+- **Fixed:** the big perfect burst showed a faint square edge.
+
 ## Build 74 — The expedition (Depth 1 playable, internal)
 
 - **A crew goes down with the machine.** Hooded miners stand on ledges either side and one hangs on a chain from the machine, their lanterns (painted with Higgsfield, like them) sweeping the rock below.

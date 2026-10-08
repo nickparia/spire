@@ -56,7 +56,21 @@ export function ramp(stops: readonly [RGB, RGB, RGB], t: number): RGB {
   return mix(stops[1], stops[2], (u - 0.5) / 0.5);
 }
 
-export type CourseId = "slide" | "gust" | "beat" | "sway" | "rush" | "breath" | "eclipse" | "split";
+export type CourseId =
+  | "slide"
+  | "gust"
+  | "beat"
+  | "sway"
+  | "rush"
+  | "breath"
+  | "eclipse"
+  | "split"
+  /** The Descent: the slab swings on a chain, quick through the middle, slow at the ends. */
+  | "pendulum"
+  /** The winch pays out and reels in: the swing's pace keeps changing. */
+  | "winch"
+  /** The chain heats: hold too long and the stone is dropped for you. */
+  | "heat";
 
 export const COURSE_CYCLE: readonly CourseId[] = [
   "gust",
@@ -87,6 +101,9 @@ export function courseHint(id: CourseId): string {
   if (id === "rush") return "Bursts through center";
   if (id === "breath") return "Holds at the walls";
   if (id === "eclipse") return "Tap the flare";
+  if (id === "pendulum") return "Swings on its chain";
+  if (id === "winch") return "The chain pays out and reels in";
+  if (id === "heat") return "The chain heats: don't hold too long";
   return "Two halves, two clocks";
 }
 
@@ -203,6 +220,11 @@ export function travelRate(
   let rate = 2 / Math.max(0.2, period);
   if (course === "gust") rate *= dir === wind ? 1.35 : 0.7;
   if (course === "rush") rate *= 0.34 + 1.2 * (1 - Math.min(1, Math.abs(u)));
+  if (course === "pendulum" || course === "winch" || course === "heat") {
+    // A pendulum: fastest through the bottom of its arc, hanging at the ends.
+    rate *= 0.2 + 1.25 * Math.sqrt(Math.max(0, 1 - u * u));
+    if (course === "winch") rate *= 0.7 + 0.55 * Math.sin(clock * 0.45);
+  }
   if (course === "beat") {
     const phase = beatPhase(clock, period);
     const env = phase < 0.58 ? Math.sin((phase / 0.58) * Math.PI) : 0;

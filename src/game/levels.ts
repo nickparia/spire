@@ -37,6 +37,8 @@ export type LevelDef = {
   tier?: number;
   /** Built down from a ceiling: the Descent. */
   descent?: boolean;
+  /** A Descent depth played on Hearth's engine with a swinging slab (the pendulum prototype). */
+  pendulum?: boolean;
   /** Its own painting and stone (art/sky/<paint>.mp4, art/slabs/<paint>.webp); defaults to the theme's. */
   paint?: string;
 };
@@ -178,55 +180,55 @@ export const LEVELS: LevelDef[] = [
   {
     id: "roots",
     name: "The Roots",
-    blurb: "Drive the Spire down. The light follows.",
+    blurb: "The stone swings on its chain. Let it go true.",
     line: "Down here the stone is older than the tower. It was never asked.",
     theme: "foundry",
     floors: 20,
-    courses: ["slide"],
-    period: [0.95, 0.85],
+    courses: ["pendulum"],
+    period: [1.25, 1.1],
     keystones: false,
     motes: false,
     bombs: false,
     parTime: 34,
     parAccuracy: 0.85,
     tier: 0,
-    descent: true,
+    pendulum: true,
     paint: "roots",
   },
   {
     id: "ossuary",
     name: "The Ossuary",
-    blurb: "The groove walks. The dead keep count.",
+    blurb: "The winch pays out and reels in. Feel the swing change.",
     line: "They laid the builders here, in rows, facing up. Break through them gently.",
     theme: "foundry",
     floors: 26,
-    courses: ["sway"],
-    period: [0.86, 0.75],
+    courses: ["winch"],
+    period: [1.2, 1.05],
     keystones: false,
     motes: false,
     bombs: false,
     parTime: 40,
     parAccuracy: 0.87,
     tier: 1,
-    descent: true,
+    pendulum: true,
     paint: "ossuary",
   },
   {
     id: "drowned",
     name: "The Drowned Halls",
-    blurb: "It rests, then it jumps. Count it in.",
+    blurb: "The chain heats as it swings. Don't hold too long.",
     line: "The water came down after the light went. Break through before it fills the shaft.",
     theme: "foundry",
     floors: 26,
-    courses: ["beat"],
-    period: [0.87, 0.77],
+    courses: ["heat"],
+    period: [1.2, 1.05],
     keystones: true,
     motes: false,
     bombs: false,
     parTime: 49,
     parAccuracy: 0.88,
     tier: 2,
-    descent: true,
+    pendulum: true,
     paint: "drowned",
   },
   {
@@ -417,6 +419,9 @@ const COURSE_THEME: Record<CourseId, ThemeId> = {
   breath: "glacier",
   eclipse: "eclipse",
   split: "apex",
+  pendulum: "foundry",
+  winch: "foundry",
+  heat: "foundry",
 };
 
 /** In endless each course brings its own sky. */

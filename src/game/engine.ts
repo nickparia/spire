@@ -252,6 +252,11 @@ const SPOKEN =
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
 const DEMO_TIME = 0.5;
+/** The Descent's chain: how high the stone rises at the ends of its arc, the chain's length, and a heating chain's limit (s). */
+const CHAIN_LIFT = 46;
+const CHAIN_LEN = 240;
+const HEAT_HOLD = 2.6;
+const isChain = (c: CourseId): boolean => c === "pendulum" || c === "winch" || c === "heat";
 /** The longest a demo may hold your taps before it steps aside, in seconds. */
 const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
@@ -568,6 +573,8 @@ type Mover = {
   /** Width lost since the last chunk broke off, and which end breaks next. */
   crumb: number;
   crumbSide: number;
+  /** A heating chain: seconds this stone has been held. */
+  heat?: number;
   /** Split: the slab is two halves. `x` is the left half; these drive the right. */
   split: boolean;
   u2: number;
@@ -1897,8 +1904,13 @@ export class SpireEngine {
       this.seat = { x: top.x + top.w / 2, y: this.seatY() };
     }
     if ((this.phase === "play" || this.phase === "ready") && this.mover.fallT < 0) {
-      // The held slab rides two floors above the settled top.
-      const want = this.seat.y + SLAB_H * 2;
+      // The held slab rides two floors above the settled top; on a chain it
+      // rises toward the ends of its arc.
+      let want = this.seat.y + SLAB_H * 2;
+      if (isChain(this.mover.course)) {
+        const u = this.mover.u;
+        want += CHAIN_LIFT * (1 - Math.sqrt(Math.max(0, 1 - u * u)));
+      }
       this.mover.y += (want - this.mover.y) * Math.min(1, dt * 6);
     }
     if (this.phase === "play") {
@@ -3243,6 +3255,17 @@ export class SpireEngine {
           }
           m.crumb = 0;
         }
+      }
+    }
+    // A heating chain: hold the stone too long and it's let go for you.
+    if (m.course === "heat" && this.phase === "play") {
+      m.heat = (m.heat ?? 0) + dt;
+      if (m.heat > HEAT_HOLD) {
+        m.heat = 0;
+        this.fx.burst(m.x + m.w / 2, m.y, [255, 120, 50], 18, 200);
+        this.sfx.hiss();
+        this.place();
+        return;
       }
     }
     const rate = travelRate(m.course, m.dir, m.wind, m.u, m.period, this.clock);
@@ -6040,7 +6063,51 @@ export class SpireEngine {
     this.paintSlab(ctx, s.x, s.y, slab.w, VISUAL_H, body, scaleY, slab.rot, hotGroove);
   }
 
+  /** The chain the stone hangs from, up to a pivot high above the stack. */
+  private drawChain(ctx: CanvasRenderingContext2D): void {
+    const m = this.mover;
+    if (!isChain(m.course) || m.fallT >= 0) return;
+    const hold = this.worldToScreen(m.x + m.w / 2, m.y + VISUAL_H);
+    const pivot = this.worldToScreen(m.center, this.seat.y + SLAB_H * 2 + CHAIN_LEN);
+    const hot = m.course === "heat" ? Math.min(1, (m.heat ?? 0) / HEAT_HOLD) : 0;
+    ctx.save();
+    ctx.lineCap = "round";
+    // Links: a dashed heavy line, glowing as it heats.
+    ctx.strokeStyle = `rgb(${Math.round(90 + 165 * hot)},${Math.round(70 + 40 * hot)},${Math.round(50 - 20 * hot)})`;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([7, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pivot.x, pivot.y);
+    ctx.lineTo(hold.x, hold.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // The two short chains to the stone's ends.
+    const l = this.worldToScreen(m.x + 6, m.y + VISUAL_H);
+    const r = this.worldToScreen(m.x + m.w - 6, m.y + VISUAL_H);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(l.x, l.y);
+    ctx.lineTo(hold.x, hold.y - 14);
+    ctx.lineTo(r.x, r.y);
+    ctx.stroke();
+    if (hot > 0.5) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = `rgba(255,120,40,${(hot - 0.5) * 1.4})`;
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(pivot.x, pivot.y);
+      ctx.lineTo(hold.x, hold.y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgb(150,110,60)";
+    ctx.beginPath();
+    ctx.arc(pivot.x, pivot.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   private drawMover(ctx: CanvasRenderingContext2D, inZone: boolean): void {
+    this.drawChain(ctx);
     const m = this.mover;
     const accent = this.theme.accent;
     const phase = beatPhase(this.clock, m.period);
