@@ -77,7 +77,7 @@ import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
 import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
-import { Drill, DRILL_FLOOR, drawDrill } from "./drill";
+import { Drill, DRILL_FLOOR, DRILL_ZOOM, drawDrill, VIEW_Y } from "./drill";
 import {
   BOMB_RGB,
   drawBomb,
@@ -257,9 +257,9 @@ const SLAB_MID = 0.07;
 const DESCENT_REACH = 5;
 /** The drill: its swing (radians each way), seconds per swing at the first depth, and the oil's pace. */
 const DRILL_SWING = 1.75;
-const DRILL_PERIOD = 2.8;
-const DRILL_OIL = 62;
-const DRILL_OIL_ACCEL = 1.8;
+const DRILL_PERIOD = 4.4;
+const DRILL_OIL = 34;
+const DRILL_OIL_ACCEL = 0.9;
 /** Floors of earth a sloppy blow on the hardest rock shakes loose behind you. */
 const CAVE_SHAKE = 0.9;
 /** The bored hole's half width (of a starting slab), its crater's depth (px), and the rock texture's size (px). */
@@ -4504,7 +4504,14 @@ export class SpireEngine {
   /* -------------------------------------------------------------- render */
 
   private worldToScreen = (x: number, yBottom: number): { x: number; y: number } => {
-    if (this.drill) return this.drill.toScreen(x, yBottom, this.vw, this.vh);
+    if (this.drill) {
+      const p = this.drill.toScreen(x, yBottom, this.vw, this.vh);
+      // The drill view is magnified about the head's anchor.
+      return {
+        x: this.vw / 2 + (p.x - this.vw / 2) * DRILL_ZOOM,
+        y: this.vh * VIEW_Y + (p.y - this.vh * VIEW_Y) * DRILL_ZOOM,
+      };
+    }
     if (this.plan.descent) {
       // Built down: the world is mirrored, so higher means further down the
       // screen. Offset by a slab so anything drawn up from its bottom edge
@@ -4923,7 +4930,7 @@ export class SpireEngine {
       this.accuracySum += 0.3;
       this.fx.burst(shot.x, shot.y, rock, 12, 150);
       this.sfx.rubble();
-      this.trauma = Math.min(1, this.trauma + 0.3);
+      this.trauma = Math.min(1, this.trauma + 0.14);
       // A careless shot breaks into the oil-soaked rock: more of the Dark pours in.
       this.float("IT SEEPS IN", shot.x, shot.y - 30, false, 18);
       haptics.medium();
@@ -4945,7 +4952,7 @@ export class SpireEngine {
       if (shot.perfect) this.sfx.perfect(this.streak);
       else this.sfx.drop();
     }
-    this.trauma = Math.min(1, this.trauma + (shot.perfect ? 0.22 : 0.12));
+    this.trauma = Math.min(1, this.trauma + (shot.perfect ? 0.12 : 0.06));
     if (shot.perfect && this.streak > 0 && this.streak % STREAK_SPOKEN === 0) {
       this.float(`PERFECT ×${this.streak}`, shot.x, shot.y - 40, true, 26);
     }

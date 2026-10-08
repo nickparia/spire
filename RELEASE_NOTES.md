@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 71 — Closer, calmer (prototype, internal)
+
+- **Bigger.** The Descent's world is drawn 1.6× closer, so the machine, the head and the oil fill the screen; the camera keeps the head centred.
+- **Calmer.** A slower pendulum, slower and heavier bores and softer shakes, nearer Hearth's rhythm. A depth now takes about 20 seconds of steady play.
+- **No text on the targets.** Seams and ore speak for themselves; the lock-on ring and the ghosted tunnel show what a tap will do.
+- **The oil sits in the tunnel** as thick black liquid, fixed to the rock and creeping down it, with a wet sheen along the walls and a swollen front, rather than a moving picture seen through a hole.
+- Checked on an iPhone simulator.
+
 ## Build 70 — The machine (prototype, internal)
 
 - **The machine.** A colossal clawed engine of brass, bone and violet eyes squats on the surface over the hole. Its ribbed brass spine runs down the tunnel behind the drill, and at every turn it drives jointed mechanical tendrils into the walls. Only the drill head swings. The head is bigger.

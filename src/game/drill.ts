@@ -56,7 +56,7 @@ const ORE_R = 20;
 /** Share of a groove that counts as perfect. */
 const PERFECT = 0.45;
 /** Seconds a bore takes. */
-const BORE_TIME = 0.28;
+const BORE_TIME = 0.5;
 /** Px a shot at nothing still bores. */
 const MISS_BORE = 30;
 /** The extra flow a leak lets in: a near miss's, and a wild shot's. */
@@ -187,7 +187,7 @@ export class Drill {
 
   step(dt: number, viewW: number, viewH: number): DrillStep {
     this.time += dt;
-    this.shake = Math.max(0, this.shake - dt * 4);
+    this.shake = Math.max(0, this.shake - dt * 3);
     this.light = Math.max(0.15, this.light - LIGHT_FADE * dt);
     for (const t of this.targets) t.age += dt;
     for (const l of this.leaks) l.age += dt;
@@ -214,7 +214,7 @@ export class Drill {
     // The camera keeps the head a little above the middle, with room below.
     const h = this.boreHead();
     const k = 1 - Math.exp(-4 * dt);
-    this.camX += (h.x * 0.7 - this.camX) * k;
+    this.camX += (h.x - this.camX) * k;
     this.camY += (h.y + viewH * 0.08 - this.camY) * k;
     void viewW;
     if (this.head.y >= this.tune.floors * DRILL_FLOOR && !this.bore) return "through";
@@ -232,7 +232,7 @@ export class Drill {
 
   /** World to screen, for a view of the given size. */
   toScreen(x: number, y: number, viewW: number, viewH: number): { x: number; y: number } {
-    return { x: viewW / 2 + (x - this.camX), y: viewH * 0.42 + (y - this.camY) };
+    return { x: viewW / 2 + (x - this.camX), y: viewH * VIEW_Y + (y - this.camY) };
   }
 
   /**
@@ -280,8 +280,8 @@ function angleDiff(a: number, b: number): number {
 export function drawDrill(
   ctx: CanvasRenderingContext2D,
   d: Drill,
-  w: number,
-  h: number,
+  vw: number,
+  vh: number,
   clock: number,
   rock: HTMLImageElement | null,
   /** The painted drill head's spin, frames side by side; the drawn head stands in without it. */
@@ -291,14 +291,24 @@ export function drawDrill(
   /** The painted machine on the surface. */
   rig: HTMLImageElement | null = null,
 ): void {
-  const at = (x: number, y: number) => d.toScreen(x, y, w, h);
-  const shake = d.shake * 2.5 * Math.sin(clock * 70);
+  // Everything is drawn magnified about the head's anchor, so the machine and
+  // the oil fill the screen; w, h and the edges below are the view in those terms.
+  ctx.save();
+  ctx.translate(vw / 2, vh * VIEW_Y);
+  ctx.scale(DRILL_ZOOM, DRILL_ZOOM);
+  ctx.translate(-vw / 2, -vh * VIEW_Y);
+  const x0 = vw / 2 - vw / 2 / DRILL_ZOOM;
+  const y0 = vh * VIEW_Y - (vh * VIEW_Y) / DRILL_ZOOM;
+  const w = vw;
+  const h = vh;
+  const at = (x: number, y: number) => d.toScreen(x, y, vw, vh);
+  const shake = d.shake * 1.2 * Math.sin(clock * 40);
   ctx.save();
   ctx.translate(0, shake);
   // The earth.
   const surface = at(0, 0).y;
   ctx.fillStyle = "rgb(10,7,9)";
-  ctx.fillRect(-40, -40, w + 80, Math.max(0, surface + 40));
+  ctx.fillRect(-w, -h, w * 3, Math.max(0, surface + h));
   let earth: string | CanvasPattern = "rgb(44,32,26)";
   if (rock && rock.complete && rock.naturalWidth > 0) {
     const p = ctx.createPattern(rock, "repeat");
@@ -309,7 +319,7 @@ export function drawDrill(
     }
   }
   ctx.fillStyle = earth;
-  ctx.fillRect(-40, surface, w + 80, h - surface + 80);
+  ctx.fillRect(-w, surface, w * 3, h * 3);
   // Darker away from the light around the head.
   const hd = at(d.boreHead().x, d.boreHead().y);
   const reach = 90 + d.light * 170;
@@ -317,7 +327,7 @@ export function drawDrill(
   dark.addColorStop(0, "rgba(0,0,0,0)");
   dark.addColorStop(1, "rgba(0,0,0,0.78)");
   ctx.fillStyle = dark;
-  ctx.fillRect(-40, -40, w + 80, h + 80);
+  ctx.fillRect(-w, -h, w * 3, h * 3);
 
   // The tunnel.
   const pts = d.path.map((p) => at(p.x, p.y));
@@ -353,21 +363,21 @@ export function drawDrill(
       d.path.map((p) => at(p.x, p.y)),
       d.oil + 30,
     ).pop();
-    const above = front ? front.y < 0 : true;
+    const above = front ? front.y < y0 : true;
     if (above) {
       const near = Math.max(0, Math.min(1, 1 - d.gap / 700));
       const h = 18 + near * 70;
-      const g = ctx.createLinearGradient(0, -shake, 0, h - shake);
+      const g = ctx.createLinearGradient(0, y0 - shake, 0, y0 + h - shake);
       g.addColorStop(0, "rgba(6,3,12,0.95)");
       g.addColorStop(1, "rgba(6,3,12,0)");
       ctx.fillStyle = g;
-      ctx.fillRect(-40, -shake - 2, w + 80, h);
+      ctx.fillRect(-w, y0 - shake - 2, w * 3, h);
       ctx.fillStyle = "rgba(8,4,14,0.92)";
       for (let i = 0; i < 9; i++) {
-        const x = ((i + 0.5) / 9) * w + Math.sin(i * 7.1) * 18;
+        const x = x0 + ((i + 0.5) / 9) * (w / DRILL_ZOOM) + Math.sin(i * 7.1) * 18;
         const len = (10 + near * 46) * (0.6 + 0.4 * Math.sin(clock * 1.4 + i * 2.3));
         ctx.beginPath();
-        ctx.ellipse(x, -shake + len * 0.5, 3 + near * 3, len * 0.55, 0, 0, Math.PI * 2);
+        ctx.ellipse(x, y0 - shake + len * 0.5, 3 + near * 3, len * 0.55, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -433,16 +443,46 @@ export function drawDrill(
     ctx.save();
     ctx.clip(shape);
     if (oil) {
-      // The painted oil, pouring: it scrolls down so it flows.
-      const ow = w + 80;
+      // The painted oil, fixed to the rock (it moves with the earth, not the
+      // screen) and creeping slowly down it, so it reads as liquid in the hole.
+      const o = at(0, 0);
+      const ow = 260;
       const oh = ow * 1.78;
-      const flow = (clock * 40) % oh;
-      ctx.drawImage(oil, -40, -40 + flow - oh, ow, oh);
-      ctx.drawImage(oil, -40, -40 + flow, ow, oh);
+      const flow = (clock * 14) % oh;
+      for (let ty = o.y - oh + flow - oh; ty < h * 2; ty += oh) {
+        for (let tx = o.x - ow * 3; tx < o.x + ow * 3; tx += ow) ctx.drawImage(oil, tx, ty, ow, oh);
+      }
+      // Deepen it: it's thick and black, its colour only in the sheen.
+      ctx.fillStyle = "rgba(4,2,8,0.62)";
+      ctx.fillRect(-w, -h, w * 3, h * 3);
     } else {
       ctx.fillStyle = "rgb(8,5,14)";
-      ctx.fillRect(-40, -40, w + 80, h + 80);
+      ctx.fillRect(-w, -h, w * 3, h * 3);
     }
+    ctx.restore();
+    // Its wet edge: a glossy line along both walls, and a swollen front.
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(150,110,230,0.28)";
+    ctx.lineWidth = 1.5;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      oilPts.forEach((p, k) => {
+        const q = oilPts[Math.min(oilPts.length - 1, k + 1)]!;
+        const pr = oilPts[Math.max(0, k - 1)]!;
+        const ang = Math.atan2(q.y - pr.y, q.x - pr.x) + (side * Math.PI) / 2;
+        const ex = p.x + Math.cos(ang) * (r - 2);
+        const ey = p.y + Math.sin(ang) * (r - 2);
+        if (k === 0) ctx.moveTo(ex, ey);
+        else ctx.lineTo(ex, ey);
+      });
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(170,130,255,0.4)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(front.x, front.y, r + 3, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -454,19 +494,6 @@ export function drawDrill(
     const grow = Math.min(1, t.age / 0.35);
     if (t.kind === "seam") drawSeam(ctx, s.x, s.y, t.r * grow, on, clock);
     else drawOre(ctx, s.x, s.y, t.r * grow, on, clock);
-    // What it does, under it: plain words, brighter when it's the one in your sights.
-    ctx.save();
-    ctx.globalAlpha = (on ? 1 : 0.62) * grow;
-    ctx.font = '800 10px "Nunito Variable", system-ui, sans-serif';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(0,0,0,0.75)";
-    const label = t.kind === "seam" ? "SEAM ▾ deeper" : "ORE ✦ light, oil back";
-    ctx.strokeText(label, s.x, s.y + t.r + 6);
-    ctx.fillStyle = t.kind === "seam" ? "rgb(255,190,120)" : "rgb(255,226,140)";
-    ctx.fillText(label, s.x, s.y + t.r + 6);
-    ctx.restore();
   }
 
   // In a groove: the tunnel you'd cut, ghosted in, and a ring on the target.
@@ -514,7 +541,12 @@ export function drawDrill(
     drawPaintedHead(ctx, head, hd.x, hd.y, heading, clock, d.bore !== null);
   } else drawHead(ctx, hd.x, hd.y, heading, clock, d.bore !== null);
   ctx.restore();
+  ctx.restore();
 }
+
+/** How magnified the drill's world is drawn, and where the head sits down the view. */
+export const DRILL_ZOOM = 1.6;
+export const VIEW_Y = 0.42;
 
 /** Where the machine's base sits in its painting, as a share of its height. */
 const RIG_BASE = 0.975;
