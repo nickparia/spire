@@ -77,7 +77,7 @@ export class Drill {
   /** Length of the tunnel, px. */
   length = 0;
   /** How far down the tunnel the oil has run, px. */
-  oil = -230;
+  oil = -420;
   /**
    * Leaks: where a careless shot broke into the oil-soaked rock. Each lets
    * more of the Dark in, and more Dark runs faster. Size grows with how far
@@ -284,6 +284,8 @@ export function drawDrill(
   h: number,
   clock: number,
   rock: HTMLImageElement | null,
+  /** The painted drill head's spin, frames side by side; the drawn head stands in without it. */
+  head: HTMLImageElement | null = null,
 ): void {
   const at = (x: number, y: number) => d.toScreen(x, y, w, h);
   const shake = d.shake * 2.5 * Math.sin(clock * 70);
@@ -325,8 +327,8 @@ export function drawDrill(
     ctx.strokeStyle = style;
     ctx.stroke();
   };
-  line(36, "rgba(120,90,70,0.55)");
-  line(30, "rgb(14,9,9)");
+  line(46, "rgba(120,90,70,0.55)");
+  line(40, "rgb(14,9,9)");
 
   // The leaks: black ooze welling out of the rock where careless shots broke in.
   for (const l of d.leaks) {
@@ -414,14 +416,10 @@ export function drawDrill(
   }
 
   // The drill head: a bronze crown of teeth, spinning, pointing along its heading.
-  drawHead(
-    ctx,
-    hd.x,
-    hd.y,
-    d.bore ? Math.atan2(d.bore.tx - d.bore.fx, d.bore.ty - d.bore.fy) : d.heading,
-    clock,
-    d.bore !== null,
-  );
+  const heading = d.bore ? Math.atan2(d.bore.tx - d.bore.fx, d.bore.ty - d.bore.fy) : d.heading;
+  if (head && head.complete && head.naturalWidth > 0) {
+    drawPaintedHead(ctx, head, hd.x, hd.y, heading, clock, d.bore !== null);
+  } else drawHead(ctx, hd.x, hd.y, heading, clock, d.bore !== null);
   ctx.restore();
 }
 
@@ -506,6 +504,45 @@ function drawOre(
     ctx.closePath();
     ctx.fill();
   }
+  ctx.restore();
+}
+
+/** Frames in the painted head's spin, and its height on screen, px. */
+export const HEAD_FRAMES = 24;
+const HEAD_H = 92;
+/** Where the drill's tip is in its painting, as a share of its height from the top. */
+const HEAD_TIP = 0.96;
+
+/**
+ * The painted drill head, its tip on the end of the tunnel and its body (with
+ * the cables trailing) behind, turned to its heading; it spins faster boring.
+ */
+function drawPaintedHead(
+  ctx: CanvasRenderingContext2D,
+  sheet: HTMLImageElement,
+  x: number,
+  y: number,
+  heading: number,
+  clock: number,
+  boring: boolean,
+): void {
+  const cw = sheet.naturalWidth / HEAD_FRAMES;
+  const ch = sheet.naturalHeight;
+  const frame = Math.floor(clock * (boring ? 34 : 14)) % HEAD_FRAMES;
+  const h = HEAD_H;
+  const w = h * (cw / ch);
+  ctx.save();
+  ctx.translate(x, y);
+  // The painting points down the screen, as does a heading of 0; the aim runs
+  // along (sin h, cos h), which a canvas turn of -h gives its "down".
+  ctx.rotate(-heading);
+  // A glow of its own violet light around it.
+  const glow = ctx.createRadialGradient(0, -h * 0.45, 0, 0, -h * 0.45, h * 0.8);
+  glow.addColorStop(0, "rgba(150,90,230,0.22)");
+  glow.addColorStop(1, "rgba(150,90,230,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(-h, -h * 1.3, h * 2, h * 1.6);
+  ctx.drawImage(sheet, frame * cw, 0, cw, ch, -w / 2, -h * HEAD_TIP, w, h);
   ctx.restore();
 }
 

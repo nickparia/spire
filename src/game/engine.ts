@@ -4888,7 +4888,7 @@ export class SpireEngine {
     } else if (this.phase === "ready") {
       // Before the first shot only the drill swings: the oil and the clock wait.
       d.step(dt, this.vw, this.vh);
-      d.oil = -230;
+      d.oil = -420;
       d.time = 0;
     } else if (this.phase === "fall") {
       this.fallAge += dt;
@@ -4963,7 +4963,12 @@ export class SpireEngine {
     }
     ctx.save();
     ctx.translate(ox, oy);
-    drawDrill(ctx, this.drill!, this.vw, this.vh, this.reduceMotion ? 0 : this.clock, tex);
+    let head = this.sprites.get("drill-head");
+    if (!head) {
+      head = Object.assign(new Image(), { src: "art/sprites/drill-head.webp" });
+      this.sprites.set("drill-head", head);
+    }
+    drawDrill(ctx, this.drill!, this.vw, this.vh, this.reduceMotion ? 0 : this.clock, tex, head);
     this.fx.draw(ctx, this.worldToScreen);
     ctx.restore();
     this.drawFloaters(ctx);

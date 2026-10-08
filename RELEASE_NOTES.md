@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 69 — The drill head (prototype, internal)
+
+- **The drill is painted** (Higgsfield): a steampunk cosmic horror of brass and blackened iron, its spiral crown of fang-teeth spinning, bone claws gripping its collar, violet eyes glowing in its portholes. It spins faster as it bores. It pivots at the end of the tunnel to aim, so while you aim sideways it swings out across the rock.
+- **A longer head start** before the oil reaches you, so the first careless taps don't end it at once.
+- The rest is still placeholder art while we judge the feel.
+
 ## Build 68 — The drill (prototype, internal)
 
 - **A new way to play the Descent** (Depth 1 for now; the other depths use the same, untuned). Simple placeholder visuals: this is to judge the feel before the Higgsfield art.
