@@ -343,6 +343,11 @@ export class Sfx {
     this.play("topple", 0.75);
   }
 
+  /** Something living taken by the dark: the presence, close and low. */
+  taken(): void {
+    if (!this.play("taken", 0.6, 0.85)) this.fail();
+  }
+
   /** The Descent's door bursting open. */
   door(): void {
     if (!this.play("door", 0.95)) this.boom();

@@ -52,7 +52,7 @@ await page.evaluate(
         const a = d.aimed();
         const want = careless
           ? Math.random() < 0.04
-          : a && a.perfect && (a.target.kind === "seam" || d.gap < 160 || d.momentum > 0.6);
+          : a && a.perfect && (a.target.kind === "seam" || a.target.kind === "creature" || d.gap < 160 || d.momentum > 0.6);
         if (want) {
           e.tap();
           last = performance.now();

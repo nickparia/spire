@@ -23,7 +23,34 @@ export type Target = {
   hp: number;
   /** Seconds since it appeared. */
   age: number;
+  /** It can only be struck while lit (see `lights`); lit now or not. */
+  dark?: boolean;
+  lit?: boolean;
+  /** Seconds it stays struck-able after the light leaves it. */
+  glow?: number;
+  /** For an actor-made target (a creature lunging): which actor. */
+  actor?: Actor;
 };
+
+/** Something living in the field (a miner, a creature): the world moves and draws it. */
+export type Actor = {
+  kind: string;
+  x: number;
+  y: number;
+  /** Free state for the world's own use. */
+  state: string;
+  t: number;
+  /** The light it carries: a cone from (x, y) along `angle`, `spread` wide, `range` long. */
+  lamp?: { angle: number; spread: number; range: number };
+  /** Facing, for drawing. */
+  face: number;
+  /** Its place in the world's roster (which ledge, which lamp rhythm). */
+  slot?: number;
+  gone?: boolean;
+};
+
+/** A cone of light in the field. */
+export type Cone = { x: number; y: number; angle: number; spread: number; range: number };
 
 /** What a hit on a kind of target does. */
 export type Outcome = {
@@ -63,6 +90,13 @@ export type RiteWorld = {
   };
   /** Seconds an outcome takes to play (aim is held meanwhile). */
   actTime: number;
+  /** Each shot knocks the aim by up to this many radians (the machine's recoil), settling at `settle`/s. */
+  recoil?: number;
+  settle?: number;
+  /** The world's own life each step: its actors moving, appearing, acting. */
+  tick?: (r: Rite, dt: number, rand: () => number) => void;
+  /** Called when a target made by an actor is struck (a creature saved from). */
+  onStrike?: (r: Rite, t: Target, perfect: boolean) => void;
 };
 
 export type Shot =
@@ -85,6 +119,10 @@ export class Rite {
   targets: Target[] = [];
   /** An outcome playing: its shot, and how far along (0..1). */
   acting: { shot: Shot; t: number } | null = null;
+  /** The world's living things. */
+  actors: Actor[] = [];
+  /** The aim's knock from recoil, settling back. */
+  kick = 0;
   /** Where misses cracked the walls, for the view (fade with age). */
   cracks: { x: number; y: number; size: number; age: number }[] = [];
   private rand: () => number;
@@ -100,6 +138,7 @@ export class Rite {
   aimed(): { target: Target; perfect: boolean } | null {
     let best: { target: Target; perfect: boolean; off: number } | null = null;
     for (const t of this.targets) {
+      if (t.dark && !t.lit && !(t.glow && t.glow > 0)) continue;
       const dist = Math.hypot(t.x, t.y);
       const angle = Math.atan2(t.x, t.y);
       const window = Math.atan2(t.r, dist);
@@ -120,6 +159,7 @@ export class Rite {
       hit.target.hp -= 1;
       const broke = hit.target.hp <= 0;
       shot = { hit: true, target: hit.target, perfect: hit.perfect, broke };
+      if (broke && hit.target.actor) this.world.onStrike?.(this, hit.target, hit.perfect);
       if (broke) {
         this.apply(hit.target.kind, hit.perfect);
         // The way opens at once: the field rises by the lurch and refills, so
@@ -128,6 +168,7 @@ export class Rite {
         const adv = this.lastAdvance(shot);
         for (const t of this.targets) t.y -= adv;
         for (const c of this.cracks) c.y -= adv;
+        for (const a of this.actors) if (a.kind !== "miner") a.y -= adv;
         this.targets = this.targets.filter((t) => t.y > -30);
         this.fill();
       }
@@ -143,6 +184,9 @@ export class Rite {
       );
       this.cracks.push({ x, y, size: 0.4 + wild * 0.6, age: 0 });
     }
+    // The machine kicks: the aim is knocked, one way or the other.
+    if (this.world.recoil)
+      this.kick += (this.rand() < 0.5 ? -1 : 1) * this.world.recoil * (0.6 + this.rand() * 0.4);
     this.acting = { shot, t: 0 };
     return shot;
   }
@@ -172,13 +216,34 @@ export class Rite {
     } else {
       this.moverTime += dt;
     }
-    this.heading = this.world.aim(this.moverTime);
+    this.kick *= Math.exp(-(this.world.settle ?? 3) * dt);
+    this.heading = this.world.aim(this.moverTime) + this.kick;
+    this.world.tick?.(this, dt, this.rand);
+    // What the lamps light now.
+    const cones = this.lights();
+    for (const t of this.targets) {
+      if (!t.dark) continue;
+      const was = t.lit;
+      t.lit = cones.some((c) => inCone(c, t.x, t.y));
+      if (was && !t.lit) t.glow = 0.35;
+      if (t.glow) t.glow = Math.max(0, t.glow - dt);
+    }
     const c = this.world.chaser;
     this.momentum = Math.max(0, this.momentum - c.fade * dt);
     this.gap -= (c.pace + c.accel * this.time) * (1 + this.momentum) * dt;
     if (this.progress >= this.world.goal && !this.acting) return "through";
     if (this.gap <= 0) return "caught";
     return null;
+  }
+
+  /** Every lamp in the field now. */
+  lights(): Cone[] {
+    const out: Cone[] = [];
+    for (const a of this.actors) {
+      if (a.gone || !a.lamp) continue;
+      out.push({ x: a.x, y: a.y, ...a.lamp });
+    }
+    return out;
   }
 
   /** How far a shot moved things down, for the field to rise by. */
@@ -202,6 +267,15 @@ export class Rite {
     }
     return Number.isFinite(best) ? best : 4;
   }
+}
+
+/** Whether a point is inside a cone of light. */
+export function inCone(c: Cone, x: number, y: number): boolean {
+  const dx = x - c.x;
+  const dy = y - c.y;
+  const d = Math.hypot(dx, dy);
+  if (d > c.range) return false;
+  return Math.abs(angleDiff(Math.atan2(dx, dy), c.angle)) <= c.spread / 2;
 }
 
 export function angleDiff(a: number, b: number): number {

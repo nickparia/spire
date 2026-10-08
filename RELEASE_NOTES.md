@@ -3,6 +3,15 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 74 — The expedition (Depth 1 playable, internal)
+
+- **A crew goes down with the machine.** Hooded miners stand on ledges either side and one hangs on a chain from the machine, their lanterns (painted with Higgsfield, like them) sweeping the rock below.
+- **Only what's lit can be struck.** Seams sit dark in the rock until a lamp's beam crosses them: you fire when the head's swing and a lit seam meet. Two rhythms, like Hearth's slab over the stack.
+- **Things hunt the crew.** Pale, many-legged creatures (Higgsfield) crawl out of the dark toward a miner. When one lunges it's caught in the miner's lamp for a moment: strike it and the miner lives (and the ooze is pushed back); miss the moment and the miner, and their light, are gone. Fewer miners, fewer lights, harder seams.
+- **The drill kicks.** Each shot knocks the head's aim; a run of quick shots is harder to control.
+- The ooze, the veins and everything else as before. Depth 1 is a little forgiving to learn on.
+- Checked on an iPhone simulator.
+
 ## Build 73 — Every tap fires (internal)
 
 - **Fixed:** after each shot the drill ignored taps for about 0.7 s while the bolt and lurch played, so quick taps did nothing. Now the way opens at once and every tap fires; the machine still visibly lurches down.

@@ -1,7 +1,7 @@
 {
-  "build": 73,
-  "title": "Every tap fires",
+  "build": 74,
+  "title": "The expedition",
   "notes": [
-    "Fixed: after each shot the drill ignored taps for a moment; now every tap fires."
+    "The Descent has a crew now: miners on ledges and chains around the machine, their lanterns sweeping the rock. Only what a lamp lights can be struck. Creatures come out of the dark for them; strike one as it lunges, caught in the lamp, or that miner and their light are lost. Each shot kicks the drill's aim."
   ]
 }

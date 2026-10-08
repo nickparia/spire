@@ -4858,8 +4858,16 @@ export class SpireEngine {
     this.fx.down = -1;
     if (this.phase === "play") {
       this.runTime += dt;
+      const crewBefore = r.actors.filter((x) => x.kind === "miner" && x.state !== "dead").length;
       const end = r.step(dt);
       this.floors = Math.floor(r.progress / DESCENT_FLOOR);
+      const crewAfter = r.actors.filter((x) => x.kind === "miner" && x.state !== "dead").length;
+      if (crewAfter < crewBefore) {
+        // A miner taken: their lamp goes out, the deep gets darker.
+        this.sfx.taken();
+        this.trauma = Math.min(1, this.trauma + 0.35);
+        haptics.heavy();
+      }
       if (end === "caught") {
         this.float("THE LIGHT IS BURIED", 0, -60, false, 24);
         this.taken = true;
@@ -4939,7 +4947,13 @@ export class SpireEngine {
     this.bestStreak = Math.max(this.bestStreak, this.streak);
     if (shot.perfect) this.perfects += 1;
     this.accuracySum += shot.perfect ? 1 : 0.8;
-    if (t.kind === "vein") {
+    if (t.kind === "creature") {
+      // Struck in the lamp's light: it bursts, and the miner lives.
+      this.fx.blood(t.x, t.y, [70, 60, 80], 30, 280, false);
+      this.fx.burst(t.x, t.y, [255, 220, 170], 14, 220);
+      this.sfx.squash();
+      this.flash = Math.max(this.flash, 0.2);
+    } else if (t.kind === "vein") {
       this.fx.burst(t.x, t.y, [255, 226, 150], 28, 260);
       this.fx.sparkle(t.x, t.y, 40, [255, 236, 180], 20);
       this.sfx.perfect(this.streak);
@@ -4982,6 +4996,8 @@ export class SpireEngine {
         head: img("drill-head", "art/sprites/drill-head.webp"),
         seam: img("kit-seam", "art/kit/seam.webp"),
         vein: img("kit-vein", "art/kit/vein.webp"),
+        miner: img("kit-miner", "art/sprites/miner.webp"),
+        creature: img("kit-creature", "art/sprites/creature.webp"),
       },
       this.vw,
       this.vh,

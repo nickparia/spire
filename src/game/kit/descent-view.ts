@@ -18,6 +18,9 @@ export type DescentArt = {
   head: HTMLImageElement | null;
   seam: HTMLImageElement | null;
   vein: HTMLImageElement | null;
+  /** The crew's run and the creatures' crawl, frames side by side. */
+  miner: HTMLImageElement | null;
+  creature: HTMLImageElement | null;
 };
 
 /** Where the head's pivot sits, as shares of the view. */
@@ -77,7 +80,9 @@ export class DescentView {
     this.drawMachine(ctx, art, w, h, px, py, surface, clock);
     this.drawCracks(ctx, r, w, h, clock);
     this.drawLight(ctx, r, w, h, px, py);
+    this.drawLamps(ctx, r, w, h, clock);
     this.drawTargets(ctx, r, art, w, h, clock);
+    this.drawActors(ctx, r, art, w, h, clock);
     this.drawBolt(ctx, r, w, h, px, py, clock);
     this.drawHead(ctx, r, art, px, py, clock);
     this.drawOoze(ctx, r, art, w, h, py, clock);
@@ -196,6 +201,11 @@ export class DescentView {
       const s = this.to(t.x, t.y, w, h);
       const grow = Math.min(1, t.age / 0.4);
       const on = aim?.target === t;
+      if (t.kind === "creature") continue;
+      // Dark until a lamp finds it: then it's there to strike, and glows a moment after.
+      const seen = !t.dark || t.lit || (t.glow ?? 0) > 0;
+      ctx.save();
+      ctx.globalAlpha = seen ? 1 : 0.22;
       const size = t.r * SCALE * 2.6 * grow;
       const img = t.kind === "seam" ? art.seam : art.vein;
       // Its glow, stronger in your sights.
@@ -221,6 +231,7 @@ export class DescentView {
         ctx.lineWidth = 3;
         ctx.strokeRect(s.x - size * 0.45, s.y - size * 0.3, size * 0.9, size * 0.6);
       }
+      ctx.restore();
       if (on) {
         ctx.strokeStyle = aim.perfect ? "rgba(255,240,200,0.95)" : "rgba(255,200,140,0.75)";
         ctx.lineWidth = 2;
@@ -228,6 +239,114 @@ export class DescentView {
         ctx.arc(s.x, s.y, Math.max(2, size * 0.55 + Math.sin(clock * 8) * 2), 0, Math.PI * 2);
         ctx.stroke();
       }
+    }
+  }
+
+  /** The crew's lamps: warm cones sweeping the rock. */
+  private drawLamps(
+    ctx: CanvasRenderingContext2D,
+    r: Rite,
+    w: number,
+    h: number,
+    clock: number,
+  ): void {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const c of r.lights()) {
+      const o = this.to(c.x, c.y, w, h);
+      const len = c.range * SCALE;
+      const flick = 0.85 + 0.15 * Math.sin(clock * 13 + c.x);
+      const g = ctx.createRadialGradient(o.x, o.y, 4, o.x, o.y, len);
+      g.addColorStop(0, `rgba(255,200,120,${0.2 * flick})`);
+      g.addColorStop(0.6, `rgba(255,190,110,${0.08 * flick})`);
+      g.addColorStop(1, "rgba(255,190,110,0)");
+      ctx.fillStyle = g;
+      // Canvas angles run from +x; the rite's run from straight down (+y).
+      const a = Math.PI / 2 - c.angle;
+      // Soft-edged: three widening cones layered, so the beam feathers out.
+      for (const k of [1, 0.7, 0.4]) {
+        ctx.globalAlpha = k === 1 ? 0.45 : 0.55;
+        ctx.beginPath();
+        ctx.moveTo(o.x, o.y);
+        ctx.arc(
+          o.x,
+          o.y,
+          len,
+          a - (c.spread / 2) * (1 + (1 - k)),
+          a + (c.spread / 2) * (1 + (1 - k)),
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  /** The miners on their ledges and chains, and what comes out of the dark for them. */
+  private drawActors(
+    ctx: CanvasRenderingContext2D,
+    r: Rite,
+    art: DescentArt,
+    w: number,
+    h: number,
+    clock: number,
+  ): void {
+    for (const a of r.actors) {
+      if (a.kind === "rig") continue;
+      const s = this.to(a.x, a.y, w, h);
+      const sheet = a.kind === "miner" ? art.miner : art.creature;
+      const size = a.kind === "miner" ? 96 : 104;
+      ctx.save();
+      if (a.kind === "miner") {
+        // A ledge or chain under them.
+        ctx.fillStyle = "rgba(30,20,14,0.95)";
+        if (a.slot === 2) {
+          ctx.strokeStyle = "rgba(150,110,60,0.8)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y - size * 0.55);
+          ctx.lineTo(w / 2, h * PIVOT_Y - 60);
+          ctx.stroke();
+        } else ctx.fillRect(s.x - 34, s.y + size * 0.42, 68, 6);
+        if (a.state === "dead") ctx.globalAlpha = Math.max(0, 1 - a.t / 1.2);
+      } else {
+        if (a.state === "dead") ctx.globalAlpha = Math.max(0, 1 - a.t / 0.6);
+        if (a.state === "lunge") {
+          // Caught in the light: a ring and a pulse, strike now.
+          const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, size);
+          g.addColorStop(0, `rgba(255,120,90,${0.35 + 0.2 * Math.sin(clock * 14)})`);
+          g.addColorStop(1, "rgba(255,120,90,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(s.x - size, s.y - size, size * 2, size * 2);
+        } else ctx.globalAlpha *= 0.75;
+      }
+      if (ready(sheet)) {
+        const frames = Math.max(1, Math.round(sheet.naturalWidth / sheet.naturalHeight));
+        const cw = sheet.naturalWidth / frames;
+        const fps =
+          a.kind === "miner" ? (a.state === "work" ? 6 : 12) : a.state === "lunge" ? 20 : 12;
+        const frame = Math.floor((clock + (a.slot ?? 0)) * fps) % frames;
+        ctx.translate(s.x, s.y);
+        ctx.scale(a.face, 1);
+        ctx.drawImage(
+          sheet,
+          frame * cw,
+          0,
+          cw,
+          sheet.naturalHeight,
+          -size / 2,
+          -size / 2,
+          size,
+          size,
+        );
+      } else {
+        ctx.fillStyle = a.kind === "miner" ? "rgb(200,150,90)" : "rgb(210,200,220)";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, size * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
   }
 
