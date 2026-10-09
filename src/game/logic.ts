@@ -280,8 +280,8 @@ export const DARK_PUSH = {
   forge: 150,
 } as const;
 
-/** Where the Dark starts, px below the foundation. */
-export const DARK_START = -168;
+/** Where the Dark starts, px below the foundation: four floors down, in frame from the first drop. */
+export const DARK_START = -112;
 
 /**
  * A ghost is the trace of a best run: the second each floor was first

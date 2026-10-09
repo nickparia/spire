@@ -363,9 +363,11 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
       return from + (to - from) * t;
     },
     difficulty: index * 6,
-    sway: 0.1 + index * 0.025,
-    // Slow enough to outbuild with steady play, never slow enough to ignore.
-    darkRate: Math.min(20, 16 + index),
+    // Testers found the early skies too forgiving: the air bites from the first sky now.
+    sway: 0.14 + index * 0.03,
+    // Slow enough to outbuild with steady play, never slow enough to ignore,
+    // and never out of sight: see DARK_REACH.
+    darkRate: Math.min(32, 18 + index * 1.8),
     // Down here nothing topples: a slab sets or it falls.
     physics: !level.descent,
     descent: level.descent ?? false,

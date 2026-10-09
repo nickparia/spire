@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 80 — Hearth bites (internal)
+
+- **The Dark is a factor from the first sky.** It starts four floors below the foundation instead of six, climbs faster on every sky (18 px/s on the Foundry rising to 31 at Apex, from 16–20), and your light can never push it more than eight floors below the top (was twelve), so it's always in frame and always a clock. Play steadily and it stays behind you; dawdle and it doesn't.
+- **The air bites sooner.** Sway starts stronger and grows faster per sky (0.14 + 0.03 a sky, from 0.10 + 0.025), so a lean gets finished off before Gale Ridge.
+- **The Dark eats what it takes.** A slab that falls into it cracks and crumbles into the ink, the tower shudders, rubble flies.
+- **Sound.** Every landing has weight now: a low thud under the chime or the drop that deepens as the tower grows. The moving slab breathes a swish as it turns. The music follows the stack harder: height and the Dark's nearness both pull it up, the Dark hardest.
+- Checked on an iPhone simulator.
+
 ## Build 79 — The arm (internal)
 
 - **The Dark's arms are painted.** When a claw bursts from a wall it's the elder god's own arm now (Higgsfield): glossy black ooze, violet eyes along it, ember-lit talons that open and clench on the chain before it draws back. Mirrored for either wall.

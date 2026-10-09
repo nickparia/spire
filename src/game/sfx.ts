@@ -147,6 +147,19 @@ export class Sfx {
     };
   }
 
+  /** The moving slab turning at the end of its run: a breath of air. */
+  swish(): void {
+    if (this.play("slice", 0.16, 1.5)) return;
+    this.noise(0.04, 0.05, 900);
+  }
+
+  /** The weight under a landing: a low thud that deepens with the tower's height. */
+  thud(height: number): void {
+    const deep = Math.min(1, height / 30);
+    if (this.play("bedrock", 0.14 + 0.1 * deep, 1.9 - 0.5 * deep)) return;
+    this.tone(70 - 20 * deep, 0.12, "sine", 0.12, 40);
+  }
+
   drop(): void {
     if (this.play("drop", 0.8, this.vary())) return;
     const wobble = 0.94 + Math.random() * 0.12;

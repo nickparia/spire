@@ -531,8 +531,9 @@ export class Music {
    */
   setClimb(climb: Climb): void {
     this.climb = climb;
+    // Height and the Dark's nearness both pull the score up, the Dark hardest.
     this.target = clamp01(
-      climb.progress * 0.45 + climb.danger * 0.6 + Math.min(climb.streak, 8) * 0.012,
+      climb.progress * 0.55 + climb.danger * 0.75 + Math.min(climb.streak, 8) * 0.015,
     );
   }
 

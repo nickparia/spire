@@ -291,7 +291,7 @@ const ESCAPE_STING = 5;
 /** Seconds between slabs in a chain of perfects going off. */
 const ESCAPE_CHAIN_STEP = 0.07;
 /** Floors below the top that light can drive the Dark, and no further. */
-const DARK_REACH = 12;
+const DARK_REACH = 8;
 /** Past par, the Dark climbs this much faster per second over, called out every QUICKEN_EVERY seconds. */
 const QUICKEN_RATE = 0.04;
 const QUICKEN_EVERY = 10;
@@ -1867,6 +1867,11 @@ export class SpireEngine {
       if (i > 0 && !slab.sank && this.plan.darkRate > 0 && view.cy < this.darkShown) {
         slab.sank = true;
         this.inkSplash(view.cx, this.darkShown, view.w);
+        // It doesn't just slip under: the stone cracks and crumbles as the Dark takes it.
+        this.fx.burst(view.cx, this.darkShown + 6, slab.rgb, 18, 190);
+        this.fx.sparkle(view.cx, this.darkShown + 10, view.w, [90, 70, 110], 8);
+        this.sfx.rubble();
+        this.trauma = Math.min(1, this.trauma + 0.18);
       }
       if (i > 0 && (lost.has(slab.body) || view.cy < -300 || Math.abs(view.cx) > 1600)) {
         // Down on the ground, or over the edge of the world: it crumbles.
@@ -3257,9 +3262,11 @@ export class SpireEngine {
       if (m.u >= 1) {
         m.u = 1;
         m.dir = -1;
+        if (this.phase === "play") this.sfx.swish();
       } else if (m.u <= -1) {
         m.u = -1;
         m.dir = 1;
+        if (this.phase === "play") this.sfx.swish();
       }
       this.syncMoverX();
     }
@@ -3600,6 +3607,7 @@ export class SpireEngine {
       this.rewardPerfect(slab, cx, seam, result.streak, result.forged);
     } else {
       this.sfx.drop();
+      this.sfx.thud(this.floors);
       if (result.scrap && result.scrap.w > 6) {
         this.sfx.slice();
         // Down the shaft, the cut-off piece tumbles away out of sight.
@@ -3830,6 +3838,7 @@ export class SpireEngine {
       haptics.medium();
     } else {
       this.sfx.perfect(streak);
+      this.sfx.thud(this.floors);
       this.float(
         streak > 0 && streak % STREAK_SPOKEN === 0 ? `PERFECT ×${streak}` : "PERFECT",
         cx,
