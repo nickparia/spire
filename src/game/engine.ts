@@ -85,8 +85,6 @@ import {
   trialFor,
   type TrialId,
 } from "./landing";
-import { Hang, hangTune, type HangEvent, STONE_H } from "./hang";
-import { HangView } from "./hang-view";
 import {
   BOMB_RGB,
   drawBomb,
@@ -165,7 +163,6 @@ const DARK_ROWS = 7;
 const DARK_FRAMES = 52;
 const DARK_FPS = 8;
 /** Down the screen the Descent's tip sits, as a share of the view. */
-const DESCENT_SEAT = 0.58;
 /** The near scenery: its size, how fast it leaves as you climb, and how solid it is. */
 const FG_SCALE = 0.7;
 const FG_PARALLAX = 1.9;
@@ -262,14 +259,6 @@ const DEMO_TIME = 0.5;
 /** The longest a demo may hold your taps before it steps aside, in seconds. */
 const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
-/** Floors behind the tip the climbers are held within, however fast you build. */
-const DESCENT_REACH = 5;
-/** Floors of earth a sloppy blow on the hardest rock shakes loose behind you. */
-const CAVE_SHAKE = 0.9;
-/** The bored hole's half width (of a starting slab), its crater's depth (px), and the rock texture's size (px). */
-const BORE_HALF = 0.68;
-const BORE_CRATER = 22;
-const BORE_TEX = 260;
 /** Each depth's rock, for the chips its blows throw up. */
 const ROCK_RGB: Record<string, RGB> = {
   roots: [92, 70, 48],
@@ -418,8 +407,6 @@ export type Hud = {
   coins: number;
   /** Floors between the Dark and the top of the stack; null when it isn't rising. */
   darkGap: number | null;
-  /** The Descent's fight: the wire's strain (0..100) and the stones the Dark holds. */
-  wire: { strain: number; held: number } | null;
   /** Built down: the Dark is the climbers. */
   descent: boolean;
   /** The Descent's boss: climbing back up; and whether the door's sting is playing. */
@@ -842,13 +829,12 @@ export class SpireEngine {
   private ascentSting = 0;
   /** The Descent: each depth's rock texture, the cave-in's front, how far the light reaches, the last blow's shudder. */
   private rockArts = new Map<string, HTMLImageElement>();
-  private oil: HTMLVideoElement | null = null;
   private dDark: HTMLVideoElement | null = null;
   private lightReach = 0.6;
   private rockShake = 0;
-  /** The Descent's fight on the wire, and how it's drawn. */
-  private hang: Hang | null = null;
-  private hangView = new HangView();
+  /** The Descent: the Dark's arms out of the shaft walls, for the view (side, world y, age), and their clock. */
+  private arms: { side: number; y: number; t: number }[] = [];
+  private armT = 0;
   /** Seconds until the drill's HUD (depth, the oil's gap) is sent again. */
   private emitCooldown = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
@@ -1015,13 +1001,6 @@ export class SpireEngine {
     }
     if (this.escape) {
       this.breakTop();
-      return;
-    }
-    if (this.hang) {
-      if (this.hang.fall >= 0) return;
-      if (this.phase === "ready") this.phase = "play";
-      this.hint = false;
-      this.hangEvent(this.hang.tap());
       return;
     }
     if (this.freeze > 0 || this.mover.fallT >= 0) return;
@@ -1349,13 +1328,8 @@ export class SpireEngine {
     this.loadSourceArt();
     this.loadDarkArt();
     this.resetRun("ready", true);
-    this.hang = null;
-    const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
-    if (level?.descent) {
-      this.hang = new Hang(hangTune(level.tier ?? 0));
-      this.hangView = new HangView();
-      this.hint = true;
-    }
+    this.arms = [];
+    this.armT = this.armEvery() * 0.8;
     this.music.setTrack(this.theme.track);
     this.music.setMood("play");
     this.music.setTension(0);
@@ -1898,7 +1872,13 @@ export class SpireEngine {
       const view = stage.read(slab.body);
       if (!view) continue;
       // Falling past the Dark's line, it plunges in.
-      if (i > 0 && !slab.sank && this.plan.darkRate > 0 && view.cy < this.darkShown) {
+      if (
+        i > 0 &&
+        !slab.sank &&
+        !this.plan.descent &&
+        this.plan.darkRate > 0 &&
+        view.cy < this.darkShown
+      ) {
         slab.sank = true;
         this.inkSplash(view.cx, this.darkShown, view.w);
         // It doesn't just slip under: the stone cracks and crumbles as the Dark takes it.
@@ -3158,7 +3138,6 @@ export class SpireEngine {
 
   /** Floors of tower still above the Dark. */
   private darkGap(): number {
-    if (this.hang) return this.hang.drag / STONE_H;
     return (this.crownY() - this.dark) / SLAB_H;
   }
 
@@ -3245,10 +3224,6 @@ export class SpireEngine {
       }
       const gap = this.darkGap();
       if (gap < 3) this.strain = Math.max(this.strain, 1 - gap / 3);
-    }
-    // Down the shaft they never fall far behind: outbuild them and they keep pace.
-    if (this.plan.descent && this.phase === "play") {
-      this.dark = Math.max(this.dark, this.crownY() - SLAB_H * DESCENT_REACH);
     }
     // Nor does the blind thing on the way back up.
     if (this.ascent && this.phase === "play") {
@@ -3485,8 +3460,7 @@ export class SpireEngine {
           rot: 0,
           vr: out * (2 + Math.random() * 3),
           rgb,
-          // Down the shaft it has further to fall before it lands on them.
-          life: this.plan.descent ? 2.4 : 1.1,
+          life: 1.1,
         });
       }
     }
@@ -3703,8 +3677,6 @@ export class SpireEngine {
       }
     }
     this.pushDark(push);
-    // The Descent: every slab is a blow on the rock below.
-    if (this.plan.descent && !this.ascent) this.strike(cx, result.perfect);
     // The ascent: a perfect vaults you clear of it, further on a streak.
     if (this.ascent && result.perfect) {
       const vault = ASCENT_VAULT + (this.streak >= 3 ? ASCENT_VAULT_STREAK : 0);
@@ -3750,8 +3722,6 @@ export class SpireEngine {
       this.sfx.thud(this.floors);
       if (result.scrap && result.scrap.w > 6) {
         this.sfx.slice();
-        // Down the shaft, the cut-off piece tumbles away out of sight.
-        if (this.plan.descent) this.sfx.fall();
         this.scraps.push({
           x: result.scrap.x,
           y: slab.y,
@@ -4178,6 +4148,7 @@ export class SpireEngine {
 
   private win(): void {
     const level = LEVELS[this.levelIndex]!;
+    if (this.plan.descent) this.breakThrough();
     const accuracy = this.accuracy();
     const goals = goalsFor(this.runTime, accuracy, level.parTime, level.parAccuracy);
     // A rebuilt run can still light the sky, but it was not a clean climb.
@@ -4247,7 +4218,7 @@ export class SpireEngine {
     const accent = this.theme.accent;
     this.fx.sparkle(cx, crown, top.w, mix(accent, BONE, 0.5), 40);
     for (let i = 0; i < this.stack.length; i++) this.stack[i]!.ripple = i * 0.035;
-    this.float("SUMMIT", cx, crown + 44, true, 30);
+    this.float(this.plan.descent ? "BROKEN THROUGH" : "SUMMIT", cx, crown + 44, true, 30);
     this.pulse = 1;
     this.flash = 0.5;
     this.trauma = Math.min(1, this.trauma + 0.5);
@@ -4388,7 +4359,6 @@ export class SpireEngine {
           ? Math.max(0, Math.floor(this.darkGap()))
           : null,
       descent: !!this.plan.descent,
-      wire: this.hang ? { strain: Math.round(this.hang.strain * 100), held: this.hang.held } : null,
       ascent: this.ascent ? { sting: this.ascentSting > 0 } : null,
       accent: rgbCss(this.theme.accent),
       result: this.result,
@@ -4466,10 +4436,7 @@ export class SpireEngine {
         this.emit();
       }
     }
-    if (this.hang && this.phase !== "menu") {
-      this.stepHang(dt);
-      return;
-    }
+    if (this.plan.descent && this.phase === "play" && !this.ascent) this.stepArms(dt);
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
     const prev = this.peak();
@@ -4584,25 +4551,13 @@ export class SpireEngine {
 
     for (let i = this.scraps.length - 1; i >= 0; i--) {
       const s = this.scraps[i]!;
-      if (this.plan.descent) {
-        // Down here what is cut off falls away from the ceiling, onto them.
-        s.vy += 1400 * dt;
-        s.y += s.vy * dt;
-        if (!s.squashed && s.y >= this.crownY() + SLAB_H) {
-          // It strikes the rock face below the tip and breaks up.
-          s.squashed = true;
-          s.life = Math.min(s.life, 0.15);
-          this.fx.burst(s.x + s.w / 2, this.crownY() + SLAB_H, this.rockRgb(), 14, 200);
-          this.sfx.rubble();
-        }
-      } else {
-        s.vy -= 1400 * dt;
-        s.y += s.vy * dt;
-        if (!s.sank && this.plan.darkRate > 0 && s.y < this.darkShown) {
-          s.sank = true;
-          s.life = Math.min(s.life, 0.2);
-          this.inkSplash(s.x + s.w / 2, this.darkShown, s.w);
-        }
+      s.vy -= 1400 * dt;
+      s.y += s.vy * dt;
+      // Down the Descent the Dark is above: what falls just falls.
+      if (!s.sank && !this.plan.descent && this.plan.darkRate > 0 && s.y < this.darkShown) {
+        s.sank = true;
+        s.life = Math.min(s.life, 0.2);
+        this.inkSplash(s.x + s.w / 2, this.darkShown, s.w);
       }
       s.x += s.vx * dt;
       s.rot += s.vr * dt;
@@ -4664,16 +4619,6 @@ export class SpireEngine {
   /* -------------------------------------------------------------- render */
 
   private worldToScreen = (x: number, yBottom: number): { x: number; y: number } => {
-    if (this.hang) return this.hangView.to(x, yBottom, this.vw);
-    if (this.plan.descent) {
-      // Built down: the world is mirrored, so higher means further down the
-      // screen. Offset by a slab so anything drawn up from its bottom edge
-      // (slabs, the mover, scraps) still covers its own floor.
-      return {
-        x: this.vw / 2 + (x - this.camX),
-        y: this.vh * DESCENT_SEAT - this.viewH * LEAD + SLAB_H + VISUAL_H + (yBottom - this.camY),
-      };
-    }
     return {
       x: this.vw / 2 + (x - this.camX),
       y: this.horizonY - (yBottom - this.camY),
@@ -4918,7 +4863,6 @@ export class SpireEngine {
    * time, its sting plays before the climb can start.
    */
   private beginAscent(fresh: boolean): void {
-    this.hang = null;
     this.ascent = true;
     this.plan = {
       ...this.plan,
@@ -5015,232 +4959,6 @@ export class SpireEngine {
     return level?.paint ?? this.theme.id;
   }
 
-  /** One frame of the Descent's fight: the tower, its view, its effects, how it ends. */
-  private stepHang(dt: number): void {
-    const h = this.hang!;
-    this.fx.down = -1;
-    if (this.phase === "play") {
-      this.runTime += dt;
-      const { events, end } = h.step(dt);
-      for (const e of events) this.hangEvent(e);
-      this.floors = h.stones.length - 1;
-      if (end === "lost") {
-        const tp = h.tip();
-        this.float("THE LIGHT IS BURIED", tp.x, tp.y + 60, false, 24);
-        this.taken = true;
-        this.sfx.fail();
-        this.trauma = 1;
-        this.phase = "fall";
-        this.fallAge = 0;
-        this.keepGhost();
-        this.emit();
-      } else if (end === "won") {
-        if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.beginAscent(true);
-        else this.win();
-      }
-      // The score follows the fight: the wire's strain against the Dark's hold.
-      const danger = clamp01(h.held / Math.max(1, h.stones.length));
-      this.strain = Math.max(this.strain * 0.95, danger);
-      this.music.setClimb({
-        progress: h.strain,
-        danger,
-        streak: this.streak,
-        landings: 2,
-      });
-    } else if (this.phase === "ready") {
-      // Before the first catch the tower only swings: the Dark waits.
-      const drag = h.drag;
-      h.step(dt);
-      h.drag = drag;
-      h.time = 0;
-    } else if (this.phase === "fall") {
-      this.fallAge += dt;
-    }
-    this.hangView.step(dt, h, this.vh);
-    // The shaft is alive: dust and the odd stone falling past, embers off the machine.
-    if (this.phase === "play" && !this.reduceMotion) {
-      if (Math.random() < dt * 0.7) this.rubble(h, 1);
-      if (Math.random() < dt * 1.5)
-        this.fx.sparkle(h.pivotX + (Math.random() - 0.5) * 160, 0, 20, [255, 150, 70], 1);
-    }
-    for (let i = this.floaters.length - 1; i >= 0; i--) {
-      const f = this.floaters[i]!;
-      f.y -= f.vy * dt;
-      f.life -= dt;
-      if (f.life <= 0) this.floaters.splice(i, 1);
-    }
-    this.fx.step(dt);
-    this.trauma = Math.max(0, this.trauma - dt * 1.7);
-    this.flash = Math.max(0, this.flash - dt * 1.8);
-    this.emitCooldown -= dt;
-    if (this.emitCooldown <= 0) {
-      this.emitCooldown = 0.1;
-      this.emit();
-    }
-  }
-
-  /** What happened on the wire: the burst, the sound, the score. */
-  private hangEvent(e: HangEvent): void {
-    const h = this.hang!;
-    const tp = h.tip();
-    const rock = this.rockRgb();
-    switch (e.kind) {
-      case "true": {
-        // The tower lurches down: a jolt, and sparks off the machine as the winch pays out.
-        this.hangView.jolt = 9;
-        this.fx.sparkle(h.pivotX, 40, 60, [255, 200, 120], 10);
-        this.sfx.slice();
-        this.drops += 1;
-        this.streak += 1;
-        this.bestStreak = Math.max(this.bestStreak, this.streak);
-        this.perfects += 1;
-        this.accuracySum += 1;
-        this.hangView.flash = 1;
-        this.fx.sparkle(tp.x, tp.y, h.tune.stoneW, [255, 230, 170], 16);
-        this.sfx.perfect(this.streak);
-        this.flash = Math.max(this.flash, 0.15);
-        if (this.streak % STREAK_SPOKEN === 0)
-          this.float(`PERFECT ×${this.streak}`, tp.x, tp.y + 50, true, 26);
-        haptics.light();
-        break;
-      }
-      case "off":
-        this.drops += 1;
-        this.streak = 0;
-        this.accuracySum += Math.max(0.4, 1 - Math.abs(e.rel) / h.tune.stoneW);
-        this.fx.burst(tp.x, tp.y, rock, 10, 140);
-        this.sfx.drop();
-        this.trauma = Math.min(1, this.trauma + 0.1);
-        haptics.light();
-        break;
-      case "lost":
-        this.hangView.menace = 1;
-        this.rubble(h, 2);
-        this.drops += 1;
-        this.streak = 0;
-        this.accuracySum += 0.2;
-        this.fx.burst(h.stoneX(), tp.y + 40, rock, 16, 200);
-        this.sfx.fall();
-        this.sfx.quicken();
-        this.hangView.shake = 0.6;
-        haptics.medium();
-        break;
-      case "crack":
-        this.fx.burst(tp.x, tp.y, rock, 24, 260);
-        this.sfx.rubble();
-        this.hangView.shake = 1;
-        this.trauma = Math.min(1, this.trauma + 0.3);
-        haptics.heavy();
-        break;
-      case "surge":
-        this.sfx.quicken();
-        this.hangView.menace = 1;
-        this.hangView.shake = 0.5;
-        this.rubble(h, 2);
-        break;
-      case "claw": {
-        // A claw out of the wall: rock bursts where it came through, the Dark roused.
-        this.fx.burst(e.side * (h.tune.shaft + 20), e.y, rock, 14, 180);
-        this.sfx.rubble();
-        this.hangView.menace = 0.8;
-        this.hangView.shake = 0.5;
-        haptics.medium();
-        break;
-      }
-      case "strike":
-        // A blow to the rock: the whole shaft shudders, rubble everywhere.
-        this.sfx.bedrock();
-        this.hangView.shake = 1;
-        this.trauma = Math.min(1, this.trauma + 0.4);
-        this.rubble(h, 4);
-        haptics.heavy();
-        break;
-      case "snap": {
-        // The wire parts and the roots go through the floor: rock everywhere, light pouring up.
-        const floor = this.hangView.floorY(h, 0);
-        this.float("BROKEN THROUGH", tp.x, floor - 30, true, 28);
-        this.fx.burst(0, floor, rock, 60, 420);
-        this.fx.burst(0, floor, [255, 200, 130], 24, 300);
-        this.fx.rayBurst(0, floor, [255, 200, 130], 260, 18);
-        this.sfx.boom();
-        this.sfx.thunder();
-        this.hangView.shake = 1;
-        this.flash = Math.max(this.flash, 0.6);
-        this.trauma = 1;
-        haptics.heavy();
-        break;
-      }
-    }
-    this.emit();
-  }
-
-  /** Rubble shaken off the shaft walls, falling past: dark, the rock in shadow. */
-  private rubble(h: Hang, n: number): void {
-    const r = this.rockRgb();
-    const rock: RGB = [r[0] * 0.5, r[1] * 0.5, r[2] * 0.5];
-    for (let i = 0; i < n; i++) {
-      const side = Math.random() < 0.5 ? -1 : 1;
-      this.fx.burst(side * (h.tune.shaft - 10), h.coat - 40 + Math.random() * 160, rock, 3, 70);
-    }
-  }
-
-  /** The Descent's view, then the usual overlays. */
-  private renderHang(ctx: CanvasRenderingContext2D, ox: number, oy: number): void {
-    const sky = this.paintedSky();
-    const darkV = this.descentDark();
-    let rig = this.sprites.get("drill-rig");
-    if (!rig) {
-      rig = Object.assign(new Image(), { src: "art/drill-rig.webp" });
-      this.sprites.set("drill-rig", rig);
-    }
-    const key = this.paintKey();
-    let rock = this.rockArts.get(key);
-    if (!rock) {
-      rock = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
-      this.rockArts.set(key, rock);
-    }
-    ctx.save();
-    ctx.translate(ox, oy);
-    this.hangView.draw(
-      ctx,
-      this.hang!,
-      {
-        depth: sky ? this.frameOf(sky.video, sky.video.poster) : null,
-        dark: darkV ? this.frameOf(darkV, "art/dark-descent.jpg") : null,
-        rig,
-        rock,
-        claw: this.sprite("claw"),
-      },
-      this.vw,
-      this.vh,
-      this.reduceMotion ? 0 : this.clock,
-      (c, x, yBottom, w, hh, held, hot) => {
-        const rgb = held ? ([40, 26, 56] as RGB) : this.slabColor(this.floors + 1);
-        this.slabLookNow = hot ? this.slabLook(null, this.burning() > 0) : null;
-        this.paintSlab(c, x, yBottom, w, hh, rgb, 1, 0, hot);
-        this.slabLookNow = null;
-        if (held) {
-          c.fillStyle = "rgba(20,10,34,0.55)";
-          c.fillRect(x, yBottom - hh, w, hh);
-        }
-      },
-    );
-    this.fx.draw(ctx, this.worldToScreen);
-    ctx.restore();
-    this.drawFloaters(ctx);
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.fx.drawScreen(ctx);
-    this.drawVignette(ctx);
-    if (this.flash > 0) {
-      ctx.fillStyle = `rgba(255,230,190,${this.flash * 0.22})`;
-      ctx.fillRect(0, 0, this.viewW, this.viewH);
-    }
-    if (this.curtain > 0) {
-      ctx.fillStyle = `rgba(8,6,5,${this.curtain})`;
-      ctx.fillRect(0, 0, this.viewW, this.viewH);
-    }
-  }
-
   /** How hard the rock is at this depth, 0 (earth) to 1 (the floor of the world). */
   private hardness(): number {
     const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
@@ -5250,118 +4968,6 @@ export class SpireEngine {
   /** The colour of the rock being broken, for its chips and dust. */
   private rockRgb(): RGB {
     return ROCK_RGB[this.paintKey()] ?? [110, 92, 80];
-  }
-
-  /**
-   * A slab driven into the rock below the tip. A perfect bursts it apart:
-   * rock flies, the light pours further down, and the cave-in is held back.
-   * Anything else cracks it, and on hard rock shakes loose earth above.
-   */
-  private strike(cx: number, perfect: boolean): void {
-    const at = this.crownY() + SLAB_H;
-    const rock = this.rockRgb();
-    this.rockShake = 1;
-    if (perfect) {
-      this.fx.burst(cx, at, rock, 30, 340);
-      this.fx.burst(cx, at, [255, 210, 150], 12, 260);
-      this.fx.sparkle(cx, at, this.startW, [255, 220, 170], 14);
-      this.lightReach = Math.min(1, this.lightReach + 0.25);
-      this.trauma = Math.min(1, this.trauma + 0.18);
-      this.sfx.boom();
-      return;
-    }
-    this.fx.burst(cx, at, rock, 12, 160);
-    this.lightReach = Math.max(0.3, this.lightReach - 0.1);
-    const hard = this.hardness();
-    if (hard > 0.2) {
-      // Hard rock fights back: the blow shakes earth loose behind you.
-      this.dark += SLAB_H * CAVE_SHAKE * hard;
-      this.trauma = Math.min(1, this.trauma + 0.25 * hard);
-      this.sfx.rubble();
-    }
-  }
-
-  /**
-   * The light from Hearth following you down: a soft column from the top of
-   * the view to the tip, stronger the cleaner you've been breaking through.
-   */
-  private drawLightShaft(ctx: CanvasRenderingContext2D): void {
-    // The hole is dark inside; only the light that follows you lights it.
-    const bore = this.borePath();
-    ctx.save();
-    ctx.clip(bore.path);
-    const inside = ctx.createLinearGradient(0, 0, 0, bore.tip);
-    inside.addColorStop(0, "rgba(6,4,6,0.85)");
-    inside.addColorStop(1, "rgba(14,9,7,0.6)");
-    ctx.fillStyle = inside;
-    ctx.fillRect(-60, -60, this.vw + 120, bore.tip + 120);
-    ctx.restore();
-    const tip = this.worldToScreen(0, this.crownY()).y;
-    const cx = this.worldToScreen(this.peak().x + this.peak().w / 2, 0).x;
-    const w = this.startW * 1.0;
-    const a = 0.04 + 0.08 * this.lightReach;
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
-    g.addColorStop(0, "rgba(255,170,90,0)");
-    g.addColorStop(0.5, `rgba(255,180,100,${a})`);
-    g.addColorStop(1, "rgba(255,170,90,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(cx - w / 2, 0, w, tip);
-    // Brightest where it reaches the rock.
-    const pool = ctx.createRadialGradient(cx, tip, 0, cx, tip, w);
-    pool.addColorStop(0, `rgba(255,190,120,${a * 0.9})`);
-    pool.addColorStop(1, "rgba(255,190,120,0)");
-    ctx.fillStyle = pool;
-    ctx.fillRect(cx - w, tip - w, w * 2, w * 2);
-    ctx.restore();
-  }
-
-  /** Screen y of a world height while building down. */
-  private boreY(world: number): number {
-    return this.worldToScreen(0, world).y;
-  }
-
-  /** World height at a screen y while building down. */
-  private boreWorld(screenY: number): number {
-    return screenY - this.boreY(0);
-  }
-
-  /**
-   * The hole the Spire has bored: its walls wander organically (fixed to the
-   * rock, so they scroll with it), and it ends in a rough crater under the tip.
-   */
-  private borePath(): { path: Path2D; cx: number; tip: number; hw: number } {
-    const base = this.stack[0]!;
-    const cx = this.worldToScreen(base.x + base.w / 2, 0).x;
-    const hw = this.startW * BORE_HALF;
-    const tip = this.boreY(this.crownY() + SLAB_H) - VISUAL_H;
-    const wall = (side: number, y: number): number => {
-      const w = this.boreWorld(y);
-      const n =
-        Math.sin(w * 0.045 + side) * 7 +
-        Math.sin(w * 0.017 + 2 + side * 3) * 11 +
-        Math.sin(w * 0.13) * 2.5;
-      return cx + side * (hw + n);
-    };
-    const top = Math.max(-40, this.boreY(0));
-    const path = new Path2D();
-    path.moveTo(wall(-1, top), top);
-    for (let y = top; y < tip - 8; y += 10) path.lineTo(wall(-1, y), y);
-    // The crater: a ragged bowl where the blows land.
-    const depth = BORE_CRATER + this.rockShake * 10;
-    const steps = 14;
-    for (let k = 0; k <= steps; k++) {
-      const t = k / steps;
-      const x = wall(-1, tip - 8) + (wall(1, tip - 8) - wall(-1, tip - 8)) * t;
-      const bowl = Math.sin(Math.PI * t) * depth;
-      const rough = Math.sin(t * 23 + this.floors * 1.3) * 3;
-      path.lineTo(x, tip - 8 + bowl + rough);
-    }
-    for (let y = tip - 8; y > top; y -= 10) path.lineTo(wall(1, y), y);
-    path.lineTo(wall(1, top), top);
-    path.closePath();
-    return { path, cx, tip, hw };
   }
 
   /** The Descent's Dark: the thing that was buried, grasping down the shaft. */
@@ -5382,144 +4988,6 @@ export class SpireEngine {
     }
     if (this.dDark.paused) void this.dDark.play().catch(() => undefined);
     return this.dDark;
-  }
-
-  private oilVideo(): HTMLVideoElement | null {
-    if (typeof document === "undefined") return null;
-    if (!this.oil) {
-      const v = document.createElement("video");
-      v.src = "art/oil.mp4";
-      v.muted = true;
-      v.loop = true;
-      v.playsInline = true;
-      v.preload = "auto";
-      v.setAttribute("playsinline", "");
-      v.style.cssText = VIDEO_BEHIND;
-      document.body.appendChild(v);
-      v.load();
-      this.oil = v;
-    }
-    if (this.oil.paused) void this.oil.play().catch(() => undefined);
-    return this.oil;
-  }
-
-  /**
-   * The Descent around the tower: the Dark pouring into the hole behind you
-   * like oil, the rock walls in front of it (dead where it has passed), the
-   * crater under the tip and the cracks the blows have driven into the stone.
-   */
-  private drawBore(ctx: CanvasRenderingContext2D): void {
-    const { path, cx, tip, hw } = this.borePath();
-    const front = this.boreY(this.darkShown);
-    // 1. The oil, filling the hole from above down to its front. Its edge
-    // clings to the walls and runs down them in drips; the painted oil
-    // fills the drips too.
-    if (front > -40) {
-      const v = this.oilVideo();
-      const frame = v ? this.frameOf(v, "art/oil.jpg") : null;
-      const clock = this.reduceMotion ? 0 : this.clock;
-      const w = hw * 2.8;
-      const edge = new Path2D();
-      edge.moveTo(cx - w / 2, -60);
-      for (let x = cx - w / 2; x <= cx + w / 2; x += 6) {
-        const u = (x - cx) / hw;
-        const cling = Math.max(0, Math.abs(u) - 0.55) * 46;
-        const drip = Math.max(0, Math.sin(x * 0.21 + 1.3) * Math.sin(x * 0.057 + clock * 0.4)) * 26;
-        edge.lineTo(x, front + cling + drip + Math.sin(x * 0.09 + clock * 1.5) * 2);
-      }
-      edge.lineTo(cx + w / 2, -60);
-      edge.closePath();
-      ctx.save();
-      ctx.clip(path);
-      ctx.clip(edge);
-      const bottom = front + 70;
-      if (frame) {
-        const h = Math.max(bottom + 60, w * 1.78);
-        ctx.drawImage(frame, cx - w / 2, bottom - h, w, h);
-      } else {
-        ctx.fillStyle = "rgb(8,5,12)";
-        ctx.fillRect(cx - w / 2, -60, w, bottom + 60);
-      }
-      // Darker toward its lip, where it thins over the stone.
-      const lip = ctx.createLinearGradient(0, front - 40, 0, bottom);
-      lip.addColorStop(0, "rgba(6,4,10,0)");
-      lip.addColorStop(1, "rgba(6,4,10,0.55)");
-      ctx.fillStyle = lip;
-      ctx.fillRect(cx - w / 2, front - 40, w, bottom - front + 40);
-      ctx.restore();
-      ctx.save();
-      ctx.clip(path);
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = "rgba(130,90,200,0.3)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke(edge);
-      ctx.restore();
-    }
-    // 2. The rock all around the hole.
-    const walls = new Path2D();
-    walls.rect(-60, Math.max(-60, this.boreY(0)), this.vw + 120, this.vh + 120);
-    walls.addPath(path);
-    const key = this.paintKey();
-    let tex = this.rockArts.get(key);
-    if (!tex) {
-      tex = Object.assign(new Image(), { src: `art/rock/${key}.jpg` });
-      this.rockArts.set(key, tex);
-    }
-    const shake = this.reduceMotion ? 0 : this.rockShake * 2.5 * Math.sin(this.clock * 60);
-    ctx.save();
-    ctx.translate(0, shake);
-    let fill: string | CanvasPattern = "rgb(40,30,26)";
-    if (tex.complete && tex.naturalWidth > 0) {
-      const pattern = ctx.createPattern(tex, "repeat");
-      if (pattern) {
-        const k = BORE_TEX / tex.naturalWidth;
-        pattern.setTransform(new DOMMatrix().translate(cx, this.boreY(0)).scale(k));
-        fill = pattern;
-      }
-    }
-    ctx.fillStyle = fill;
-    ctx.fill(walls, "evenodd");
-    ctx.save();
-    ctx.clip(walls, "evenodd");
-    // Darker away from the light of the hole.
-    const side = ctx.createRadialGradient(cx, tip, hw, cx, tip, this.vw * 0.9);
-    side.addColorStop(0, "rgba(0,0,0,0)");
-    side.addColorStop(1, "rgba(0,0,0,0.6)");
-    ctx.fillStyle = side;
-    ctx.fillRect(-60, -60, this.vw + 120, this.vh + 120);
-    // 3. Where the oil has passed, the soil dies: drained of colour, blackened.
-    if (front > -40) {
-      const dead = Math.min(this.vh + 60, front + 40);
-      ctx.globalCompositeOperation = "saturation";
-      ctx.fillStyle = "rgb(128,128,128)";
-      ctx.fillRect(-60, -60, this.vw + 120, dead + 60);
-      ctx.globalCompositeOperation = "multiply";
-      const g = ctx.createLinearGradient(0, front - 120, 0, dead);
-      g.addColorStop(0, "rgb(70,50,90)");
-      g.addColorStop(1, "rgb(255,255,255)");
-      ctx.fillStyle = g;
-      ctx.fillRect(-60, -60, this.vw + 120, dead + 60);
-      ctx.globalCompositeOperation = "source-over";
-    }
-    // 4. Cracks driven into the rock from the crater.
-    this.drawCracks(ctx, cx, tip + BORE_CRATER * 0.6);
-    ctx.restore();
-    // The hole's rim, lit from inside by the light that follows you.
-    ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = `rgba(255,180,110,${0.12 + 0.25 * this.lightReach})`;
-    ctx.lineWidth = 2;
-    ctx.stroke(path);
-    ctx.restore();
-    // Stones and earth crumbling off the oil's front.
-    if (!this.reduceMotion && this.phase === "play" && front > 0 && Math.random() < 0.35) {
-      this.fx.burst(
-        this.camX + (Math.random() - 0.5) * hw * 2,
-        this.darkShown,
-        this.rockRgb(),
-        2,
-        70,
-      );
-    }
   }
 
   /** Jagged cracks running out from the crater, longer for harder rock and harder blows. */
@@ -5561,19 +5029,6 @@ export class SpireEngine {
     return { img, cell, frames: Math.max(1, Math.round(img.naturalWidth / cell)) };
   }
 
-  /** The ceiling the Descent hangs from: rock above the foundation. */
-  private drawCeiling(ctx: CanvasRenderingContext2D): void {
-    const y = this.worldToScreen(0, 0).y - VISUAL_H;
-    if (y < -80) return;
-    const g = ctx.createLinearGradient(0, y - 220, 0, y);
-    g.addColorStop(0, "rgb(10,6,8)");
-    g.addColorStop(1, "rgb(46,30,24)");
-    ctx.fillStyle = g;
-    ctx.fillRect(-120, -40, this.vw + 240, y + 40);
-    ctx.fillStyle = "rgba(255,170,90,0.35)";
-    ctx.fillRect(-120, y - 3, this.vw + 240, 3);
-  }
-
   private render(): void {
     const ctx = this.ctx;
     const zoom = 1 + (this.fitZoom - 1) * this.pull;
@@ -5608,11 +5063,6 @@ export class SpireEngine {
       reduceMotion: this.reduceMotion,
     };
 
-    if (this.hang) {
-      this.renderHang(ctx, ox, oy);
-      return;
-    }
-
     // The sky takes a third of the shake: it is far away.
     ctx.save();
     ctx.translate(ox * 0.3, oy * 0.3);
@@ -5630,24 +5080,22 @@ export class SpireEngine {
       ctx.translate(-vw / 2, -vh * 0.72);
     }
 
-    this.fx.down = this.plan.descent ? -1 : 1;
-    if (this.plan.descent && !this.ascent && this.phase !== "menu") {
-      this.drawLightShaft(ctx);
-    }
-    if (this.plan.descent) this.drawCeiling(ctx);
+    this.fx.down = 1;
+    if (this.plan.descent) this.drawLift(ctx);
     else if (this.paintedSky()) this.drawPaintedGround(ctx);
     else this.drawGround(ctx);
     this.drawGhost(ctx);
     if (!this.escape) this.drawSummitLine(ctx);
     if (this.kit.sight && !this.mover.split) this.drawSight(ctx);
-    this.drawPlinth(ctx);
+    if (!this.plan.descent) this.drawPlinth(ctx);
     if (this.bedrockGone >= 0) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - this.bedrockGone / 1.2);
       this.drawBedrock(ctx);
       ctx.restore();
     } else this.drawBedrock(ctx);
-    if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
+    if ((this.phase === "won" || (this.phase === "menu" && this.demoLit)) && !this.plan.descent)
+      this.drawBeacon(ctx);
     this.drawAura(ctx);
 
     const prev = this.peak();
@@ -5661,13 +5109,14 @@ export class SpireEngine {
       this.drawSlab(ctx, slab, (inZone || beat) && slab === prev);
     }
     this.slabLookNow = null;
+    if (this.plan.descent) this.drawArms(ctx);
     if (this.stage && aiming && this.phase !== "menu") this.drawPlumb(ctx, prev);
     if (this.phase === "play" && this.ghost) this.drawGhostLine(ctx);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
     // Once the sky is won the Dark is gone: the pull-back must not reveal it.
     if (this.plan.darkRate > 0 && this.phase !== "menu" && this.phase !== "won" && !this.escape) {
-      if (this.plan.descent) this.drawBore(ctx);
+      if (this.plan.descent) this.drawDarkAbove(ctx);
       else if (this.ascent && this.blindArt) this.drawBlind(ctx);
       else this.drawDark(ctx);
     }
@@ -5915,6 +5364,226 @@ export class SpireEngine {
     ctx.textAlign = "left";
     ctx.fillText(label, 28, y - 6);
     ctx.restore();
+  }
+
+  /** The Descent's shaft half width at this depth, px: it narrows with every depth. */
+  private shaftHalf(): number {
+    const tier = this.mode === "level" ? (LEVELS[this.levelIndex]?.tier ?? 0) : 0;
+    return 200 - tier * 10;
+  }
+
+  /** Seconds between the Dark's arms at this depth; 0 for none. */
+  private armEvery(): number {
+    if (!this.plan.descent) return 0;
+    const tier = this.mode === "level" ? (LEVELS[this.levelIndex]?.tier ?? 0) : 0;
+    return [0, 0, 9, 8, 7, 7, 6, 5][tier] ?? 5;
+  }
+
+  /**
+   * The Dark's arms: out of a shaft wall, a shove at one of the top slabs,
+   * then gone. The stack has to take it; the topple is the risk.
+   */
+  private stepArms(dt: number): void {
+    for (const a of this.arms) a.t += dt;
+    this.arms = this.arms.filter((a) => a.t < 1);
+    const every = this.armEvery();
+    if (every <= 0 || !this.stage || this.stack.length < 3 || this.freeze > 0) return;
+    this.armT -= dt;
+    if (this.armT > 0) return;
+    this.armT = every * (0.7 + Math.random() * 0.6);
+    const tier = LEVELS[this.levelIndex]?.tier ?? 0;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const i =
+      this.stack.length - 1 - Math.floor(Math.random() * Math.min(3, this.stack.length - 1));
+    const slab = this.stack[i]!;
+    if (slab.body === null) return;
+    this.stage.shove(slab.body, -side * (120 + tier * 14));
+    this.arms.push({ side, y: slab.y + SLAB_H / 2, t: 0 });
+    const wall = this.shaftHalf() + 20;
+    this.fx.burst(side * wall, slab.y + SLAB_H / 2, this.rockRgb(), 14, 180);
+    this.sfx.rubble();
+    this.trauma = Math.min(1, this.trauma + 0.35);
+    haptics.medium();
+  }
+
+  /** The arm as it comes: the painted sheet, mirrored for the right wall. */
+  private drawArms(ctx: CanvasRenderingContext2D): void {
+    if (this.arms.length === 0) return;
+    const claw = this.sprite("claw");
+    const shaft = this.shaftHalf();
+    for (const a of this.arms) {
+      const p = this.worldToScreen(a.side * (shaft + 40), a.y);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(-a.side, 1);
+      ctx.globalAlpha = a.t < 0.1 ? a.t / 0.1 : a.t > 0.85 ? (1 - a.t) / 0.15 : 1;
+      if (claw) {
+        const size = shaft * 1.9;
+        const frame = Math.min(claw.frames - 1, Math.floor(a.t * claw.frames));
+        ctx.drawImage(
+          claw.img,
+          frame * claw.cell,
+          0,
+          claw.cell,
+          claw.cell,
+          -size * 0.08,
+          -size / 2,
+          size,
+          size,
+        );
+      } else {
+        const reach = Math.sin(Math.min(1, a.t) * Math.PI) * shaft * 0.75;
+        ctx.fillStyle = "rgb(30,14,46)";
+        ctx.beginPath();
+        ctx.moveTo(0, -30);
+        ctx.quadraticCurveTo(reach * 0.5, -26, reach, -6);
+        ctx.lineTo(reach * 0.9, 8);
+        ctx.quadraticCurveTo(reach * 0.5, 28, 0, 32);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  /**
+   * The lift: the drill's platform the tower stands on, hung on two chains
+   * from the winch above, the machine under it with its bit pointing down
+   * the shaft. It's what's being lowered; the tower rides it.
+   */
+  private drawLift(ctx: CanvasRenderingContext2D): void {
+    const base = this.stack[0];
+    if (!base) return;
+    const w = this.startW + 60;
+    const c = this.worldToScreen(0, 0);
+    const left = c.x - w / 2;
+    // The chains, up out of sight. They sway a little with the lift.
+    const sway = this.reduceMotion ? 0 : Math.sin(this.clock * 0.7) * 3;
+    ctx.save();
+    ctx.lineCap = "round";
+    for (const x of [left + 10, left + w - 10]) {
+      for (let y = c.y - 6; y > -40; y -= 14) {
+        const cx = x + sway * ((c.y - y) / 400);
+        ctx.strokeStyle = "rgb(118,92,60)";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(cx, y);
+        ctx.lineTo(cx, y - 12);
+        ctx.stroke();
+        ctx.fillStyle = "rgb(196,160,104)";
+        ctx.fillRect(cx - 4, y - 3, 8, 3);
+      }
+    }
+    ctx.restore();
+    // The machine under the plate, bit down.
+    let rig = this.sprites.get("drill-rig");
+    if (!rig) {
+      rig = Object.assign(new Image(), { src: "art/drill-rig.webp" });
+      this.sprites.set("drill-rig", rig);
+    }
+    if (rig.complete && rig.naturalWidth > 0 && c.y < this.vh + 60) {
+      const rw = w * 1.9;
+      const rh = rw * (rig.naturalHeight / rig.naturalWidth);
+      ctx.drawImage(rig, c.x - rw / 2, c.y + 8, rw, rh);
+    }
+    // The plate.
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillRect(left - 6, c.y + 6, w + 12, 10);
+    this.paintSlab(ctx, left, c.y + 4, w, 22, [78, 58, 38], 1, 0, false);
+    ctx.fillStyle = "rgba(255,190,120,0.18)";
+    ctx.fillRect(left, c.y - 18, w, 2);
+  }
+
+  /**
+   * The Dark down the Descent: it pours down the shaft from above, its
+   * fringe of tendrils hanging the Dark's gap above the top of the tower.
+   * Same race as Hearth's, mirrored: the lift descends with every floor,
+   * the Dark follows.
+   */
+  private drawDarkAbove(ctx: CanvasRenderingContext2D): void {
+    const gap = Math.max(0, this.crownY() - this.darkShown);
+    const front = this.worldToScreen(0, this.crownY() + gap + SLAB_H * 0.5).y;
+    if (front > this.vh + 200) return;
+    const w = this.vw;
+    const bottom = Math.max(0, Math.min(this.vh, front + 70));
+    const v = this.descentDark();
+    const art = v ? this.frameOf(v, "art/dark-descent.jpg") : null;
+    const k = ctx.getTransform().a || 1;
+    const layer = this.scratch(0, Math.ceil(w * k), Math.ceil(Math.max(1, bottom) * k));
+    const lc = layer.getContext("2d")!;
+    lc.setTransform(k, 0, 0, k, 0, 0);
+    lc.globalCompositeOperation = "source-over";
+    lc.clearRect(0, 0, w, bottom);
+    lc.fillStyle = "rgb(6,3,10)";
+    lc.fillRect(-120, 0, w + 240, bottom);
+    if (art) {
+      const ow = w * 1.3;
+      const oh = ow * 1.78;
+      const breathe = this.reduceMotion ? 0 : Math.sin(this.clock * 0.8) * 6;
+      lc.drawImage(art, w / 2 - ow / 2, front + 60 + breathe - oh, ow, oh);
+    }
+    // Its fringe fades out, ragged, so there's no cut line against the shaft.
+    const mask = this.scratch(1, Math.ceil(w * k), Math.ceil(Math.max(1, bottom) * k));
+    const mc = mask.getContext("2d")!;
+    mc.setTransform(k, 0, 0, k, 0, 0);
+    mc.globalCompositeOperation = "source-over";
+    mc.clearRect(0, 0, w, bottom);
+    const clock = this.reduceMotion ? 0 : this.clock;
+    for (let x = -12; x < w + 12; x += 12) {
+      const rag = Math.sin(x * 0.17 + 1.3) * 10 + Math.sin(x * 0.043 + clock * 0.5) * 12;
+      const f = mc.createLinearGradient(0, front - 50 + rag, 0, front + 60 + rag);
+      f.addColorStop(0, "rgba(0,0,0,1)");
+      f.addColorStop(0.4, "rgba(0,0,0,1)");
+      f.addColorStop(1, "rgba(0,0,0,0)");
+      mc.fillStyle = f;
+      mc.fillRect(x, 0, 12, bottom);
+    }
+    lc.globalCompositeOperation = "destination-in";
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.drawImage(mask, 0, 0);
+    lc.globalCompositeOperation = "source-over";
+    ctx.drawImage(layer, 0, 0, w * k, bottom * k, 0, 0, w, bottom);
+    // Its shadow on the shaft below the fringe.
+    const sh = ctx.createLinearGradient(0, front, 0, front + 100);
+    sh.addColorStop(0, "rgba(4,2,8,0.55)");
+    sh.addColorStop(1, "rgba(4,2,8,0)");
+    ctx.fillStyle = sh;
+    ctx.fillRect(-120, front, w + 240, 100);
+    // Motes drifting down off it when it is close.
+    if (!this.reduceMotion && this.darkGap() < 4 && Math.random() < 0.3) {
+      this.fx.sparkle(
+        this.camX + (Math.random() - 0.5) * this.vw * 0.6,
+        this.crownY() + gap,
+        40,
+        [170, 110, 255],
+        1,
+      );
+    }
+  }
+
+  private scratches: HTMLCanvasElement[] = [];
+
+  /** A scratch canvas at least this size, kept between frames. */
+  private scratch(i: number, w: number, h: number): HTMLCanvasElement {
+    let el = this.scratches[i];
+    if (!el) el = this.scratches[i] = document.createElement("canvas");
+    if (el.width < w) el.width = w;
+    if (el.height < h) el.height = h;
+    return el;
+  }
+
+  /** The Descent's summit: the lift punches through the floor of this depth. */
+  private breakThrough(): void {
+    const base = this.stack[0];
+    const cx = base ? base.x + base.w / 2 : 0;
+    this.fx.burst(cx, -10, this.rockRgb(), 60, 420);
+    this.fx.burst(cx, -10, [255, 200, 130], 24, 300);
+    this.fx.rayBurst(cx, -10, [255, 200, 130], 260, 18);
+    this.sfx.boom();
+    this.sfx.thunder();
+    this.trauma = 1;
+    this.flash = Math.max(this.flash, 0.6);
+    haptics.heavy();
   }
 
   private drawPlinth(ctx: CanvasRenderingContext2D): void {
@@ -6698,7 +6367,7 @@ export class SpireEngine {
   }
 
   private drawVignette(ctx: CanvasRenderingContext2D): void {
-    if (this.gift.slow > 0 && !this.hang) {
+    if (this.gift.slow > 0) {
       // Stillness: a violet hush that thins as it's spent.
       ctx.fillStyle = `rgba(120,80,200,${0.05 + 0.1 * Math.min(1, this.gift.slow / 6)})`;
       ctx.fillRect(0, 0, this.viewW, this.viewH);

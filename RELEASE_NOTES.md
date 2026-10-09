@@ -3,6 +3,15 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 82 — The lift (internal)
+
+- **The Descent is Hearth's game, going down.** You stack on the drill's platform — a plate hung on two chains from the winch above, the machine under it with its bit pointing down the shaft — and every floor you add is the lift being lowered. Real physics, lean, sway, topple, landings, the cards: all of it, with the Descent's painted depths scrolling up past you.
+- **The Dark pours down from above.** It's the clock, the same race as Hearth's mirrored: the gap is counted in floors *above* the tower, the lift descends with every floor, and the eyes-and-tendrils mass follows you down. Let it reach the top of the tower and the light is buried.
+- **The god's arms.** From Depth 3, arms burst from the shaft walls and shove the top of the stack. The stack has to take it; the topple is the risk. Deeper, more often and harder.
+- **Breaking through.** The summit of a depth is the lift punching through its floor: rock and light burst up under the platform, the shaft shudders, the next depth opens.
+- The chain-and-wire Descent (builds 76–79) is retired; its feel test stays at `/proto/chain.html`.
+- Checked on an iPhone simulator.
+
 ## Build 81 — The cards matter (internal)
 
 - **Every landing announces a trial.** Before the cards are dealt, the world shows what the next flight brings — the Dark heaves up a floor with a roar, the groove's walk widens, the beat quickens, the gale rises in a storm of embers, the sky darkens — and it stays that way until the next landing or the summit. Each is the sky's own character turned up, not a new rule.

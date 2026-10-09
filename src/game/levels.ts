@@ -368,8 +368,7 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
     // Slow enough to outbuild with steady play, never slow enough to ignore,
     // and never out of sight: see DARK_REACH.
     darkRate: Math.min(32, 18 + index * 1.8),
-    // Down here nothing topples: a slab sets or it falls.
-    physics: !level.descent,
+    physics: true,
     descent: level.descent ?? false,
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
