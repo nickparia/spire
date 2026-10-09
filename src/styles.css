@@ -2569,6 +2569,17 @@
   grid-column: 1 / -1;
 }
 
+/* Side by side with New, the plaque is narrow: a tighter word, a slimmer New. */
+.wpanel-actions .btn-primary:not(:only-child) {
+  gap: 0.3rem;
+  letter-spacing: 0;
+  font-size: clamp(14px, 4.6vw, 19px);
+}
+
+.wpanel-actions .btn:not(.btn-primary) {
+  padding-inline: 0.85rem;
+}
+
 .wpanel-lock {
   margin-top: 0.75rem;
   display: flex;
@@ -4380,6 +4391,11 @@
     0 0 12px rgba(255, 140, 60, 0.6);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  /* The plaque's own border is the padding; keep the word on one line and let it shrink to fit. */
+  padding-inline: 0.3rem;
+  white-space: nowrap;
+  min-width: 0;
+  font-size: clamp(15px, 5.2vw, 20px);
 }
 
 /* Every other button: dark stone with an ember edge. */
