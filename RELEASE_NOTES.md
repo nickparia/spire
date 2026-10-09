@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 84 — The title answers again (internal)
+
+- **Fixed: the title (and the menus) stopped taking taps once every Hearth sky was relit.** Two causes, both ours. With Hearth complete the menu picked the next uncleared level to run behind the title — the first Descent depth, a parked world — and its paths got in the way. And no video behind the canvas was ever paused or taken out of the page when you came back to a menu; it only stopped being drawn. On iPhone a playing video behind the page swallows taps whatever it's told, which is the bug build 64 fixed for the first launch and this build fixes for every launch and every return: the menu never runs a parked world, and entering any menu pauses and removes every behind-the-canvas video (they come back when a sky starts).
+- Checked: a save with every sky relit, title taps at 1, 2.5 and 4 seconds on an iPhone simulator, and a run followed by the Levels screen and Play.
+
 ## Build 83 — Finishes (internal)
 
 - **Your stars and feats earn something you wear.** Under Achievements, below the feats:

@@ -1,8 +1,7 @@
 {
-  "build": 83,
-  "title": "Finishes",
+  "build": 84,
+  "title": "The title answers again",
   "notes": [
-    "Your stars and feats earn something you wear: three stars on a sky earns its stone for your slabs in any sky; feats earn a trail the moving slab leaves. Under Achievements.",
-    "The Descent is parked on the map as a world to come until it has a picture worth playing."
+    "Fixed: the title and the menus stopped taking taps once every Hearth sky was relit. The menu never runs a parked world now, and no video plays behind a menu."
   ]
 }

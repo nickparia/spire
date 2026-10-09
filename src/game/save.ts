@@ -4,6 +4,7 @@ import { cleanName, newPlayerId } from "./board";
 import { isWeaponId, type WeaponId } from "./build";
 import { refundDevices, type Levels, type Tracks } from "./gear";
 import { LEVELS } from "./levels";
+import { WORLDS } from "./worlds";
 import { starCount, type Ghost, type Goals } from "./logic";
 
 const SAVE_KEY = "spire-v2";
@@ -326,7 +327,16 @@ export function isUnlocked(save: Save, index: number): boolean {
 }
 
 /** Where "Play" should drop you: the first level not yet cleared. */
+/**
+ * The level the menu shows behind the title: the first uncleared one among
+ * the worlds offered (a parked world's levels are never run there), else the
+ * last offered.
+ */
 export function nextLevelIndex(save: Save): number {
-  const index = LEVELS.findIndex((level) => !save.levels[level.id]?.clear);
-  return index === -1 ? LEVELS.length - 1 : index;
+  const offered = new Set(WORLDS.flatMap((w) => w.levelIds));
+  const open = LEVELS.map((level, i) => ({ level, i })).filter(({ level }) =>
+    offered.has(level.id),
+  );
+  const next = open.find(({ level }) => !save.levels[level.id]?.clear) ?? open[open.length - 1];
+  return next?.i ?? 0;
 }

@@ -1025,6 +1025,7 @@ export class SpireEngine {
     const cut = this.phase !== "menu";
     this.setTheme(THEMES[level.theme], 0, !cut);
     this.resetRun("menu", cut);
+    this.restArt();
     this.music.setTrack(this.theme.track);
     this.music.setMood("menu");
   }
@@ -2736,8 +2737,39 @@ export class SpireEngine {
   }
 
   /** Loads the painted Dark quietly; the drawn gradient stands in until then. */
+  /**
+   * Behind the menus no video may play: on iPhone a playing video behind the
+   * page swallows taps, whatever its z-index or pointer-events (builds 62 and
+   * 83 both lost the title's tap to this). Every behind-the-canvas video is
+   * paused and taken out of the page until a sky starts again.
+   */
+  private restArt(): void {
+    const all = [
+      this.darkArt,
+      this.sourceArt,
+      this.dDark,
+      ...[...this.skies.values()].map((s) => s.video),
+    ];
+    for (const v of all) {
+      if (!v) continue;
+      if (!v.paused) v.pause();
+      if (v.isConnected) v.remove();
+    }
+  }
+
+  /** A behind-the-canvas video back in the page and playing, for a sky that's started. */
+  private wakeVideo(v: HTMLVideoElement): void {
+    if (typeof document === "undefined") return;
+    if (!v.isConnected) document.body.appendChild(v);
+    if (v.paused) void v.play().catch(() => undefined);
+  }
+
   private loadDarkArt(): void {
-    if (typeof document === "undefined" || this.darkArt) return;
+    if (typeof document === "undefined") return;
+    if (this.darkArt) {
+      this.wakeVideo(this.darkArt);
+      return;
+    }
     const v = document.createElement("video");
     v.src = "art/dark-hearth.mp4";
     v.muted = true;
@@ -2828,7 +2860,11 @@ export class SpireEngine {
   }
 
   private loadSourceArt(): void {
-    if (typeof document === "undefined" || this.sourceArt) return;
+    if (typeof document === "undefined") return;
+    if (this.sourceArt) {
+      this.wakeVideo(this.sourceArt);
+      return;
+    }
     const v = document.createElement("video");
     v.src = "art/source.mp4";
     v.muted = true;
@@ -4718,7 +4754,7 @@ export class SpireEngine {
     }
     // Only the sky in view plays.
     for (const [other, s] of this.skies) if (other !== id && !s.video.paused) s.video.pause();
-    if (sky.video.paused) void sky.video.play().catch(() => undefined);
+    this.wakeVideo(sky.video);
     // Ready once its video plays, or its still has loaded to stand in.
     if (sky.ready) return sky;
     return this.frameOf(sky.video, sky.video.poster) ? sky : null;
@@ -5007,7 +5043,7 @@ export class SpireEngine {
       v.load();
       this.dDark = v;
     }
-    if (this.dDark.paused) void this.dDark.play().catch(() => undefined);
+    this.wakeVideo(this.dDark);
     return this.dDark;
   }
 

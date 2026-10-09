@@ -135,11 +135,33 @@ describe("progress", () => {
     expect(totalStars(save)).toBe(4);
   });
 
-  it("parks on the last level once everything is cleared", () => {
+  it("parks on the last offered level once everything is cleared", () => {
     const save = emptySave();
     for (const level of LEVELS) {
       recordRun(save, level.id, 20, 0.9, { clear: true, precise: false, swift: false });
     }
-    expect(nextLevelIndex(save)).toBe(LEVELS.length - 1);
+    // The last level of the last offered world, never a parked world's.
+    expect(LEVELS[nextLevelIndex(save)]!.id).toBe("apex");
+  });
+});
+
+describe("nextLevelIndex", () => {
+  it("never points the menu at a parked world's level", async () => {
+    const { nextLevelIndex, emptySave } = await import("./save");
+    const { LEVELS } = await import("./levels");
+    const { WORLDS } = await import("./worlds");
+    const save = emptySave();
+    for (const w of WORLDS)
+      for (const id of w.levelIds)
+        save.levels[id] = {
+          clear: true,
+          precise: true,
+          swift: true,
+          bestTime: 1,
+          bestAccuracy: 1,
+          runs: 1,
+        };
+    const next = LEVELS[nextLevelIndex(save)]!;
+    expect(WORLDS.some((w) => w.levelIds.includes(next.id))).toBe(true);
   });
 });
