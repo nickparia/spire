@@ -54,8 +54,6 @@ export class HangView {
   menace = 0;
   /** A jolt of the camera when the tower is dragged down, px. */
   jolt = 0;
-  /** How unlit the shaft is drawn, 0..1, eased. */
-  unlit = 0;
 
   step(dt: number, h: Hang, viewH: number): void {
     // The machine stays in view until the tower has grown enough to push it up.
@@ -65,7 +63,6 @@ export class HangView {
     this.shake = Math.max(0, this.shake - dt * 2.6);
     this.menace = Math.max(0, this.menace - dt * 1.4);
     this.jolt *= Math.exp(-dt * 6);
-    this.unlit += ((h.twist === "unlit" ? 1 : 0) - this.unlit) * Math.min(1, dt * 1.2);
     // The Dark gives ground grudgingly (slow to be dragged off), and takes it fast.
     if (this.coatShown < 0) this.coatShown = h.coat;
     const k = h.coat < this.coatShown ? 2.2 : 9;
@@ -102,136 +99,12 @@ export class HangView {
     ctx.fillRect(ox - t.shaft - 40, 0, t.shaft * 2 + 80, vh);
     this.drawFloor(ctx, h, art, ox, oy, clock);
     this.drawDark(ctx, h, art, w, vh, ox, oy, clock, false);
-    this.drawCrystal(ctx, h, vh, ox, clock);
     this.drawRig(ctx, art, ox, oy);
     this.drawWire(ctx, h, ox, oy, fallY, clock);
     this.drawTower(ctx, h, ox, oy + fallY, paint);
     this.drawGrip(ctx, h, ox, oy, clock);
     this.drawDark(ctx, h, art, w, vh, ox, oy, clock, true);
     if (h.fall < 0) this.drawSlider(ctx, h, ox, oy, paint);
-    this.drawFlood(ctx, h, w, vh, ox, oy, clock);
-    this.drawUnlit(ctx, h, w, vh, ox, oy);
-  }
-
-  /** Narrowing: crystal grows in from the walls, closing the shaft as the roots lengthen. */
-  private drawCrystal(
-    ctx: CanvasRenderingContext2D,
-    h: Hang,
-    vh: number,
-    ox: number,
-    clock: number,
-  ): void {
-    const t = h.tune;
-    const grown = t.shaft - h.shaft;
-    if (grown < 2) return;
-    ctx.save();
-    for (const side of [-1, 1]) {
-      const outer = ox + side * (t.shaft + 40);
-      const inner = ox + side * h.shaft;
-      ctx.beginPath();
-      ctx.moveTo(outer, -20);
-      for (let y = -20; y <= vh + 20; y += 22) {
-        const jag =
-          (Math.sin(y * 0.21 + side) * 0.5 + 0.5) * grown * 0.5 +
-          Math.sin(y * 0.07 + clock * 0.3) * 4;
-        ctx.lineTo(inner + side * jag, y);
-      }
-      ctx.lineTo(outer, vh + 20);
-      ctx.closePath();
-      const g = ctx.createLinearGradient(outer, 0, inner, 0);
-      g.addColorStop(0, "rgba(30,20,50,0.95)");
-      g.addColorStop(0.7, "rgba(70,50,120,0.9)");
-      g.addColorStop(1, "rgba(170,140,255,0.85)");
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.strokeStyle = `rgba(210,190,255,${0.35 + 0.15 * Math.sin(clock * 2)})`;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  /** Flooded: a wash of drowned light over the shaft, bubbles rising past. */
-  private drawFlood(
-    ctx: CanvasRenderingContext2D,
-    h: Hang,
-    w: number,
-    vh: number,
-    ox: number,
-    oy: number,
-    clock: number,
-  ): void {
-    const f = h.flood;
-    if (f < 0.02) return;
-    ctx.save();
-    const top = oy - 10;
-    const g = ctx.createLinearGradient(0, top, 0, vh);
-    g.addColorStop(0, `rgba(30,90,120,${0.1 * f})`);
-    g.addColorStop(1, `rgba(10,40,70,${0.4 * f})`);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, top, w, vh - top);
-    // The surface, lapping at the machine.
-    ctx.strokeStyle = `rgba(160,220,255,${0.35 * f})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let x = 0; x <= w; x += 10) ctx.lineTo(x, top + Math.sin(x * 0.05 + clock * 2) * 3);
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(200,235,255,${0.3 * f})`;
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 16; i++) {
-      const pace = 30 + (i % 4) * 12;
-      const span = vh - top + 40;
-      const y = vh + 20 - ((i * 131 + clock * pace) % span);
-      const x = ox + Math.sin(i * 2.3) * h.shaft * 0.85 + Math.sin(clock * 1.5 + i) * 4;
-      ctx.beginPath();
-      ctx.arc(x, y, 2 + (i % 3), 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  /** Unlit: the shaft goes black but for the roots' own glow, and the machine's. */
-  private drawUnlit(
-    ctx: CanvasRenderingContext2D,
-    h: Hang,
-    w: number,
-    vh: number,
-    ox: number,
-    oy: number,
-  ): void {
-    const u = this.unlit;
-    if (u < 0.02) return;
-    const k = ctx.getTransform().a || 1;
-    const layer = this.layer(Math.ceil(w * k), Math.ceil(vh * k));
-    const lc = layer.getContext("2d")!;
-    lc.setTransform(k, 0, 0, k, 0, 0);
-    lc.globalCompositeOperation = "source-over";
-    lc.fillStyle = `rgba(2,1,4,${0.94 * u})`;
-    lc.fillRect(0, 0, w, vh);
-    lc.globalCompositeOperation = "destination-out";
-    const tp = h.tip();
-    const tx = ox + tp.x;
-    const ty = oy + tp.y + (h.fall >= 0 ? h.fall * h.fall * 520 : 0);
-    const glow = lc.createRadialGradient(tx, ty, 30, tx, ty, 210);
-    glow.addColorStop(0, "rgba(0,0,0,1)");
-    glow.addColorStop(0.5, "rgba(0,0,0,0.7)");
-    glow.addColorStop(1, "rgba(0,0,0,0)");
-    lc.fillStyle = glow;
-    lc.fillRect(0, 0, w, vh);
-    // The tower itself glows faintly all the way up, and the machine's furnace at the pivot.
-    const spine = lc.createLinearGradient(0, oy, 0, ty);
-    spine.addColorStop(0, "rgba(0,0,0,0.5)");
-    spine.addColorStop(1, "rgba(0,0,0,0.6)");
-    lc.fillStyle = spine;
-    lc.fillRect(ox - h.tune.stoneW, oy, h.tune.stoneW * 2, Math.max(0, ty - oy));
-    const rig = lc.createRadialGradient(ox, oy, 0, ox, oy, 150);
-    rig.addColorStop(0, "rgba(0,0,0,0.8)");
-    rig.addColorStop(1, "rgba(0,0,0,0)");
-    lc.fillStyle = rig;
-    lc.fillRect(0, 0, w, vh);
-    lc.setTransform(1, 0, 0, 1, 0, 0);
-    lc.globalCompositeOperation = "source-over";
-    ctx.drawImage(layer, 0, 0, w * k, vh * k, 0, 0, w, vh);
   }
 
   /** Where the floor you're breaking through sits on screen: it nears as the wire strains. */
@@ -254,8 +127,8 @@ export class HangView {
   ): void {
     const t = h.tune;
     const y = this.floorY(h, oy);
-    const left = ox - h.shaft - 40;
-    const width = h.shaft * 2 + 80;
+    const left = ox - t.shaft - 40;
+    const width = t.shaft * 2 + 80;
     const depth = 90;
     ctx.save();
     ctx.beginPath();
@@ -310,7 +183,7 @@ export class HangView {
     ctx.lineCap = "round";
     for (let i = 0; i < n; i++) {
       const seed = i * 7.31;
-      const cx = ox + Math.sin(seed) * h.shaft * 0.9;
+      const cx = ox + Math.sin(seed) * t.shaft * 0.9;
       const reach = 20 + ((h.strain * 9 - i) / 2) * 30;
       ctx.beginPath();
       ctx.moveTo(cx, y + 2);
@@ -422,7 +295,7 @@ export class HangView {
     lc.setTransform(k, 0, 0, k, 0, 0);
     lc.clearRect(0, 0, w, bottom);
     lc.fillStyle = "rgb(6,3,10)";
-    lc.fillRect(ox - h.shaft - 40, 0, h.shaft * 2 + 80, bottom);
+    lc.fillRect(ox - t.shaft - 40, 0, t.shaft * 2 + 80, bottom);
     if (art.dark) {
       const ow = t.shaft * 2 + 120;
       const oh = ow * 1.78;
@@ -445,7 +318,7 @@ export class HangView {
     const mc = mask.getContext("2d")!;
     mc.setTransform(k, 0, 0, k, 0, 0);
     mc.clearRect(0, 0, w, bottom);
-    for (let x = ox - h.shaft - 40; x < ox + h.shaft + 40; x += 12) {
+    for (let x = ox - t.shaft - 40; x < ox + t.shaft + 40; x += 12) {
       const rag = Math.sin(x * 0.17 + 1.3) * 10 + Math.sin(x * 0.043 + clock * 0.5) * 12;
       const f = mc.createLinearGradient(0, front - 50 + rag, 0, front + 60 + rag);
       f.addColorStop(0, over ? "rgba(0,0,0,0)" : "rgba(0,0,0,1)");
@@ -501,23 +374,11 @@ export class HangView {
     clock: number,
   ): void {
     const s = h.strain;
-    const heat = h.heat;
     ctx.save();
     ctx.translate(ox + h.pivotX, oy);
     ctx.rotate(-h.theta);
     if (h.fall < 0) {
-      if (heat > 0.05) {
-        // Hot: the wire glows through orange to white.
-        ctx.globalCompositeOperation = "lighter";
-        ctx.strokeStyle = `rgba(255,${Math.round(120 + 120 * heat)},${Math.round(40 + 160 * heat)},${0.25 + 0.6 * heat})`;
-        ctx.lineWidth = 6 + 10 * heat;
-        ctx.beginPath();
-        ctx.moveTo(0, -30);
-        ctx.lineTo(0, 60);
-        ctx.stroke();
-        ctx.globalCompositeOperation = "source-over";
-      }
-      ctx.strokeStyle = `rgb(${Math.round(120 + 135 * Math.max(s, heat))},${Math.round(100 - 50 * s + 100 * heat)},${Math.round(70 - 50 * s + 100 * heat)})`;
+      ctx.strokeStyle = `rgb(${Math.round(120 + 135 * s)},${Math.round(100 - 50 * s)},${Math.round(70 - 50 * s)})`;
       ctx.lineWidth = 7 - 4.5 * s;
       ctx.beginPath();
       ctx.moveTo(0, -30);
@@ -606,7 +467,6 @@ export class HangView {
     const sy = oy + tp.y + STONE_H * 1.5;
     const sx = ox + h.stoneX();
     paint(ctx, sx - t.stoneW / 2, sy + VISUAL, t.stoneW, VISUAL, false, true);
-    if (this.unlit > 0.5) return;
     ctx.save();
     ctx.strokeStyle = "rgba(255,220,160,0.3)";
     ctx.setLineDash([4, 5]);

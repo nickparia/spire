@@ -15,20 +15,6 @@
 
 export const STONE_H = 28;
 
-/**
- * A depth's twist on the fight. Flood: the shaft is drowned, the swing slow
- * and heavy, a current pulling. Narrow: the walls close in as the roots grow.
- * Heat: a wild swing heats the wire, and a hot wire gives to the Dark. Unlit:
- * only what the roots' own glow reaches can be seen. Cycle: each in turn.
- */
-export type Twist = "none" | "flood" | "narrow" | "heat" | "unlit";
-const CYCLE: Twist[] = ["flood", "narrow", "heat", "unlit"];
-/** Seconds each twist lasts on a cycling depth. */
-export const CYCLE_EVERY = 9;
-/** Narrowing: px of half width lost per stone, and the narrowest the shaft gets. */
-const NARROW_PER_STONE = 6;
-const NARROW_MIN = 95;
-
 export type HangTune = {
   /** Stones' worth of drag that snaps the wire. */
   snap: number;
@@ -53,8 +39,6 @@ export type HangTune = {
   surge: number;
   /** The pivot's own sway (the machine on its mount): px of amplitude, 0 for none. */
   pivotSway: number;
-  /** The depth's twist, or "cycle" for each in turn. */
-  twist: Twist | "cycle";
 };
 
 export type HangEvent =
@@ -63,11 +47,7 @@ export type HangEvent =
   | { kind: "lost" }
   | { kind: "crack" }
   | { kind: "surge" }
-  | { kind: "snap" }
-  /** The wire overheated and gave: the Dark hauls. */
-  | { kind: "scorch" }
-  /** A cycling depth moved on to its next twist. */
-  | { kind: "twist"; twist: Twist };
+  | { kind: "snap" };
 
 export class Hang {
   readonly tune: HangTune;
@@ -84,28 +64,13 @@ export class Hang {
   fall = -1;
   /** The pivot's sideways sway now, px. */
   pivotX = 0;
-  /** The shaft's half width now (it narrows on some depths), eased. */
-  shaft: number;
-  /** How flooded the shaft is now, 0..1, eased. */
-  flood = 0;
-  /** The wire's heat, 0..1: it gives to the Dark when hot and scorches at 1. */
-  heat = 0;
   private surgeT = 0;
-  private twistPhase = -1;
   private rand: () => number;
 
   constructor(tune: HangTune, rand: () => number = Math.random) {
     this.tune = tune;
     this.rand = rand;
     this.drag = 2 * STONE_H;
-    this.shaft = tune.shaft;
-  }
-
-  /** The twist in force now. */
-  get twist(): Twist {
-    const t = this.tune.twist;
-    if (t !== "cycle") return t;
-    return CYCLE[Math.floor(this.time / CYCLE_EVERY) % CYCLE.length]!;
   }
 
   /** The tower's length from the pivot to the tip. */
@@ -146,7 +111,7 @@ export class Hang {
 
   /** The sliding stone's centre x, world px. */
   stoneX(): number {
-    return this.stone.x * (this.shaft - this.tune.stoneW / 2);
+    return this.stone.x * (this.tune.shaft - this.tune.stoneW / 2);
   }
 
   /** One tap: fix the sliding stone to the tip. */
@@ -193,41 +158,12 @@ export class Hang {
       return { events, end: this.fall > 1.5 ? "won" : null };
     }
     const L = this.length;
-    const twist = this.twist;
-    if (t.twist === "cycle") {
-      const phase = Math.floor(this.time / CYCLE_EVERY);
-      if (phase !== this.twistPhase) {
-        this.twistPhase = phase;
-        events.push({ kind: "twist", twist });
-      }
-    }
-    // The twists ease in and out so a cycling depth doesn't jump.
-    this.flood += ((twist === "flood" ? 1 : 0) - this.flood) * Math.min(1, dt * 1.5);
-    const wantShaft =
-      twist === "narrow"
-        ? Math.max(NARROW_MIN, t.shaft - NARROW_PER_STONE * this.stones.length)
-        : t.shaft;
-    this.shaft += (wantShaft - this.shaft) * Math.min(1, dt * 2);
     this.pivotX = t.pivotSway > 0 ? Math.sin(this.time * 0.9) * t.pivotSway : 0;
     const lean = Math.atan2(this.comOffset(), L * 0.55);
-    // Flooded: gravity feels less, the water drags, and a slow current pulls the tower.
-    const g = 9.8 * 60 * (1 - 0.55 * this.flood);
-    const damping = t.damping + 0.7 * this.flood;
-    const alpha = -(g / (L * 0.66)) * Math.sin(this.theta + lean) - damping * this.omega;
-    this.omega += alpha * dt + Math.sin(this.time * 0.6) * 0.5 * this.flood * dt;
+    const alpha = -((9.8 * 60) / (L * 0.66)) * Math.sin(this.theta + lean) - t.damping * this.omega;
+    this.omega += alpha * dt;
     this.theta += this.omega * dt;
-    // Heat: a wild swing heats the wire; hot, it gives to the Dark; at the limit it scorches.
-    if (twist === "heat") {
-      const wild = Math.abs(this.omega) * 0.9 + Math.abs(this.theta) * 1.2 - 0.35;
-      this.heat = Math.max(0, Math.min(1, this.heat + wild * dt * 0.8));
-      if (this.heat > 0.3) this.drag -= t.suckIdle * 3 * this.heat * dt;
-      if (this.heat >= 1) {
-        this.heat = 0.55;
-        this.drag -= t.suckMiss;
-        events.push({ kind: "scorch" });
-      }
-    } else this.heat = Math.max(0, this.heat - dt * 0.5);
-    const speed = (t.slide + this.stones.length * t.slideGrow) * (1 - 0.3 * this.flood);
+    const speed = t.slide + this.stones.length * t.slideGrow;
     this.stone.speed = speed;
     this.stone.x += this.stone.dir * speed * dt;
     if (this.stone.x > 1) {
@@ -239,10 +175,10 @@ export class Hang {
     }
     // Walls: swing too wide and the tip strikes the rock, the bottom stone breaks off, and the Dark gains.
     const tp = this.tip();
-    if (Math.abs(tp.x) + t.stoneW / 2 > this.shaft && this.stones.length > 1) {
+    if (Math.abs(tp.x) + t.stoneW / 2 > t.shaft && this.stones.length > 1) {
       this.stones.pop();
       this.omega *= -0.45;
-      const bound = Math.asin(Math.min(1, (this.shaft - t.stoneW / 2) / this.length));
+      const bound = Math.asin(Math.min(1, (t.shaft - t.stoneW / 2) / this.length));
       this.theta = Math.sign(this.theta) * Math.min(Math.abs(this.theta), bound);
       this.drag -= t.suckCrack;
       events.push({ kind: "crack" });
@@ -282,20 +218,8 @@ export function hangTune(tier: number): HangTune {
     slideGrow: 0.025,
     damping: tier === 2 ? 0.5 : 0.28 - deep * 0.12,
     window: 13 - tier * 0.6,
-    surgeEvery: tier === 1 ? 6 : 0,
+    surgeEvery: tier === 1 || tier === 7 ? 6 : 0,
     surge: 30,
     pivotSway: tier === 5 || tier === 7 ? 26 : 0,
-    twist:
-      tier === 2
-        ? "flood"
-        : tier === 3
-          ? "narrow"
-          : tier === 4
-            ? "heat"
-            : tier === 6
-              ? "unlit"
-              : tier === 7
-                ? "cycle"
-                : "none",
   };
 }
