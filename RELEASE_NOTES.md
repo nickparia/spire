@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 79 — The arm (internal)
+
+- **The Dark's arms are painted.** When a claw bursts from a wall it's the elder god's own arm now (Higgsfield): glossy black ooze, violet eyes along it, ember-lit talons that open and clench on the chain before it draws back. Mirrored for either wall.
+- Checked on an iPhone simulator.
+
 ## Build 78 — The chain (internal)
 
 - **The roots hang on real chains now.** Each slab hangs on two short chains hooked onto the slab above where you caught it, so it stays level and its weight sits where you put it: an off-centre catch shifts the whole column's balance, the column leans and swings as one articulated thing, and slabs knock against the rock (which costs you). It's physics all the way down.
