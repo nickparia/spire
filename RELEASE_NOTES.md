@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 81 — The cards matter (internal)
+
+- **Every landing announces a trial.** Before the cards are dealt, the world shows what the next flight brings — the Dark heaves up a floor with a roar, the groove's walk widens, the beat quickens, the gale rises in a storm of embers, the sky darkens — and it stays that way until the next landing or the summit. Each is the sky's own character turned up, not a new rule.
+- **The offer is the answer or a gamble.** One of the two cards always counters the trial (Bedrock against the gale or the walk; Rime, Forge-fire or Starfall against the heave; Stillness against the beat and the rush); the other helps your time or accuracy but not the threat. Safe, or fast.
+- **Picking is the explanation.** The effect fires on the tower the moment you take a card — the Dark crusts over with ice and stops, the stone burns and the Dark recoils, the first star falls as lightning, buttresses heave up out of the rock, a violet hush settles — with three words in the world, not a paragraph. And every card's life is visible until it's spent: the ice thaws, the flames gutter out, the buttresses crumble, the hush fades.
+- **Fixed:** landings were silently skipped whenever the next slab was already in the air when a floor counted — which on the hover skies (Gale Ridge) meant never. Every landing floor now opens as soon as the air is clear.
+- Checked on an iPhone simulator.
+
 ## Build 80 — Hearth bites (internal)
 
 - **The Dark is a factor from the first sky.** It starts four floors below the foundation instead of six, climbs faster on every sky (18 px/s on the Foundry rising to 31 at Apex, from 16–20), and your light can never push it more than eight floors below the top (was twelve), so it's always in frame and always a clock. Play steadily and it stays behind you; dawdle and it doesn't.

@@ -107,6 +107,7 @@ function Build({
 /** The run paused: one of three upgrades, one from each class where it can. */
 export function PickPanel({ hud, onChoose }: { hud: Hud; onChoose: (index: number) => void }) {
   if (hud.landing) {
+    if (hud.landing.omen) return null;
     return <GiftCards floor={hud.landing.floor} offers={hud.landing.offers} onChoose={onChoose} />;
   }
   return (

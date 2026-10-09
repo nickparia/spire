@@ -69,6 +69,11 @@ await page.evaluate(
   force,
 );
 const t0 = Date.now();
+// The omen first: the world announcing the next flight's trial.
+while (Date.now() - t0 < 60000 && !(await page.evaluate(() => !!window.__spire.landing)))
+  await wait(100);
+await wait(600);
+await page.screenshot({ path: `${out}/g-omen.png` });
 while (Date.now() - t0 < 60000 && !(await page.$(".ecard"))) await wait(200);
 await wait(1300);
 await page.screenshot({ path: `${out}/g-cards.png` });

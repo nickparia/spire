@@ -76,7 +76,15 @@ import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
-import { isLanding, LANDING_BY_ID, landingOffer, type LandingId } from "./landing";
+import {
+  isLanding,
+  LANDING_BY_ID,
+  landingOffer,
+  type LandingId,
+  TRIALS,
+  trialFor,
+  type TrialId,
+} from "./landing";
 import { Hang, hangTune, type HangEvent, STONE_H } from "./hang";
 import { HangView } from "./hang-view";
 import {
@@ -246,7 +254,7 @@ const SKY_STONES: readonly string[] = [
 const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
-  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|THE DARK HEAVES|THE GROOVE WALKS|THE BEAT QUICKENS|THE RUSH|THE BREATH SHORTENS|THE GALE RISES|THE SKY DARKENS|THE COLUMN SPLITS|THE STONE BURNS|THE DARK FREEZES|THE STARS FALL|THE ROCK BRACES|THE WORLD STILLS|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
 /** A streak is only called out at these milestones. */
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
@@ -292,6 +300,8 @@ const ESCAPE_STING = 5;
 const ESCAPE_CHAIN_STEP = 0.07;
 /** Floors below the top that light can drive the Dark, and no further. */
 const DARK_REACH = 8;
+/** Seconds a landing's omen plays before the cards are dealt. */
+const OMEN_SECONDS = 1.6;
 /** Past par, the Dark climbs this much faster per second over, called out every QUICKEN_EVERY seconds. */
 const QUICKEN_RATE = 0.04;
 const QUICKEN_EVERY = 10;
@@ -440,7 +450,8 @@ export type Hud = {
     bound: number;
   } | null;
   /** A landing to choose from. */
-  landing: { floor: number; offers: LandingId[] } | null;
+  /** A landing: the omen plays first (the cards wait), then the gifts are offered. */
+  landing: { floor: number; offers: LandingId[]; omen: boolean } | null;
 };
 
 export type EngineEvents = {
@@ -857,7 +868,15 @@ export class SpireEngine {
   /** The tower as it stood at the summit, kept so a failed escape can be retried from there. */
   private escapeTower: EscapeSlab[] | null = null;
   /** The landing being chosen from, if the climb is stopped at one. */
-  private landing: { floor: number; offers: LandingId[] } | null = null;
+  private landing: { floor: number; offers: LandingId[]; omen: boolean } | null = null;
+  /** The omen's seconds left before the cards are dealt. */
+  private omen = 0;
+  /** A landing reached while a slab was still falling: opened once it lands. */
+  private landingDue: number | null = null;
+  /** The trial in force until the next landing or the summit. */
+  private trial: TrialId | null = null;
+  /** How long the buttresses have been crumbling, once the stone gift is spent; -1 while standing. */
+  private bedrockGone = -1;
   /** Landings already taken this run, by floor. */
   private landed = new Set<number>();
   /** Gifts in effect: slabs left that set wherever they land, wide, or slow. */
@@ -1425,7 +1444,8 @@ export class SpireEngine {
     this.stage = null;
     if (this.plan.physics && phase === "ready") {
       this.stage = new Stage();
-      this.stage.sway = this.plan.sway * this.kit.sway;
+      this.trial = null;
+      this.applySway();
       this.stack[0]!.body = this.stage.addStatic(-this.startW / 2, 0, this.startW, SLAB_H);
     }
     this.seat = { x: 0, y: SLAB_H };
@@ -1441,6 +1461,10 @@ export class SpireEngine {
     this.gift = { set: 0, broad: 0, slow: 0, fire: 0, frost: 0, storm: 0 };
     this.giftsTaken = [];
     this.bedrock = -1;
+    this.bedrockGone = -1;
+    this.trial = null;
+    this.omen = 0;
+    this.landingDue = null;
     this.rime = 0;
     this.bolts = [];
     this.flares = [];
@@ -1559,6 +1583,14 @@ export class SpireEngine {
     if (this.gift.broad > 0) {
       this.gift.broad -= 1;
       w = Math.min(this.startW * 1.6, w * 1.33);
+      if (this.gift.broad === 0) {
+        // Spent: the buttresses crumble and the air is itself again.
+        this.bedrockGone = 0;
+        this.applySway();
+        const base = this.stack[0];
+        if (base) this.fx.burst(base.x + base.w / 2, base.y + SLAB_H, [150, 128, 110], 20, 160);
+        this.sfx.rubble();
+      }
     }
     const course: CourseId = this.boss ? "slide" : this.plan.courseAt(this.floors);
     const halfSpan = Math.max(w * 0.98, 80);
@@ -1577,7 +1609,8 @@ export class SpireEngine {
     const slowGift = this.gift.slow > 0;
     if (slowGift) this.gift.slow -= 1;
     const slowed = this.lull || slipping || slowGift;
-    const period = this.plan.periodAt(this.floors) * (slowed ? 1.8 : 1);
+    const trial = this.trial ? TRIALS[this.trial] : null;
+    const period = this.plan.periodAt(this.floors) * (slowed ? 1.8 : 1) * (trial?.period ?? 1);
     this.lull = false;
     if (slipping) this.slip -= 1;
     const keystone = isKeystone(this.plan, this.floors);
@@ -1599,6 +1632,7 @@ export class SpireEngine {
       drift:
         (fall?.drift ?? 0) *
         this.tune.drift *
+        (trial?.drift ?? 1) *
         (slipping && this.kit.slipCalm ? 0 : slowed ? 0.5 : 1),
       guide: fall?.guide ?? false,
       fallT: -1,
@@ -1911,20 +1945,18 @@ export class SpireEngine {
     if (this.phase === "play") {
       const reached = this.floorsNow();
       if (reached !== this.floors) {
+        const prev = this.floors;
         this.floors = reached;
         this.mark(reached);
         this.emit();
-        if (
-          this.mode === "level" &&
-          !this.boss &&
-          !this.ascent &&
-          isLanding(reached, this.plan.goal) &&
-          !this.landed.has(reached) &&
-          this.mover.fallT < 0
-        ) {
-          this.openLanding(reached);
-          return;
-        }
+        this.noteLanding(prev, reached);
+      }
+      // A landing waits for a slab already in the air to come down, never skips.
+      if (this.landingDue !== null && this.mover.fallT < 0) {
+        const due = this.landingDue;
+        this.landingDue = null;
+        this.openLanding(due);
+        return;
       }
       // The summit counts once the top has stood at goal height for a
       // moment: not in passing, and not while a crooked slab beneath it is
@@ -1966,10 +1998,17 @@ export class SpireEngine {
     this.music.landing();
     const set = this.setSpire();
     this.phase = "pick";
+    // The next flight's trial, announced now and in force once the climb goes on.
+    const trial = trialFor(this.plan.courseAt(floor + 1));
+    this.trial = trial;
+    this.applySway();
     this.landing = {
       floor,
-      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken),
+      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken, trial),
+      omen: true,
     };
+    this.omen = OMEN_SECONDS;
+    this.playOmen(trial);
     this.offers = [];
     this.mote = null;
     this.bomb = null;
@@ -1986,10 +2025,75 @@ export class SpireEngine {
     this.emit();
   }
 
+  /**
+   * Floors climbed from `prev` to `reached`: any landing floor among them is
+   * due. It opens once no slab is in the air (see settle), never skipped —
+   * two slabs can settle in one frame, and a floor can be counted at the
+   * drop or at the landing.
+   */
+  private noteLanding(prev: number, reached: number): void {
+    if (this.mode !== "level" || this.boss || this.ascent) return;
+    for (let f = prev + 1; f <= reached; f++) {
+      if (isLanding(f, this.plan.goal) && !this.landed.has(f)) this.landingDue = f;
+    }
+  }
+
+  /** The world shows what the next flight brings, before the cards are dealt. */
+  private playOmen(trial: TrialId): void {
+    const def = TRIALS[trial];
+    const cx = this.seat.x;
+    this.float(def.omen, cx, this.seat.y + 120, false, 22);
+    switch (trial) {
+      case "heave":
+      case "dusk":
+        // The Dark surges up a floor, roaring; the rock shakes.
+        this.dark = Math.min(this.dark + SLAB_H, this.crownY() - SLAB_H * 3);
+        this.rockShake = 1;
+        this.trauma = Math.min(1, this.trauma + 0.5);
+        this.fx.blood(cx, this.dark, INK_RGB, 40, 260, false);
+        this.sfx.quicken();
+        if (trial === "dusk") this.curtain = 0.45;
+        break;
+      case "gale":
+        // Wind: embers streak across the shaft, the tower shudders.
+        for (let i = 0; i < 40; i++)
+          this.fx.sparkle(
+            cx + (Math.random() - 0.5) * this.vw,
+            this.seat.y + Math.random() * 400 - 100,
+            40,
+            [255, 170, 90],
+            1,
+          );
+        this.rockShake = 0.6;
+        this.sfx.hiss();
+        break;
+      case "walk":
+      case "split":
+        // The groove sweeps wide either side of the seat.
+        this.fx.ring(cx, this.seat.y + SLAB_H, BONE, 320, 3);
+        this.fx.sparkle(cx, this.seat.y + SLAB_H * 2, this.vw * 0.8, BONE, 24);
+        this.sfx.tick();
+        break;
+      default:
+        // The beat, the rush, the breath: the pulse quickens.
+        this.pulse = 1;
+        this.sfx.tick();
+        this.sfx.tick();
+        break;
+    }
+  }
+
+  /** The sway in force: the sky's, turned up by a trial, halved while Bedrock stands. */
+  private applySway(): void {
+    if (!this.stage) return;
+    const trial = this.trial ? TRIALS[this.trial].sway : 1;
+    this.stage.sway = this.plan.sway * this.kit.sway * trial * (this.gift.broad > 0 ? 0.5 : 1);
+  }
+
   /** Takes a landing's gift; the climb goes on. */
   private takeLanding(index: number): void {
     const id = this.landing?.offers[index];
-    if (!id) return;
+    if (!id || this.landing?.omen) return;
     this.landing = null;
     this.applyGift(id);
     this.sfx.pick();
@@ -2003,36 +2107,63 @@ export class SpireEngine {
     const cx = this.seat.x;
     const y = this.seat.y + 60;
     this.giftsTaken.push(id);
+    let said = LANDING_BY_ID[id].name.toUpperCase();
     switch (id) {
       case "fire":
+        // The stone above ignites and the Dark recoils a floor at once.
         this.gift.fire = 6;
         this.sfx.fire();
+        this.fx.sparkle(
+          cx,
+          this.seat.y + SLAB_H,
+          (this.peak()?.w ?? 120) * 1.4,
+          [255, 150, 50],
+          36,
+        );
+        this.pushDark(SLAB_H);
+        said = "THE STONE BURNS";
         break;
       case "frost":
+        // The Dark crusts over with ice and stops.
         this.sfx.frost();
         this.gift.frost = 5;
         this.gift.set = Math.max(this.gift.set, 5);
         this.rime = RIME_SECONDS;
         this.breather = Math.max(this.breather, RIME_SECONDS);
         this.fx.sparkle(cx, this.dark, this.vw, LANDING_BY_ID.frost.rgb, 40);
+        this.fx.ring(cx, this.dark, LANDING_BY_ID.frost.rgb, 300, 4);
+        said = "THE DARK FREEZES";
         break;
       case "storm":
+        // The first star falls now: lightning on the Dark.
         this.gift.storm = 3;
         this.sfx.thunder();
+        this.fx.rayBurst(cx, this.dark, [255, 240, 200], 260, 10);
+        this.flash = Math.max(this.flash, 0.7);
+        said = "THE STARS FALL";
         break;
       case "stone":
+        // Buttresses heave up out of the rock and grip the base.
         this.gift.broad = Math.max(this.gift.broad, 4);
-        if (this.stage) this.stage.sway *= 0.5;
         this.bedrock = 0;
+        this.bedrockGone = -1;
+        this.applySway();
         this.sfx.bedrock();
         this.trauma = Math.min(1, this.trauma + 0.4);
+        {
+          const base = this.stack[0];
+          if (base) this.fx.burst(base.x + base.w / 2, base.y, [150, 128, 110], 30, 220);
+        }
+        said = "THE ROCK BRACES";
         break;
       case "shadow":
+        // The air thickens: a violet hush over everything.
         this.gift.slow = 6;
         this.sfx.slow();
+        said = "THE WORLD STILLS";
         break;
     }
-    this.float(LANDING_BY_ID[id].name.toUpperCase(), cx, y, true, 24);
+    this.float(said, cx, y, true, 24);
     const rgb: RGB = LANDING_BY_ID[id].rgb;
     this.fx.rayBurst(cx, this.seat.y, rgb, 220, 18);
     this.fx.sparkle(cx, this.seat.y, 160, rgb, 30);
@@ -3040,6 +3171,13 @@ export class SpireEngine {
     this.rockShake = Math.max(0, this.rockShake - dt * 5);
     this.rime = Math.max(0, this.rime - dt);
     if (this.bedrock >= 0 && this.bedrock < 1) this.bedrock = Math.min(1, this.bedrock + dt * 1.4);
+    if (this.bedrockGone >= 0) {
+      this.bedrockGone += dt;
+      if (this.bedrockGone > 1.2) {
+        this.bedrock = -1;
+        this.bedrockGone = -1;
+      }
+    }
     for (let i = this.bursts.length - 1; i >= 0; i--) {
       this.bursts[i]!.life -= dt;
       if (this.bursts[i]!.life <= 0) this.bursts.splice(i, 1);
@@ -3065,7 +3203,7 @@ export class SpireEngine {
         ? ASCENT_RATE + ASCENT_ACCEL * this.runTime
         : this.boss
           ? this.plan.darkRate * (1 + this.boss.surge * 0.25)
-          : this.plan.darkRate;
+          : this.plan.darkRate * (this.trial ? TRIALS[this.trial].dark : 1);
       // Linger past par and the Dark quickens: about 40% faster ten seconds
       // over, more than twice as fast by thirty. Not in the boss fight.
       const rate = base * (this.boss ? 1 : this.quickening());
@@ -3172,7 +3310,8 @@ export class SpireEngine {
   }
 
   private sway(): number {
-    return swayOffset(this.mover.course, this.clock, this.mover.w);
+    const walk = this.trial ? TRIALS[this.trial].walk : 1;
+    return swayOffset(this.mover.course, this.clock, this.mover.w) * walk;
   }
 
   private syncMoverX(): void {
@@ -3500,6 +3639,7 @@ export class SpireEngine {
       other.counts = slab.counts;
       this.stack.push(other);
     }
+    this.noteLanding(this.floors, floor);
     this.floors = floor;
     this.score += points;
     // A broken streak puts the fire out where you can see it: steam and smoke off the slabs.
@@ -3900,6 +4040,7 @@ export class SpireEngine {
     const floor = this.stack.length;
     const slab = this.makeSlab(x, prev.y + SLAB_H, w, floor, 0, 1);
     this.stack.push(slab);
+    this.noteLanding(this.floors, floor);
     this.floors = floor;
     this.score += 5;
     this.streak = 0;
@@ -4315,6 +4456,16 @@ export class SpireEngine {
     }
     this.curtain = Math.max(0, this.curtain - dt / 0.32);
     this.pulse = Math.max(0, this.pulse - dt * 2.2);
+    if (this.phase === "pick" && this.landing?.omen && !this.paused) {
+      // The omen plays out on the world, then the cards are dealt.
+      this.omen -= dt;
+      this.trauma = Math.max(0, this.trauma - dt * 1.7);
+      this.rockShake = Math.max(0, this.rockShake - dt * 5);
+      if (this.omen <= 0) {
+        this.landing.omen = false;
+        this.emit();
+      }
+    }
     if (this.hang && this.phase !== "menu") {
       this.stepHang(dt);
       return;
@@ -5490,7 +5641,12 @@ export class SpireEngine {
     if (!this.escape) this.drawSummitLine(ctx);
     if (this.kit.sight && !this.mover.split) this.drawSight(ctx);
     this.drawPlinth(ctx);
-    this.drawBedrock(ctx);
+    if (this.bedrockGone >= 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - this.bedrockGone / 1.2);
+      this.drawBedrock(ctx);
+      ctx.restore();
+    } else this.drawBedrock(ctx);
     if (this.phase === "won" || (this.phase === "menu" && this.demoLit)) this.drawBeacon(ctx);
     this.drawAura(ctx);
 
@@ -6542,6 +6698,11 @@ export class SpireEngine {
   }
 
   private drawVignette(ctx: CanvasRenderingContext2D): void {
+    if (this.gift.slow > 0 && !this.hang) {
+      // Stillness: a violet hush that thins as it's spent.
+      ctx.fillStyle = `rgba(120,80,200,${0.05 + 0.1 * Math.min(1, this.gift.slow / 6)})`;
+      ctx.fillRect(0, 0, this.viewW, this.viewH);
+    }
     if (!this.vignette) {
       const g = ctx.createRadialGradient(
         this.viewW / 2,

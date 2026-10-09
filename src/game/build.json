@@ -1,9 +1,9 @@
 {
-  "build": 80,
-  "title": "Hearth bites",
+  "build": 81,
+  "title": "The cards matter",
   "notes": [
-    "The Dark is a factor from the first sky: it starts closer, climbs faster, and never falls more than eight floors behind.",
-    "The air bites sooner: sway starts stronger and grows faster per sky.",
-    "The Dark cracks and crumbles what it takes; every landing has a thud, the slab breathes as it turns, the music follows the stack harder."
+    "Every landing announces a trial for the next flight — the Dark heaves, the gale rises, the groove walks — and one of the two cards always answers it.",
+    "Taking a card shows its effect on the tower at once, and you can see it running out.",
+    "Fixed: landings were skipped on the hover skies."
   ]
 }
