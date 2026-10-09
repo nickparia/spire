@@ -3,6 +3,7 @@ const [out, bot = "16", secs = "40"] = process.argv.slice(2);
 const browser = await puppeteer.launch({
   executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   headless: "new",
+  args: ["--mute-audio"],
 });
 const page = await browser.newPage();
 page.on("pageerror", (e) => console.log("pageerror", String(e).slice(0, 300)));
