@@ -1,10 +1,11 @@
-import { Hang, STONE_H } from "./hang";
+import { Hang, LINK_H, LINK_W, SINK, STONE_H } from "./hang";
 
 /**
- * How the Descent looks: one shaft, the painted depth behind, the machine at
- * the top with the wire running down from it into the tower, the Dark
- * filling the shaft above the line it has hauled the tower up to, and the
- * stone sliding below the tip. Stones are painted by the engine's own
+ * How the Descent looks: one shaft, the painted depth behind, the drill in
+ * the opening at the top sinking into the rock as the fight is won, the
+ * chains running down from it through the slabs, the Dark filling the shaft
+ * above the line it has hauled the drill up to, its claws out of the walls,
+ * and the stone sliding below the tip. Slabs are painted by the engine's own
  * painter, so they match the rest of the game.
  */
 
@@ -86,7 +87,6 @@ export class HangView {
     const t = h.tune;
     const ox = w / 2 + (this.shake > 0 ? Math.sin(clock * 60) * this.shake * 7 : 0);
     const oy = this.camY + this.jolt;
-    const fallY = h.fall >= 0 ? h.fall * h.fall * 520 : 0;
     this.drawDepth(ctx, art, w, vh, oy);
     // The shaft: darker than the rock either side, its walls where the swing is bounded.
     const g = ctx.createLinearGradient(ox - t.shaft - 40, 0, ox + t.shaft + 40, 0);
@@ -99,15 +99,129 @@ export class HangView {
     ctx.fillRect(ox - t.shaft - 40, 0, t.shaft * 2 + 80, vh);
     this.drawFloor(ctx, h, art, ox, oy, clock);
     this.drawDark(ctx, h, art, w, vh, ox, oy, clock, false);
-    this.drawRig(ctx, art, ox, oy);
-    this.drawWire(ctx, h, ox, oy, fallY, clock);
-    this.drawTower(ctx, h, ox, oy + fallY, paint);
+    this.drawRig(ctx, h, art, ox, oy);
+    this.drawChain(ctx, h, ox, oy, clock);
+    this.drawTower(ctx, h, ox, oy, paint);
     this.drawGrip(ctx, h, ox, oy, clock);
     this.drawDark(ctx, h, art, w, vh, ox, oy, clock, true);
+    this.drawClaws(ctx, h, ox, oy, clock);
+    this.drawLip(ctx, h, art, ox, oy);
     if (h.fall < 0) this.drawSlider(ctx, h, ox, oy, paint);
   }
 
-  /** Where the floor you're breaking through sits on screen: it nears as the wire strains. */
+  /**
+   * The Dark's claws: arms out of the rock walls, reaching for the chain and
+   * drawing back. Painted for now; the Higgsfield sheets replace them.
+   */
+  private drawClaws(
+    ctx: CanvasRenderingContext2D,
+    h: Hang,
+    ox: number,
+    oy: number,
+    clock: number,
+  ): void {
+    const t = h.tune;
+    for (const c of h.claws) {
+      const reach = Math.sin(Math.min(1, c.t) * Math.PI) * (t.shaft * 0.75);
+      const x0 = ox + c.side * (t.shaft + 40);
+      const y = oy + c.y;
+      const dir = -c.side;
+      ctx.save();
+      ctx.translate(x0, y);
+      ctx.scale(dir, 1);
+      // The arm: thick at the wall, tapering, with a glossy ridge.
+      const arm = ctx.createLinearGradient(0, 0, reach, 0);
+      arm.addColorStop(0, "rgb(18,8,30)");
+      arm.addColorStop(1, "rgb(40,18,60)");
+      ctx.fillStyle = arm;
+      ctx.beginPath();
+      ctx.moveTo(0, -34);
+      ctx.quadraticCurveTo(reach * 0.5, -30 + Math.sin(clock * 7) * 3, reach * 0.82, -12);
+      // Three talons.
+      for (const [dy, len] of [
+        [-12, 1],
+        [0, 1.12],
+        [12, 0.95],
+      ] as const) {
+        ctx.lineTo(reach * 0.82, dy - 5);
+        ctx.quadraticCurveTo(
+          reach * (0.82 + 0.1 * len),
+          dy - 2,
+          reach * (0.82 + 0.18 * len),
+          dy + 4,
+        );
+        ctx.quadraticCurveTo(reach * (0.82 + 0.08 * len), dy + 3, reach * 0.82, dy + 6);
+      }
+      ctx.lineTo(reach * 0.82, 12);
+      ctx.quadraticCurveTo(reach * 0.5, 30 + Math.sin(clock * 6) * 3, 0, 36);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(150,100,220,0.35)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(4, -20);
+      ctx.quadraticCurveTo(reach * 0.5, -16, reach * 0.8, -6);
+      ctx.stroke();
+      // The rock it came through, cracked.
+      ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, -40 + i * 26);
+        ctx.lineTo(-18 - (i % 2) * 10, -50 + i * 26 + Math.sin(i * 3) * 8);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  /** The lip of the opening: drawn over the drill, so it reads as sunk into the rock. */
+  private drawLip(
+    ctx: CanvasRenderingContext2D,
+    h: Hang,
+    art: HangArt,
+    ox: number,
+    oy: number,
+  ): void {
+    const t = h.tune;
+    const sink = h.sink;
+    const top = oy - SINK - 30;
+    const left = ox - t.shaft - 40;
+    const width = t.shaft * 2 + 80;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(left, top - 200);
+    ctx.lineTo(left + width, top - 200);
+    ctx.lineTo(left + width, top + sink);
+    for (let x = width; x >= 0; x -= 12) {
+      ctx.lineTo(left + x, top + sink + Math.sin(x * 0.13) * 4 + Math.sin(x * 0.041 + 2) * 7);
+    }
+    ctx.closePath();
+    if (ready(art.rock)) {
+      const pat = ctx.createPattern(art.rock, "repeat");
+      if (pat) {
+        pat.setTransform(new DOMMatrix().translate(left, top).scale(200 / art.rock.naturalWidth));
+        ctx.fillStyle = pat;
+      } else ctx.fillStyle = "rgb(40,28,24)";
+    } else ctx.fillStyle = "rgb(40,28,24)";
+    ctx.fill();
+    const shade = ctx.createLinearGradient(0, top + sink - 40, 0, top + sink + 10);
+    shade.addColorStop(0, "rgba(0,0,0,0)");
+    shade.addColorStop(1, "rgba(0,0,0,0.55)");
+    ctx.fillStyle = shade;
+    ctx.fill();
+    // The broken edge of the opening, lit from the drill's furnace below it.
+    ctx.strokeStyle = "rgba(255,190,120,0.3)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x <= width; x += 12) {
+      ctx.lineTo(left + x, top + sink + Math.sin(x * 0.13) * 4 + Math.sin(x * 0.041 + 2) * 7);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Where the floor you're breaking through sits on screen: it nears as the drill strains. */
   floorY(h: Hang, oy: number): number {
     return oy + h.length + FLOOR_GAP + (1 - h.strain) * FLOOR_FAR;
   }
@@ -220,9 +334,9 @@ export class HangView {
     const shownFront = oy + Math.max(DARK_MIN, this.coatShown);
     const stretch = shownFront - trueFront;
     if (stretch < 4 || h.fall >= 0) return;
+    const tp = h.tip();
     ctx.save();
-    ctx.translate(ox + h.pivotX, oy);
-    ctx.rotate(-h.theta);
+    ctx.translate(ox + tp.x * (this.coatShown / Math.max(1, h.length)), oy);
     ctx.lineCap = "round";
     const a = Math.min(1, stretch / 40);
     for (let i = 0; i < 7; i++) {
@@ -356,69 +470,63 @@ export class HangView {
     return el;
   }
 
-  /** The machine, squatting over the shaft at the pivot. */
-  private drawRig(ctx: CanvasRenderingContext2D, art: HangArt, ox: number, oy: number): void {
+  /** The drill, in the opening at the top of the shaft; the mount's hook is at (pivotX, 0). */
+  private drawRig(
+    ctx: CanvasRenderingContext2D,
+    h: Hang,
+    art: HangArt,
+    ox: number,
+    oy: number,
+  ): void {
     if (!ready(art.rig) || oy < -420) return;
     const rw = 400;
     const rh = rw * (art.rig.naturalHeight / art.rig.naturalWidth);
-    ctx.drawImage(art.rig, ox - rw / 2, oy - rh * 0.97, rw, rh);
+    const fallY = h.fall >= 0 ? h.fall * h.fall * 520 : 0;
+    ctx.drawImage(art.rig, ox + h.pivotX - rw / 2, oy - rh * 0.97 + fallY, rw, rh);
   }
 
-  /** The wire from the machine to the tower: it reddens and frays as the fight is won. */
-  private drawWire(
+  /** The chains: every link where the physics has it, a hook nub at its foot. */
+  private drawChain(
     ctx: CanvasRenderingContext2D,
     h: Hang,
     ox: number,
     oy: number,
-    fallY: number,
     clock: number,
   ): void {
     const s = h.strain;
     ctx.save();
-    ctx.translate(ox + h.pivotX, oy);
-    ctx.rotate(-h.theta);
-    if (h.fall < 0) {
-      ctx.strokeStyle = `rgb(${Math.round(120 + 135 * s)},${Math.round(100 - 50 * s)},${Math.round(70 - 50 * s)})`;
-      ctx.lineWidth = 7 - 4.5 * s;
+    ctx.lineCap = "round";
+    const hot = s > 0.55 ? (s - 0.55) * 2 : 0;
+    for (const l of h.linkPoses()) {
+      ctx.save();
+      ctx.translate(ox + l.x, oy + l.y);
+      ctx.rotate(l.angle);
+      ctx.strokeStyle = `rgb(${Math.round(110 + 120 * hot)},${Math.round(88 - 30 * hot)},${Math.round(60 - 30 * hot)})`;
+      ctx.lineWidth = LINK_W;
       ctx.beginPath();
-      ctx.moveTo(0, -30);
-      ctx.lineTo(0, 60);
+      ctx.moveTo(0, -LINK_H / 2 + 1);
+      ctx.lineTo(0, LINK_H / 2 - 1);
       ctx.stroke();
-      if (s > 0.55) {
-        ctx.strokeStyle = `rgba(255,200,120,${(s - 0.55) * 2})`;
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 6; i++) {
-          ctx.beginPath();
-          ctx.moveTo(0, 4 + i * 9);
-          ctx.lineTo((i % 2 ? 9 : -9) * s, 9 + i * 9 + Math.sin(clock * 20 + i) * 2);
-          ctx.stroke();
-        }
-        ctx.globalCompositeOperation = "lighter";
-        ctx.strokeStyle = `rgba(255,120,60,${(s - 0.55) * 0.8})`;
-        ctx.lineWidth = 10;
+      ctx.fillStyle = "rgb(200,165,105)";
+      ctx.fillRect(-4, LINK_H / 2 - 3, 8, 3);
+      ctx.restore();
+    }
+    if (hot > 0) {
+      // Near the limit the whole chain glows, straining.
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = `rgba(255,120,60,${hot * 0.5 + Math.sin(clock * 12) * 0.08})`;
+      ctx.lineWidth = 9;
+      for (const l of h.linkPoses()) {
         ctx.beginPath();
-        ctx.moveTo(0, -30);
-        ctx.lineTo(0, 60);
+        ctx.moveTo(ox + l.x, oy + l.y - LINK_H / 2);
+        ctx.lineTo(ox + l.x, oy + l.y + LINK_H / 2);
         ctx.stroke();
       }
-    } else {
-      // Snapped: the stub whips.
-      ctx.strokeStyle = "rgb(230,80,40)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, -30);
-      ctx.lineTo(Math.sin(clock * 30) * 12, 20);
-      ctx.stroke();
-      ctx.translate(0, fallY);
-      ctx.beginPath();
-      ctx.moveTo(0, 60);
-      ctx.lineTo(Math.sin(clock * 24) * 8, 34);
-      ctx.stroke();
     }
     ctx.restore();
   }
 
-  /** The tower, in its own swinging frame: stones held by the Dark are coated. */
+  /** The slabs, each where the physics has it: those held by the Dark are coated. */
   private drawTower(
     ctx: CanvasRenderingContext2D,
     h: Hang,
@@ -427,31 +535,20 @@ export class HangView {
     paint: StonePainter,
   ): void {
     const t = h.tune;
-    ctx.save();
-    ctx.translate(ox + h.pivotX, oy);
-    ctx.rotate(-h.theta);
-    // The mount the tower hangs from.
-    ctx.fillStyle = "rgb(60,44,30)";
-    ctx.fillRect(-26, 46, 52, 16);
-    h.stones.forEach((s, i) => {
-      const y = 60 + i * STONE_H;
-      const held = y < h.coat;
-      paint(ctx, s.off - t.stoneW / 2, y + VISUAL, t.stoneW, VISUAL, held, false);
-    });
-    if (this.flash > 0) {
-      const s = h.stones[h.stones.length - 1]!;
+    const coat = h.coat;
+    const poses = h.slabPoses();
+    poses.forEach((p, i) => {
       ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.fillStyle = `rgba(255,220,160,${this.flash * 0.5})`;
-      ctx.fillRect(
-        s.off - t.stoneW / 2 - 6,
-        60 + (h.stones.length - 1) * STONE_H - 4,
-        t.stoneW + 12,
-        STONE_H + 6,
-      );
+      ctx.translate(ox + p.x, oy + p.y);
+      ctx.rotate(p.angle);
+      paint(ctx, -t.stoneW / 2, VISUAL / 2, t.stoneW, VISUAL, p.y < coat, false);
+      if (this.flash > 0 && i === poses.length - 1) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = `rgba(255,220,160,${this.flash * 0.5})`;
+        ctx.fillRect(-t.stoneW / 2 - 6, -VISUAL / 2 - 4, t.stoneW + 12, VISUAL + 6);
+      }
       ctx.restore();
-    }
-    ctx.restore();
+    });
   }
 
   /** The stone sliding below the tip, and the line down from the tip's groove. */
@@ -464,7 +561,7 @@ export class HangView {
   ): void {
     const t = h.tune;
     const tp = h.tip();
-    const sy = oy + tp.y + STONE_H * 1.5;
+    const sy = oy + tp.y + 2 * LINK_H + 6;
     const sx = ox + h.stoneX();
     paint(ctx, sx - t.stoneW / 2, sy + VISUAL, t.stoneW, VISUAL, false, true);
     ctx.save();

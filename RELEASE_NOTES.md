@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 78 — The chain (internal)
+
+- **The roots hang on real chains now.** Each slab hangs on two short chains hooked onto the slab above where you caught it, so it stays level and its weight sits where you put it: an off-centre catch shifts the whole column's balance, the column leans and swings as one articulated thing, and slabs knock against the rock (which costs you). It's physics all the way down.
+- **The drill is the stake.** It sits in the opening at the top; every true catch its weight drags it a step deeper into the rock, the broken lip rising over it; every miss the Dark hauls it back. At the limit it tears through the floor and drops with the chain.
+- **The Dark fights physically.** From Depth 3 its **claws burst from the walls** and shove the chain; from Depth 4 it **strikes the rock** and the mount whips. (Painted claws for now; the Higgsfield arms come next.)
+- Pay-out per catch rebalanced for the chain's pitch (off-centre catches earn more; the limit is 14 + depth slabs' worth).
+- Checked on an iPhone simulator.
+
 ## Build 77 — The battle (internal)
 
 - **The Dark has a face.** It's painted now (a mass of violet eyes, tendrils reaching down the shaft) and it never quite lets go of the machine. When it holds stones its tendrils wrap over them; when you drag it off, it clings — strands stretch and part as the line is pulled back. Miss, and its eyes flare.

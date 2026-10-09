@@ -73,7 +73,7 @@ for (let i = 0; i < 20; i++) {
       stones: h ? h.stones.length - 1 : null,
       strain: h ? h.strain.toFixed(2) : null,
       held: h?.held,
-      theta: h?.theta.toFixed(2),
+      tipX: h ? Math.round(h.tip().x) : null,
       t: e.runTime.toFixed(1),
     };
   });

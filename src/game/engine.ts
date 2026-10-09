@@ -4959,7 +4959,7 @@ export class SpireEngine {
         this.drops += 1;
         this.streak = 0;
         this.accuracySum += 0.2;
-        this.fx.burst(h.stoneX(), tp.y + STONE_H * 1.5, rock, 16, 200);
+        this.fx.burst(h.stoneX(), tp.y + 40, rock, 16, 200);
         this.sfx.fall();
         this.sfx.quicken();
         this.hangView.shake = 0.6;
@@ -4977,6 +4977,23 @@ export class SpireEngine {
         this.hangView.menace = 1;
         this.hangView.shake = 0.5;
         this.rubble(h, 2);
+        break;
+      case "claw": {
+        // A claw out of the wall: rock bursts where it came through, the Dark roused.
+        this.fx.burst(e.side * (h.tune.shaft + 20), e.y, rock, 14, 180);
+        this.sfx.rubble();
+        this.hangView.menace = 0.8;
+        this.hangView.shake = 0.5;
+        haptics.medium();
+        break;
+      }
+      case "strike":
+        // A blow to the rock: the whole shaft shudders, rubble everywhere.
+        this.sfx.bedrock();
+        this.hangView.shake = 1;
+        this.trauma = Math.min(1, this.trauma + 0.4);
+        this.rubble(h, 4);
+        haptics.heavy();
         break;
       case "snap": {
         // The wire parts and the roots go through the floor: rock everywhere, light pouring up.

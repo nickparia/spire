@@ -1,27 +1,45 @@
+import { Body, Box, RevoluteJoint, Vec2, World } from "planck";
+
 /**
- * The Descent: the Spire's roots hang from the machine, down into the Dark,
- * which grips the tower from above and hauls on it. You add stones at the
- * tip: a true catch drags the tower down a step, out of the Dark's grip; a
- * miss lets the Dark suck it back up. A tug of war on the wire, which frays
- * as you win it and snaps when you've won: the roots fall through to the
- * next depth. Let the Dark haul the whole tower up, and the light is buried.
+ * The Descent: the drill sits in the opening at the top of the shaft, and the
+ * Spire's roots hang from it on chains, down into the Dark, which hauls on
+ * them from above. You add slabs at the tip: a true catch drags the drill a
+ * step deeper into the rock, out of the Dark's grip; a miss lets it be hauled
+ * back up. A tug of war on the drill: at the limit it tears through the floor
+ * to the next depth. Let the Dark haul it all the way out, and the light is
+ * buried.
  *
- * The tower is a real pendulum: an off-centre stone shifts its weight and
- * leans it, a stone caught against the swing throws it, and a swing wide
- * enough to strike the shaft walls breaks stones off.
+ * The chain is real physics (planck). Each slab hangs on two short chains
+ * hooked onto the slab above at the x where it was caught, so it stays level
+ * and its weight sits where you put it, shifting the whole column's balance.
+ * The Dark fights physically too: claws burst from the walls and shove the
+ * chain, and blows to the rock whip the drill's mount.
  *
- * World units are px: the pivot at (0, 0), y down the shaft.
+ * World units are px: the mount's hook at (0, 0), y down the shaft; physics
+ * runs in metres at PPM px each.
  */
 
 export const STONE_H = 28;
+/** The chain: two links of this height hang each slab, LINK_W wide. */
+export const LINK_H = 14;
+export const LINK_W = 6;
+/** The two chains hang this far either side of where the slab was caught. */
+const HOOK = 40;
+const PPM = 60;
+/** Mount-to-slab for the first slab, then slab-to-slab. */
+const MOUNT_DROP = 8;
+/** How far the drill sinks into the opening between the start and the limit, px. */
+export const SINK = 110;
+/** One slab's share of the chain: a slab and its two links. */
+const PITCH = STONE_H + 2 * LINK_H;
 
 export type HangTune = {
-  /** Stones' worth of drag that snaps the wire. */
+  /** Slabs' worth of drag that breaks through. */
   snap: number;
-  /** Stone width, and the shaft's half width the swing is bounded by. */
+  /** Slab width, and the shaft's half width the chain swings in. */
   stoneW: number;
   shaft: number;
-  /** Drag a true catch and an off-centre catch give, px; what a lost stone and a crack cost; the Dark's steady pull, px/s. */
+  /** Drag a true catch and an off-centre catch give, px; what a lost stone and a wall knock cost; the Dark's steady pull, px/s. */
   pullTrue: number;
   pullOff: number;
   suckMiss: number;
@@ -30,83 +48,137 @@ export type HangTune = {
   /** The sliding stone's pace (shaft widths per second) at the first stone, and more per stone. */
   slide: number;
   slideGrow: number;
-  /** The swing's damping; lower swings longer. */
-  damping: number;
-  /** Px either side of the tip's groove that count as a true catch. */
+  /** Px either side of the tip's hook that count as a true catch. */
   window: number;
   /** The Dark's surges: every `surgeEvery` s it heaves `surge` px (0 for none). */
   surgeEvery: number;
   surge: number;
-  /** The pivot's own sway (the machine on its mount): px of amplitude, 0 for none. */
+  /** The mount's own sway (the machine on its mount): px of amplitude, 0 for none. */
   pivotSway: number;
+  /** Claws from the walls: every `clawEvery` s (0 for none), shoving with `clawPush` (N·s, plus per slab). */
+  clawEvery: number;
+  clawPush: number;
+  /** Blows to the rock: every `strikeEvery` s (0 for none), the mount whipped at `strikeKick` m/s. */
+  strikeEvery: number;
+  strikeKick: number;
 };
 
 export type HangEvent =
   | { kind: "true" }
   | { kind: "off"; rel: number }
   | { kind: "lost" }
+  /** A slab knocked the rock wall. */
   | { kind: "crack" }
   | { kind: "surge" }
-  | { kind: "snap" };
+  | { kind: "snap" }
+  /** A claw burst from a wall (side −1 left, 1 right) at y px below the mount and shoved the chain. */
+  | { kind: "claw"; side: number; y: number }
+  /** A blow to the rock: the mount whipped toward `side`. */
+  | { kind: "strike"; side: number };
+
+export type Pose = { x: number; y: number; angle: number };
 
 export class Hang {
   readonly tune: HangTune;
-  /** Each stone: its offset from the tower's axis, in the tower's own frame. */
-  stones: { off: number }[] = [{ off: 0 }];
-  theta = 0.22;
-  omega = 0;
+  /** Each slab: how far off the hook above it was caught, and its body. */
+  stones: { off: number; body: Body }[] = [];
   /** The sliding stone: -1..1 across the shaft, its direction and pace. */
   stone = { x: -1, dir: 1, speed: 1 };
-  /** How far the tower has been dragged out of the Dark, px. */
+  /** How far the drill has been dragged out of the Dark, px. */
   drag: number;
   time = 0;
-  /** Set once the wire has snapped: the fall's age. */
+  /** Set once the drill has torn through: the fall's age. */
   fall = -1;
-  /** The pivot's sideways sway now, px. */
+  /** The mount's sideways sway now, px. */
   pivotX = 0;
+  /** The claws out of the walls right now, for the view: side, y below the mount, age. */
+  claws: { side: number; y: number; t: number }[] = [];
+  private world: World;
+  private mount: Body;
+  private links: Body[] = [];
   private surgeT = 0;
+  private clawT: number;
+  private strikeT: number;
+  private strike: { side: number; t: number } | null = null;
+  private wallT = -1;
+  private wallHit = false;
   private rand: () => number;
 
   constructor(tune: HangTune, rand: () => number = Math.random) {
     this.tune = tune;
     this.rand = rand;
     this.drag = 2 * STONE_H;
+    this.clawT = tune.clawEvery > 0 ? tune.clawEvery * 0.6 : 0;
+    this.strikeT = tune.strikeEvery > 0 ? tune.strikeEvery * 0.8 : 0;
+    this.world = new World({ gravity: new Vec2(0, 9.8) });
+    this.mount = this.world.createBody({ type: "kinematic", position: new Vec2(0, 0) });
+    this.mount.createFixture(new Box(m(60), m(MOUNT_DROP)), { filterMaskBits: 0 });
+    for (const side of [-1, 1]) {
+      // Tall enough for the longest chain a depth can reach.
+      const wall = this.world.createBody({
+        position: new Vec2(m(side * (tune.shaft + 20)), m(2500)),
+      });
+      wall.createFixture(new Box(m(20), m(4000)), { friction: 0.4 });
+    }
+    this.world.on("begin-contact", (c) => {
+      const a = c.getFixtureA().getBody();
+      const b = c.getFixtureB().getBody();
+      if (a.isStatic() || b.isStatic()) this.wallHit = true;
+    });
+    this.addSlab(0);
   }
 
-  /** The tower's length from the pivot to the tip. */
+  /** The mount's world position, px: it sinks into the opening as the fight is won. */
+  get sink(): number {
+    return this.strain * SINK;
+  }
+
+  /** The tower's length: the mount's hook to the tip, px. */
   get length(): number {
-    return 60 + this.stones.length * STONE_H;
+    return this.tip().y;
   }
 
-  /** How far down the tower the Dark's grip reaches, from the pivot. */
+  /** How far down the tower the Dark's grip reaches, from the mount: the drag is in slabs' worth. */
   get coat(): number {
-    return Math.max(0, this.length - this.drag);
+    return Math.max(0, this.length - (this.drag / STONE_H) * PITCH);
   }
 
-  /** The wire's strain, 0..1: it snaps at 1. */
+  /** The drill's strain, 0..1: it tears through at 1. */
   get strain(): number {
     return Math.min(1, this.drag / (this.tune.snap * STONE_H));
   }
 
-  /** Stones the Dark holds. */
+  /** Slabs the Dark holds. */
   get held(): number {
-    return Math.max(0, Math.min(this.stones.length, Math.round(this.coat / STONE_H) - 2));
+    const coat = this.coat;
+    let n = 0;
+    for (const s of this.stones) if (this.pose(s.body).y < coat) n += 1;
+    return n;
   }
 
-  private comOffset(): number {
-    let s = 0;
-    for (const st of this.stones) s += st.off;
-    return s / this.stones.length;
+  /** A body's pose in px, relative to the mount's hook. */
+  private pose(b: Body): Pose {
+    const p = b.getPosition();
+    const mp = this.mount.getPosition();
+    return { x: px(p.x - mp.x) + this.pivotX, y: px(p.y - mp.y), angle: b.getAngle() };
   }
 
-  /** The tip: the bottom of the last stone, in world px. */
-  tip(): { x: number; y: number } {
-    const L = this.length;
-    const last = this.stones[this.stones.length - 1]!;
-    return {
-      x: this.pivotX + Math.sin(this.theta) * L + Math.cos(this.theta) * last.off,
-      y: Math.cos(this.theta) * L - Math.sin(this.theta) * last.off,
-    };
+  /** The slabs' poses (centres), in order from the mount down. */
+  slabPoses(): Pose[] {
+    return this.stones.map((s) => this.pose(s.body));
+  }
+
+  /** The chain links' poses (centres). */
+  linkPoses(): Pose[] {
+    return this.links.map((l) => this.pose(l));
+  }
+
+  /** The tip: the lowest slab's bottom centre, where the next one hooks on. */
+  tip(): Pose {
+    const b = this.stones[this.stones.length - 1]!.body;
+    const p = b.getWorldPoint(new Vec2(0, m(STONE_H / 2)));
+    const mp = this.mount.getPosition();
+    return { x: px(p.x - mp.x) + this.pivotX, y: px(p.y - mp.y), angle: b.getAngle() };
   }
 
   /** The sliding stone's centre x, world px. */
@@ -114,34 +186,81 @@ export class Hang {
     return this.stone.x * (this.tune.shaft - this.tune.stoneW / 2);
   }
 
-  /** One tap: fix the sliding stone to the tip. */
+  /** A chain of two links hung from `body` at local point `at` (metres); returns the lower link. */
+  private addLinks(body: Body, at: Vec2): Body {
+    let prev = body;
+    let anchor = body.getWorldPoint(at);
+    for (let i = 0; i < 2; i++) {
+      const link = this.world.createBody({
+        type: "dynamic",
+        position: new Vec2(anchor.x, anchor.y + m(LINK_H / 2)),
+        angle: body.getAngle(),
+        linearDamping: 0.3,
+        angularDamping: 0.8,
+      });
+      // Links are heavy for their size: the solver keeps a chain together only when the
+      // masses along it are within a few times of each other.
+      link.createFixture(new Box(m(LINK_W / 2), m(LINK_H / 2)), { density: 14, filterMaskBits: 0 });
+      this.world.createJoint(new RevoluteJoint({}, prev, link, anchor));
+      this.links.push(link);
+      prev = link;
+      anchor = link.getWorldPoint(new Vec2(0, m(LINK_H / 2)));
+    }
+    return prev;
+  }
+
+  /** A slab hung under the lowest slab (or the mount) on two chains, hooked on `off` px to the side. */
+  private addSlab(off: number): void {
+    const t = this.tune;
+    const last = this.stones[this.stones.length - 1];
+    const parent = last ? last.body : this.mount;
+    const bottom = last ? STONE_H / 2 : MOUNT_DROP;
+    const edge = t.stoneW / 2 - 2;
+    const hx = [
+      Math.max(-edge, Math.min(edge, off - HOOK)),
+      Math.max(-edge, Math.min(edge, off + HOOK)),
+    ];
+    const links = hx.map((x) => this.addLinks(parent, new Vec2(m(x), m(bottom))));
+    const c = parent.getWorldPoint(new Vec2(m(off), m(bottom + 2 * LINK_H + STONE_H / 2)));
+    const slab = this.world.createBody({
+      type: "dynamic",
+      position: c,
+      angle: parent.getAngle(),
+      linearDamping: 0.2,
+      angularDamping: 0.5,
+    });
+    slab.createFixture(new Box(m(t.stoneW / 2), m(STONE_H / 2)), { density: 1, friction: 0.6 });
+    for (const link of links) {
+      const a = link.getWorldPoint(new Vec2(0, m(LINK_H / 2)));
+      this.world.createJoint(new RevoluteJoint({}, link, slab, a));
+    }
+    this.stones.push({ off, body: slab });
+  }
+
+  /** One tap: hook the sliding stone onto the tip. */
   tap(): HangEvent {
     const t = this.tune;
     const tp = this.tip();
-    const rel = (this.stoneX() - tp.x) * Math.cos(this.theta);
-    if (Math.abs(rel) > t.stoneW * 0.85) {
-      // Missed the tip: the stone is lost to the dark, the jolt swings the tower, and the Dark gains.
-      this.omega += Math.sign(rel || 1) * 0.35;
-      this.drag -= t.suckMiss;
-      return { kind: "lost" };
-    }
-    const last = this.stones[this.stones.length - 1]!;
-    // The stone's momentum goes into the tower: with the swing it settles, against it the tower is thrown.
-    const vStone = this.stone.dir * this.stone.speed * (t.shaft - t.stoneW / 2);
-    const vTip = -Math.cos(this.theta) * this.length * this.omega;
-    this.omega += -((vStone - vTip) / this.length) * 0.55;
-    const perfect = Math.abs(rel) < t.window;
+    const rel = this.stoneX() - tp.x;
     let ev: HangEvent;
-    if (perfect) {
-      this.stones.push({ off: last.off });
-      this.omega *= 0.35;
-      this.drag += t.pullTrue;
-      ev = { kind: "true" };
+    if (Math.abs(rel) > t.stoneW * 0.85) {
+      // Missed the tip: the stone is lost to the Dark, which gains; the chain is knocked.
+      this.drag -= t.suckMiss;
+      const last = this.stones[this.stones.length - 1]!.body;
+      last.applyLinearImpulse(new Vec2(Math.sign(rel || 1) * 2.5, 0), last.getWorldCenter(), true);
+      ev = { kind: "lost" };
     } else {
-      this.stones.push({ off: last.off + rel });
-      this.omega += (rel / t.stoneW) * 1.4;
-      this.drag += t.pullOff;
-      ev = { kind: "off", rel };
+      const perfect = Math.abs(rel) < t.window;
+      this.addSlab(perfect ? 0 : rel);
+      this.drag += perfect ? t.pullTrue : t.pullOff;
+      // The stone's momentum goes into the chain.
+      const b = this.stones[this.stones.length - 1]!.body;
+      b.applyLinearImpulse(
+        new Vec2(this.stone.dir * this.stone.speed * 1.2, 0),
+        b.getWorldCenter(),
+        true,
+      );
+      ev = perfect ? { kind: "true" } : { kind: "off", rel };
     }
     const fromLeft = this.rand() < 0.5;
     this.stone = { x: fromLeft ? -1 : 1, dir: fromLeft ? 1 : -1, speed: this.stone.speed };
@@ -153,16 +272,30 @@ export class Hang {
     const t = this.tune;
     const events: HangEvent[] = [];
     this.time += dt;
+    for (const c of this.claws) c.t += dt;
+    this.claws = this.claws.filter((c) => c.t < 1);
     if (this.fall >= 0) {
       this.fall += dt;
+      this.world.step(1 / 60, 20, 10);
       return { events, end: this.fall > 1.5 ? "won" : null };
     }
-    const L = this.length;
+    // The mount: its sway, a blow's whip, and the drill sinking as the fight is won.
     this.pivotX = t.pivotSway > 0 ? Math.sin(this.time * 0.9) * t.pivotSway : 0;
-    const lean = Math.atan2(this.comOffset(), L * 0.55);
-    const alpha = -((9.8 * 60) / (L * 0.66)) * Math.sin(this.theta + lean) - t.damping * this.omega;
-    this.omega += alpha * dt;
-    this.theta += this.omega * dt;
+    let vx = 0;
+    if (this.strike) {
+      this.strike.t += dt;
+      vx =
+        this.strike.t < 0.12
+          ? this.strike.side * t.strikeKick
+          : this.strike.t < 0.24
+            ? -this.strike.side * t.strikeKick
+            : 0;
+      if (this.strike.t >= 0.24) this.strike = null;
+    }
+    const mp = this.mount.getPosition();
+    this.mount.setLinearVelocity(
+      new Vec2(vx + (vx === 0 ? -mp.x * 4 : 0), (m(this.sink) - mp.y) * 6),
+    );
     const speed = t.slide + this.stones.length * t.slideGrow;
     this.stone.speed = speed;
     this.stone.x += this.stone.dir * speed * dt;
@@ -173,17 +306,15 @@ export class Hang {
       this.stone.x = -1;
       this.stone.dir = 1;
     }
-    // Walls: swing too wide and the tip strikes the rock, the bottom stone breaks off, and the Dark gains.
-    const tp = this.tip();
-    if (Math.abs(tp.x) + t.stoneW / 2 > t.shaft && this.stones.length > 1) {
-      this.stones.pop();
-      this.omega *= -0.45;
-      const bound = Math.asin(Math.min(1, (t.shaft - t.stoneW / 2) / this.length));
-      this.theta = Math.sign(this.theta) * Math.min(Math.abs(this.theta), bound);
+    this.wallHit = false;
+    this.world.step(1 / 60, 20, 10);
+    // A slab knocking the rock: the Dark gains a little (one knock per half second).
+    if (this.wallHit && this.time - this.wallT > 0.5) {
+      this.wallT = this.time;
       this.drag -= t.suckCrack;
       events.push({ kind: "crack" });
     }
-    // The Dark never lets go: it draws the tower up a little all the time, and sometimes heaves.
+    // The Dark never lets go: it draws the drill up a little all the time, and sometimes heaves.
     this.drag -= t.suckIdle * dt;
     if (t.surgeEvery > 0) {
       this.surgeT += dt;
@@ -193,33 +324,69 @@ export class Hang {
         events.push({ kind: "surge" });
       }
     }
+    // Its claws, and its blows to the rock.
+    if (t.clawEvery > 0 && this.stones.length > 1) {
+      this.clawT -= dt;
+      if (this.clawT <= 0) {
+        this.clawT = t.clawEvery * (0.7 + this.rand() * 0.6);
+        const side = this.rand() < 0.5 ? -1 : 1;
+        const i = Math.floor(this.rand() * this.stones.length);
+        const b = this.stones[i]!.body;
+        b.applyLinearImpulse(
+          new Vec2(-side * (t.clawPush + this.stones.length * 0.12), 0.5),
+          b.getWorldCenter(),
+          true,
+        );
+        const y = this.pose(b).y;
+        this.claws.push({ side, y, t: 0 });
+        events.push({ kind: "claw", side, y });
+      }
+    }
+    if (t.strikeEvery > 0) {
+      this.strikeT -= dt;
+      if (this.strikeT <= 0) {
+        this.strikeT = t.strikeEvery * (0.7 + this.rand() * 0.6);
+        const side = this.rand() < 0.5 ? -1 : 1;
+        this.strike = { side, t: 0 };
+        events.push({ kind: "strike", side });
+      }
+    }
     if (this.drag <= 0) return { events, end: "lost" };
     if (this.strain >= 1) {
+      // Through: the drill is let go and falls with the chain.
       this.fall = 0;
+      this.mount.setType("dynamic");
+      this.mount.createFixture(new Box(m(40), m(30)), { density: 8, filterMaskBits: 0 });
       events.push({ kind: "snap" });
     }
     return { events, end: null };
   }
 }
 
+const m = (pxv: number): number => pxv / PPM;
+const px = (mv: number): number => mv * PPM;
+
 /** The Descent's tuning for a depth (tier 0..7). */
 export function hangTune(tier: number): HangTune {
   const deep = tier / 7;
   return {
-    snap: 15 + tier * 1.5,
+    snap: 14 + tier,
     stoneW: 120,
     shaft: 200 - tier * 10,
     pullTrue: 38,
-    pullOff: 18 - tier,
+    pullOff: 26 - tier,
     suckMiss: 34 + tier * 3,
-    suckCrack: 26,
+    suckCrack: 10,
     suckIdle: 3.5 + tier * 1.2,
     slide: 1.05 + deep * 0.35,
     slideGrow: 0.025,
-    damping: tier === 2 ? 0.5 : 0.28 - deep * 0.12,
     window: 13 - tier * 0.6,
-    surgeEvery: tier === 1 || tier === 7 ? 6 : 0,
+    surgeEvery: tier === 1 ? 6 : 0,
     surge: 30,
     pivotSway: tier === 5 || tier === 7 ? 26 : 0,
+    clawEvery: [0, 0, 8, 7, 6, 7, 6, 5][tier] ?? 5,
+    clawPush: 1.6 + deep * 0.8,
+    strikeEvery: [0, 0, 0, 12, 10, 9, 9, 8][tier] ?? 8,
+    strikeKick: 4 + deep * 2,
   };
 }
