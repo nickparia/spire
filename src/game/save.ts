@@ -64,6 +64,9 @@ export type Save = {
    * New sets it back to 0; stars and records are never touched by it.
    */
   progress: Record<string, number>;
+  /** The stone finish worn and the trail left: see finishes.ts. */
+  finish: string;
+  trail: string;
   /** When this save was last written, ms since the epoch. */
   savedAt: number;
 };
@@ -95,6 +98,8 @@ export function emptySave(): Save {
     tester: false,
     practice: false,
     progress: {},
+    finish: "sky",
+    trail: "none",
     savedAt: 0,
   };
 }
@@ -157,6 +162,8 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
         if (typeof n === "number" && n >= 0) save.progress[id] = Math.floor(n);
       }
       save.practice = data.practice === true;
+      if (typeof data.finish === "string") save.finish = data.finish;
+      if (typeof data.trail === "string") save.trail = data.trail;
       save.savedAt = Math.max(0, num(data.savedAt, 0));
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));
       save.storySeen = data.storySeen === true;

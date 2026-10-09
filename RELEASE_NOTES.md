@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 83 — Finishes (internal)
+
+- **Your stars and feats earn something you wear.** Under Achievements, below the feats:
+  - **Stone.** Three stars on a sky earns its painted stone as a finish — Sea stone, Canyon stone, Glacier ice, Apex stone… — to cut your slabs from in *any* sky. Every sky relit earns the Boring iron. Locked tiles say how.
+  - **Trail.** Feats earn a trail the moving slab leaves in the air: Embers (four skies relit), Rime (a summit with every drop perfect), Shadow (beat your own ghost), Starlight (every star on every sky).
+  - Tap a tile to wear it; it applies to your next drop. Nothing here changes how the game plays.
+- **The Descent is parked.** It sits on the map as a world to come, next to the Wheel, until it has a picture worth playing. Its depths and engine stay in the build.
+
 ## Build 82 — The lift (internal)
 
 - **The Descent is Hearth's game, going down.** You stack on the drill's platform — a plate hung on two chains from the winch above, the machine under it with its bit pointing down the shaft — and every floor you add is the lift being lowered. Real physics, lean, sway, topple, landings, the cards: all of it, with the Descent's painted depths scrolling up past you.

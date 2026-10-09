@@ -404,6 +404,8 @@ export function SpireGame() {
               engineRef.current?.click();
               setStory(true);
             }}
+            onFinish={(id) => engineRef.current?.setFinish(id)}
+            onTrail={(id) => engineRef.current?.setTrail(id)}
           />
         ) : null}
 

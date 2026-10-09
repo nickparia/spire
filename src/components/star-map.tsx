@@ -5,6 +5,14 @@ import { LEVELS } from "@/game/levels";
 import type { Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
 import { levelsOf, worldDone, WORLDS, WORLDS_TO_COME } from "@/game/worlds";
+import {
+  FINISHES,
+  TRAILS,
+  finishWorn,
+  trailWorn,
+  type FinishId,
+  type TrailId,
+} from "@/game/finishes";
 import { IconButton, StarIcon } from "./bits";
 
 /**
@@ -17,8 +25,12 @@ export function StarMap({
   onBack,
   onWorld,
   onStory,
+  onFinish,
+  onTrail,
 }: {
   save: Save;
+  onFinish?: (id: FinishId) => void;
+  onTrail?: (id: TrailId) => void;
   /** A world completed just now: its constellation draws itself. */
   justLit?: string;
   onBack: () => void;
@@ -133,6 +145,81 @@ export function StarMap({
                 <small>{f.blurb}</small>
               </span>
             </div>
+          );
+        })}
+      </div>
+      <Finishes save={save} onFinish={onFinish} onTrail={onTrail} />
+    </div>
+  );
+}
+
+/**
+ * What the stars and feats have earned: a stone finish for the slabs, worn
+ * into any sky, and a trail the moving slab leaves. Locked ones say how.
+ */
+function Finishes({
+  save,
+  onFinish,
+  onTrail,
+}: {
+  save: Save;
+  onFinish?: (id: FinishId) => void;
+  onTrail?: (id: TrailId) => void;
+}) {
+  const worn = finishWorn(save);
+  const trail = trailWorn(save)?.id ?? "none";
+  const earned = FINISHES.filter((f) => f.id !== "sky" && f.unlocked(save)).length;
+  return (
+    <div className="finishes" aria-label="Finishes">
+      <p className="kicker">
+        Stone · {earned} of {FINISHES.length - 1} earned
+      </p>
+      <div className="finish-row">
+        {FINISHES.map((f) => {
+          const on = f.unlocked(save);
+          const sel = worn === f.id;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              className={"finish" + (on ? "" : " finish-locked") + (sel ? " finish-on" : "")}
+              style={
+                f.id === "sky" ? undefined : { backgroundImage: `url(art/slabs/${f.id}.webp)` }
+              }
+              disabled={!on}
+              title={on ? f.name : `${f.name}: ${f.how}`}
+              onClick={() => onFinish?.(f.id)}
+            >
+              <b>{f.name}</b>
+              {on ? null : <small>{f.how}</small>}
+            </button>
+          );
+        })}
+      </div>
+      <p className="kicker mt-3">Trail</p>
+      <div className="finish-row">
+        {TRAILS.map((t) => {
+          const on = t.unlocked(save);
+          const sel = trail === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={
+                "finish finish-trail" + (on ? "" : " finish-locked") + (sel ? " finish-on" : "")
+              }
+              style={
+                t.id === "none"
+                  ? undefined
+                  : ({ "--trail": `rgb(${t.rgb.join(",")})` } as React.CSSProperties)
+              }
+              disabled={!on}
+              title={on ? t.name : `${t.name}: ${t.how}`}
+              onClick={() => onTrail?.(t.id)}
+            >
+              <b>{t.name}</b>
+              {on ? null : <small>{t.how}</small>}
+            </button>
           );
         })}
       </div>

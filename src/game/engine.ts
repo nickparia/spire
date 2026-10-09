@@ -76,6 +76,7 @@ import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
+import { finishWorn, trailWorn, type FinishId, type TrailId } from "./finishes";
 import {
   isLanding,
   LANDING_BY_ID,
@@ -1205,6 +1206,26 @@ export class SpireEngine {
     this.wake();
     if (this.save.weapon !== id) {
       this.save.weapon = id;
+      this.sfx.ui();
+      this.commit();
+    }
+  }
+
+  /** Wears a stone finish (an unearned one falls back to the sky's own). */
+  setFinish(id: FinishId): void {
+    this.wake();
+    if (this.save.finish !== id) {
+      this.save.finish = id;
+      this.sfx.ui();
+      this.commit();
+    }
+  }
+
+  /** Leaves a trail behind the moving slab. */
+  setTrail(id: TrailId): void {
+    this.wake();
+    if (this.save.trail !== id) {
+      this.save.trail = id;
       this.sfx.ui();
       this.commit();
     }
@@ -5958,6 +5979,17 @@ export class SpireEngine {
 
   private drawMover(ctx: CanvasRenderingContext2D, inZone: boolean): void {
     const m = this.mover;
+    // A trail earned: the moving slab leaves its element in the air behind it.
+    const trail = trailWorn(this.save);
+    if (
+      trail &&
+      this.phase === "play" &&
+      m.fallT < 0 &&
+      !this.reduceMotion &&
+      Math.random() < 0.6
+    ) {
+      this.fx.sparkle(m.x + m.w / 2 - m.dir * m.w * 0.5, m.y + VISUAL_H * 0.5, 12, trail.rgb, 1);
+    }
     const accent = this.theme.accent;
     const phase = beatPhase(this.clock, m.period);
     const kicking = m.course === "beat" && phase < 0.2;
@@ -6235,10 +6267,15 @@ export class SpireEngine {
     if (w < 0.5 || h < 0.5) return;
     const sy = Number.isFinite(scaleY) ? Math.max(0.2, scaleY) : 1;
     const key = this.paintKey();
-    // Down the Descent the Spire is a drill: bronze-bound boring segments.
-    const stone = this.plan.descent
-      ? "drill"
-      : (STONE_FOR[key] ?? (SKY_STONES.includes(key) ? key : "foundry"));
+    // A finish earned and worn is carried into any sky; down the Descent the
+    // Spire is a drill: bronze-bound boring segments.
+    const worn = finishWorn(this.save);
+    const stone =
+      worn !== "sky"
+        ? worn
+        : this.plan.descent
+          ? "drill"
+          : (STONE_FOR[key] ?? (SKY_STONES.includes(key) ? key : "foundry"));
     let art = this.slabArts.get(stone);
     if (!art) {
       art = Object.assign(new Image(), { src: `art/slabs/${stone}.webp` });
