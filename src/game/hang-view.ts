@@ -16,6 +16,8 @@ export type HangArt = {
   rig: HTMLImageElement | null;
   /** The rock of this depth, for the floor you're dragging the roots down to. */
   rock: HTMLImageElement | null;
+  /** The Dark's arm, a sprite sheet (square cells): reaching in from the left, grasping, drawing back. */
+  claw: { img: HTMLImageElement; cell: number; frames: number } | null;
 };
 
 /** Paints one stone with its bottom-left at (x, yBottom) in the current transform. */
@@ -104,7 +106,7 @@ export class HangView {
     this.drawTower(ctx, h, ox, oy, paint);
     this.drawGrip(ctx, h, ox, oy, clock);
     this.drawDark(ctx, h, art, w, vh, ox, oy, clock, true);
-    this.drawClaws(ctx, h, ox, oy, clock);
+    this.drawClaws(ctx, h, art, ox, oy, clock);
     this.drawLip(ctx, h, art, ox, oy);
     if (h.fall < 0) this.drawSlider(ctx, h, ox, oy, paint);
   }
@@ -116,11 +118,29 @@ export class HangView {
   private drawClaws(
     ctx: CanvasRenderingContext2D,
     h: Hang,
+    art: HangArt,
     ox: number,
     oy: number,
     clock: number,
   ): void {
     const t = h.tune;
+    if (art.claw) {
+      // The painted arm: its cell spans the shaft, its wrist at the wall it came through.
+      const { img, cell, frames } = art.claw;
+      const size = t.shaft * 1.9;
+      for (const c of h.claws) {
+        const frame = Math.min(frames - 1, Math.floor(c.t * frames));
+        const x0 = ox + c.side * (t.shaft + 40);
+        ctx.save();
+        ctx.translate(x0, oy + c.y);
+        ctx.scale(-c.side, 1);
+        // Bursts in and fades as it withdraws: the sheet's own motion carries the reach.
+        ctx.globalAlpha = c.t < 0.1 ? c.t / 0.1 : c.t > 0.85 ? (1 - c.t) / 0.15 : 1;
+        ctx.drawImage(img, frame * cell, 0, cell, cell, -size * 0.08, -size / 2, size, size);
+        ctx.restore();
+      }
+      return;
+    }
     for (const c of h.claws) {
       const reach = Math.sin(Math.min(1, c.t) * Math.PI) * (t.shaft * 0.75);
       const x0 = ox + c.side * (t.shaft + 40);

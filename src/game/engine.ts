@@ -5049,6 +5049,7 @@ export class SpireEngine {
         dark: darkV ? this.frameOf(darkV, "art/dark-descent.jpg") : null,
         rig,
         rock,
+        claw: this.sprite("claw"),
       },
       this.vw,
       this.vh,
