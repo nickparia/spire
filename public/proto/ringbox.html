@@ -191,10 +191,10 @@
             mover.u = -1;
             mover.dir = 1;
           }
-          dark -= DARK_RATE * dt; // the Dark rises: its distance below the rim shrinks
-          dark = Math.min(dark, height + SLAB_H * 8); // never further than eight floors below the top
           const t = towerTop();
           const height = -t.y; // the tower's height above the rim, px
+          dark -= DARK_RATE * dt; // the Dark rises: its distance below the rim shrinks
+          dark = Math.min(dark, height + SLAB_H * 8); // never further than eight floors below the top
           if (dark <= -height + SLAB_H) over = "taken";
           // Slabs that fall off the rim are lost.
           for (let i = slabs.length - 1; i >= 0; i--) {
@@ -213,7 +213,8 @@
         // The crane follows the tower's top with a lag, as the real one would.
         const t = towerTop();
         mover.center += (t.x - mover.center) * Math.min(1, dt / 0.9);
-        camY += (H * 0.62 + Math.min(0, t.y + 120) - H * 0.62 - camY) * Math.min(1, dt * 3);
+        // The camera follows the tower's top up once it has grown past the lower screen.
+        camY += (Math.min(0, t.y + 140) - camY) * Math.min(1, dt * 3);
         flash = Math.max(0, flash - dt);
         shake = Math.max(0, shake - dt * 2);
         for (const f of floats) f.y += dt;
