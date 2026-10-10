@@ -13,13 +13,27 @@ await page.goto("http://localhost:8080/proto/cutwheel.html", { waitUntil: "netwo
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 await page.evaluate((aim) => {
   window.__k = 0;
+  window.__counts = {};
+  setInterval(() => {
+    for (const f of floats)
+      if (!f.seen) {
+        f.seen = true;
+        const key = f.t.split(" ")[0];
+        window.__counts[key] = (window.__counts[key] || 0) + 1;
+      }
+  }, 30);
   setInterval(() => {
     if (over || !mover) return;
     const t = towerTop();
     const x = mover.center + mover.u * mover.half;
-    // Right, centre, left, centre: every drop's centre sits over the slab below, the lean alternates.
-    const seq = [aim, 0, -aim, 0];
-    const want = seq[window.__k % 4];
+    // Kick on alternating pads; steady at the centre when the cradle leans or the arm blocks the side.
+    const side = window.__k % 2 ? -1 : 1;
+    const lean = cradle.getAngle();
+    let want = 0;
+    if (Math.abs(lean) < 0.12 && !(arm && arm.side === side)) {
+      const px0 = padX(pads.find((q) => q.side === side));
+      want = Math.abs(px0) <= aim ? px0 : 0;
+    }
     if (Math.abs(x - want) < 8) {
       tap();
       window.__k++;
@@ -37,6 +51,7 @@ for (let i = 0; i < 6; i++) {
     gap: darkGap.toFixed(1),
     over,
     lean: cradle.getAngle().toFixed(2),
+    counts: window.__counts,
   }));
   console.log(JSON.stringify(s));
   if (i === 1)

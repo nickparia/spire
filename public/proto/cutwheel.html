@@ -75,12 +75,19 @@
       const WHEEL_R = 150,
         CRADLE_W = 220;
       const GOAL = Number(params.get("goal") || 40); // metres of earth to cut
-      const KICK = Number(params.get("kick") || 2.6); // spin per px of off-centre landing (×0.01)
+      const KICK = Number(params.get("kick") || 3.4); // spin per px of off-centre landing (×0.01)
       const SPIN_DECAY = Number(params.get("decay") || 2.6); // seconds for spin to fall by e
       const CUT = 0.7; // metres cut per second per unit of spin
-      const DARK_RATE = Number(params.get("dark") || 0.55); // metres per second the Dark falls
+      const DARK_RATE = Number(params.get("dark") || 0.4); // metres per second the Dark falls
       const SLIDE = 1.4; // half-spans per second
       const PERFECT = 12;
+      // The Dark's arm: out of one wall every ARM_EVERY s, for ARM_DUR s; it takes anything dropped on its side.
+      const ARM_EVERY = Number(params.get("arm") || 9),
+        ARM_DUR = Number(params.get("armdur") || 6);
+      // The treadle pads: one each side, riding in and out along the cradle; a slab kicks only if it lands on one.
+      const PAD_MIN = 34,
+        PAD_MAX = 88,
+        PAD_HALF = 18;
       const cv = document.getElementById("c");
       const dpr = Math.min(2, devicePixelRatio || 1);
       cv.width = W * dpr;
@@ -109,7 +116,10 @@
         lost,
         kickT,
         camY,
-        tipT;
+        tipT,
+        arm,
+        armT,
+        pads;
       function reset() {
         world = new World({ gravity: Vec2(0, 9.8) });
         axle = world.createBody({ type: "static", position: Vec2(0, 0) });
@@ -139,12 +149,23 @@
         kickT = 0;
         camY = 0;
         tipT = 0;
+        arm = null;
+        armT = ARM_EVERY;
+        pads = [
+          { side: -1, ph: Math.random() * 6, rate: 0.35 },
+          { side: 1, ph: Math.random() * 6, rate: 0.27 },
+        ];
         time = 0;
         over = null;
         floats = [];
         flash = 0;
         shake = 0;
         spawn();
+      }
+      /** Where a side's pad sits now, px from the axle (signed). */
+      function padX(pad) {
+        const u = 0.5 + 0.5 * Math.sin(time * pad.rate + pad.ph);
+        return pad.side * (PAD_MIN + (PAD_MAX - PAD_MIN) * u);
       }
       function towerTop() {
         const b = slabs.length ? slabs[slabs.length - 1].body : cradle;
@@ -210,6 +231,15 @@
         const offAxle = px(fp.x);
         // Centred means over the axle: no lever arm, nothing to kick, and the cradle steadies.
         const centred = Math.abs(offAxle) < PERFECT;
+        if (arm && !centred && Math.sign(offAxle) === arm.side) {
+          // Dropped into the arm's reach: taken. The Dark gains.
+          world.destroyBody(f.body);
+          darkGap -= 1.2;
+          shake = 0.7;
+          floats.push({ t: "TAKEN", c: "#b48cff", y: 0 });
+          spawn();
+          return;
+        }
         void along;
         // Every slab that lands sets to what it's on: the tower is one stone. The risk is
         // the cradle's lean (its weight against the axle), which you balance by alternating sides.
@@ -222,11 +252,15 @@
           floats.push({ t: "TRUE · STEADY", c: "#ffd27a", y: 0 });
           flash = 0.3;
         } else {
-          const kick = Math.abs(offAxle) * KICK * 0.01;
-          spin += kick;
-          kickT = 0.25;
-          floats.push({ t: "KICK " + kick.toFixed(1), c: "#ffb060", y: 0 });
-          shake = 0.3;
+          // A kick only if it landed on a pad; the kick is the pad's lever arm.
+          const pad = pads.find((q) => Math.abs(offAxle - padX(q)) < PAD_HALF);
+          if (pad) {
+            const kick = Math.abs(padX(pad)) * KICK * 0.01;
+            spin += kick;
+            kickT = 0.25;
+            floats.push({ t: "KICK " + kick.toFixed(1), c: "#ffb060", y: 0 });
+            shake = 0.3;
+          } else floats.push({ t: "NO KICK", c: "#caa", y: 0 });
         }
         slabs.push({ body: f.body, w: f.w, centred });
         spawn();
@@ -257,6 +291,16 @@
           darkGap += cut - DARK_RATE * dt;
           if (darkGap <= 0) over = "taken";
           if (depth >= GOAL) over = "through";
+          if (arm) {
+            arm.t += dt;
+            if (arm.t > ARM_DUR) {
+              arm = null;
+              armT = ARM_EVERY * (0.7 + Math.random() * 0.6);
+            }
+          } else {
+            armT -= dt;
+            if (armT <= 0) arm = { side: Math.random() < 0.5 ? -1 : 1, t: 0 };
+          }
           // Leaning on its stop for a moment, the tower goes over: it comes loose and falls.
           if (Math.abs(cradle.getAngle()) > 0.33) tipT += dt;
           else tipT = Math.max(0, tipT - dt * 2);
@@ -419,13 +463,43 @@
         ctx.fillStyle = "#8a6a46";
         ctx.fillRect(-CRADLE_W / 2, -10, CRADLE_W, 20);
         const mx = mover ? mover.center + mover.u * mover.half - px(cp.x) : 999;
-        const onBand = Math.abs(mx) > PERFECT && Math.abs(mx) < CRADLE_W / 2;
-        ctx.fillStyle = onBand ? "rgba(255,176,96,0.9)" : "rgba(255,176,96,0.35)";
-        ctx.fillRect(-CRADLE_W / 2, -14, CRADLE_W / 2 - PERFECT, 4);
-        ctx.fillRect(PERFECT, -14, CRADLE_W / 2 - PERFECT, 4);
+        // The two pads, where a kick lands; lit when the slab is over one.
+        for (const q of pads) {
+          const x = padX(q);
+          const on = Math.abs(mx - x) < PAD_HALF;
+          ctx.fillStyle = on ? "rgba(255,176,96,0.95)" : "rgba(255,176,96,0.4)";
+          ctx.fillRect(x - PAD_HALF, -16, PAD_HALF * 2, 6);
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.fillRect(x - 2, -10, 4, 20);
+        }
         ctx.fillStyle = Math.abs(mx) <= PERFECT ? "#fff0c0" : "rgba(255,240,192,0.4)";
         ctx.fillRect(-PERFECT, -16, PERFECT * 2, 6);
         ctx.restore();
+        if (arm) {
+          const reach =
+            Math.min(1, arm.t / 0.5) * (arm.t > ARM_DUR - 0.5 ? (ARM_DUR - arm.t) / 0.5 : 1) * 150;
+          const x0 = arm.side * (WHEEL_R + 30);
+          const y0 = t.y - 10;
+          ctx.fillStyle = "rgb(36,18,54)";
+          ctx.beginPath();
+          ctx.moveTo(x0, y0 - 34);
+          ctx.quadraticCurveTo(
+            x0 - arm.side * reach * 0.5,
+            y0 - 30,
+            x0 - arm.side * reach,
+            y0 - 10,
+          );
+          ctx.lineTo(x0 - arm.side * reach * 0.9, y0 + 12);
+          ctx.quadraticCurveTo(x0 - arm.side * reach * 0.5, y0 + 30, x0, y0 + 36);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "rgba(180,140,255,0.9)";
+          ctx.beginPath();
+          ctx.arc(x0 - arm.side * reach * 0.6, y0 - 4, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(60,30,90,0.25)";
+          ctx.fillRect(arm.side > 0 ? PERFECT : -W, t.y - 400, W - PERFECT, 420);
+        }
         for (const s of slabs) slabRect(s.body, s.w, s.centred ? "#c9a56a" : "#b07a48");
         if (falling) slabRect(falling.body, falling.w, "#d9a060");
         if (!over && mover) {
