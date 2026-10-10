@@ -145,6 +145,8 @@ export type Plan = {
    * Dark becomes things climbing up from below, and what is cut off falls on them.
    */
   descent?: boolean;
+  /** Floors between the wind turning. */
+  windTurn?: number;
   /** The cutting wheel: the goal is metres cut, not floors; the Dark follows from above. */
   cut?: boolean;
   /**

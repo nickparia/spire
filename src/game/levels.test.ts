@@ -31,7 +31,8 @@ describe("levels", () => {
       for (let f = 0; f < WARMUP_FLOORS; f++) expect(levelCourseAt(level, f)).toBe("slide");
       const seen = new Set<string>();
       for (let f = WARMUP_FLOORS; f < level.floors; f++) seen.add(levelCourseAt(level, f));
-      expect([...seen]).toEqual(level.courses);
+      // A sky may return to a course (gust, beat, gust): the courses seen are its distinct ones, in order.
+      expect([...seen]).toEqual([...new Set(level.courses)]);
     }
   });
 

@@ -18,6 +18,8 @@ export type WorldDef = {
   levelIds: string[];
   /** One line that lands when the boss falls: why this sky went out. */
   revelation: string;
+  /** Opens on three stars on this sky (an element's own world); otherwise once the world before is relit. */
+  opensWith?: string;
   /** Where its stars sit on the map, 0..1 of the map's width and height. */
   stars: [number, number][];
 };
@@ -39,6 +41,24 @@ export const WORLDS: WorldDef[] = [
       [0.6, 0.27],
       [0.69, 0.2],
       [0.78, 0.1],
+    ],
+  },
+  {
+    id: "gale",
+    name: "The Gale",
+    blurb: "Gale Ridge's wind, six ways. Lead every drop.",
+    concept:
+      "The wind that carries the slab, developed: quicker, laden, turning, and finally still.",
+    levelIds: ["gale1", "gale2", "gale3", "gale4", "gale5", "gale6"],
+    revelation: "The wind was never weather. It was breath.",
+    opensWith: "ridge",
+    stars: [
+      [0.5, 0.3],
+      [0.56, 0.26],
+      [0.62, 0.3],
+      [0.58, 0.36],
+      [0.52, 0.38],
+      [0.56, 0.44],
     ],
   },
 ];

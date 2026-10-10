@@ -1651,7 +1651,7 @@ export class SpireEngine {
     const fall = this.plan.fallAt(this.floors);
     // Wind that carries a falling slab holds for six floors, so it can be
     // read and relied on; a shift is called out and shown for two floors.
-    const turned = !fall || fall.drift <= 0 || this.floors % 6 === 0;
+    const turned = !fall || fall.drift <= 0 || this.floors % (this.plan.windTurn ?? 6) === 0;
     if (turned) {
       this.wind = -this.wind;
       this.windTurnedAt = this.floors;

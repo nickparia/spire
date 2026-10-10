@@ -4,6 +4,7 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## In progress
 
+- **Direction (Nick, Oct 10 evening): "in hearth we have our answer" — each element becomes a world that develops it, iterating within the element for complexity and variety.** Shape agreed: Hearth stays as the eight-sky tour; an element's world opens on three stars on its Hearth sky; six skies on a fixed ladder (plain & quicker → + a hazard → the element at its extreme → combined with a second element → a twist → a boss sky); the element's existing painting and stone, one new painting per world later. **The Gale is built (94)**; next worlds in the same shape: the Tide (sway), the Pulse (beat), the Canyon (rush), the Glacier (breath), the Eclipse, the Split — each a day of level data and bot tuning, no engine work.
 - **World 2: stopped (Nick on build 92, Oct 10): "completely not working on any level — unplayable, makes no sense, silly animations… a hard no."** Sixth world-2 attempt in a week to fail on the phone (build-down, drill, chain, lift, tilting/turning ring, cutting wheel); the cutting-wheel page passed but the engine version didn't. Parked: `DESCENT` out of `WORLDS` (build 93); its depths and the `cut` engine paths stay in the code. **No further world-2 builds until the approach itself is rethought with Nick** — not another mechanic. The work returns to Hearth: progression, replay (the Vigil daily), polish, Game Center.
 - **Nick on build 82 (Oct 9, evening): "descent doesn't work for me. Looks like a plain 2D graphical overlay sliding cheaply down and the concept is not clear… we are way away from descent being good."** Third Descent judged the same way (abstract, weightless, unclear). Proposed: park world 2 (hide its card for testers), spend the next builds on Hearth progression/replay, and return to world 2 as a design pass — a painted key frame that says what the Descent *is* at a glance, approved before any code — or replace it with a different world idea.
 
@@ -46,6 +47,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 - **Resume a half-built run** after the app is killed (save every slab's position and weld). Only if testers ask.
 
 ## Done (most recent first)
+
+- 94 The Gale: six skies `gale1`–`gale6` in `levels.ts` (tiers 4–9: Updraft wind 30–52; Crosswind + keystones/motes; Full Gale wind 50–80 + bombs; Gale and Pulse courses gust/beat/gust; the Howl `windTurn: 3`; the Eye gust/sway/gust/beat/gust, `windTurn: 4`, the boss as the world's last sky). `LevelDef.windTurn` → `Plan.windTurn` → `spawnMover` (`floors % windTurn`). `WorldDef.opensWith` (a Hearth sky id) → `worldOpen` opens on `starCount ≥ 3` for that sky; the locked card says "Three stars on Gale Ridge to open". Tests: a sky may revisit a course (distinct courses compared); tiers rise within the world. Bot `galecard.mjs` (Gale Ridge three-starred → the card is open → first sky plays). `pace.mjs 19–24 1.2 1` for the ladder's difficulty.
 
 - 93 World 2 parked again after Nick's hard no on the cutting wheel (build 92). `DESCENT` parked like `RING`; tests back to Hearth's last sky as the last offered level.
 

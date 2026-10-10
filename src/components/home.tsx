@@ -384,7 +384,10 @@ function WorldPanel({
           </div>
         ) : (
           <p className="wpanel-lock">
-            <Lock size={14} strokeWidth={2.4} /> Relight {WORLDS[index - 1]?.name} to open
+            <Lock size={14} strokeWidth={2.4} />{" "}
+            {world.opensWith
+              ? `Three stars on ${LEVELS.find((l) => l.id === world.opensWith)?.name} to open`
+              : `Relight ${WORLDS[index - 1]?.name} to open`}
           </p>
         )}
       </div>

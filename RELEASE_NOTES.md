@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 94 — The Gale (internal)
+
+- **World 2 is Hearth's own wind, developed.** Nick's call: instead of a new mechanic, each of Hearth's elements becomes a world that develops it, one new thing a sky. The Gale is the first: six skies of Gale Ridge's wind.
+  - **The Updraft** — the wind again, quicker. **Crosswind** — keystones and motes ride it. **The Full Gale** — it carries the slab half its width, and bombs. **Gale and Pulse** — the wind, then the beat, then the wind. **The Howl** — the wind turns every three floors instead of six. **The Eye** — everything the wind knows, then the boss.
+- **It opens on three stars on Gale Ridge** — stars buy something now. The locked card says so.
+- Gale Ridge's painting and stone throughout, on purpose; one new painting per world later if it earns it.
+
 ## Build 93 — World 2 parked (internal)
 
 - **The Descent is off the carousel again.** The cutting wheel didn't survive contact with a phone. Hearth is the game; the work goes back to it.

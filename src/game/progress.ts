@@ -1,4 +1,5 @@
 import type { Save } from "./save";
+import { starCount } from "./logic";
 import { WORLDS, type WorldDef } from "./worlds";
 
 /**
@@ -15,6 +16,12 @@ export function nextSkyIn(save: Save, world: WorldDef): number {
 /** A world is open once the one before it has every sky relit. */
 export function worldOpen(save: Save, index: number): boolean {
   if (index <= 0 || save.tester) return true;
+  const world = WORLDS[index]!;
+  if (world.opensWith) {
+    // An element's world: three stars on its sky in Hearth opens it.
+    const rec = save.levels[world.opensWith];
+    return !!rec && starCount(rec) >= 3;
+  }
   const before = WORLDS[index - 1]!;
   return before.levelIds.every((id) => save.levels[id]?.clear);
 }
