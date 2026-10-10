@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 86 — The Ring, open to all testers (internal)
+
+- **Fixed: the Ring was locked** ("Relight the world before it to open") unless every Hearth sky was relit or the tester switch was on. A grey box is for everyone testing: it's open now.
+
 ## Build 85 — The Ring, in grey boxes (internal)
 
 - **A third world to feel, not to look at.** The Ring is three skies on Hearth's engine with one change: **the rim you stand on tilts**, rolling slowly either way, and gravity tilts with it. A true column holds through any tilt; an off-centre stack leans with the world and goes over. Nothing new is painted — it borrows Gale Ridge's sky and stone on purpose, so the only thing to judge is whether the tilt makes your taps matter more.

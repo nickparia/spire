@@ -15,6 +15,8 @@ export function nextSkyIn(save: Save, world: WorldDef): number {
 /** A world is open once the one before it has every sky relit. */
 export function worldOpen(save: Save, index: number): boolean {
   if (index <= 0 || save.tester) return true;
+  // A grey-box world is there to be felt by everyone testing: never gated.
+  if (WORLDS[index]?.id === "ring") return true;
   const before = WORLDS[index - 1]!;
   return before.levelIds.every((id) => save.levels[id]?.clear);
 }

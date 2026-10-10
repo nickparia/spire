@@ -1,8 +1,7 @@
 {
-  "build": 85,
-  "title": "The Ring, in grey boxes",
+  "build": 86,
+  "title": "The Ring, open to all testers",
   "notes": [
-    "A third world to feel, not to look at: three skies on Hearth's engine where the rim you stand on tilts, and gravity tilts with it. Borrowed art on purpose.",
-    "The Rim, the Spoke, the Hub: gentler to harder. No boss or chapter yet."
+    "Fixed: the Ring was locked unless every Hearth sky was relit. It's open to everyone testing now."
   ]
 }
