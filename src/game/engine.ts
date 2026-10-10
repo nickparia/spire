@@ -5736,7 +5736,6 @@ export class SpireEngine {
     const base = this.stack[0];
     if (!c || !base || base.body === null || !this.stage) return;
     const axle = this.worldToScreen(0, -8);
-    const clock = this.reduceMotion ? 0 : this.clock;
     ctx.save();
     ctx.translate(axle.x, axle.y + WHEEL_R);
     // The shaft the wheel has cut: dark, with the wheel in it.
