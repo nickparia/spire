@@ -3,6 +3,17 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 95 — The Gale, six winds (internal)
+
+- **Each sky of the Gale is a different thing the wind does, and you can always see it.** A flag on the ridge shows the wind's direction and strength; the streaks thicken with it.
+  - **The Updraft** — steady wind. Learn the lead.
+  - **Gusts** — calm for a few seconds, then a gust you see arrive. Drop in the calm and it's easy; drop *in* the gust and land true and it's a **wind-true**: the light drives the Dark twice as far.
+  - **Crosswinds** — it turns every floor, the flag first. Keystones ride it.
+  - **Tailwind** — it blows *along* the slide. Drop short and it carries the slab home; overshoot and it carries it away.
+  - **The Howl** — strength in a long wave; build in the lulls, which shorten as you climb. At full howl the air leans on anything you haven't set.
+  - **The Eye** — gusts, crosswinds and the howl in turn; then the wind stops dead, and the boss.
+- The rule behind it: an element is irritating when it's invisible, random and only ever a penalty; it's fun when you can see it coming, read its pattern and use it. Half these winds help a good player.
+
 ## Build 94 — The Gale (internal)
 
 - **World 2 is Hearth's own wind, developed.** Nick's call: instead of a new mechanic, each of Hearth's elements becomes a world that develops it, one new thing a sky. The Gale is the first: six skies of Gale Ridge's wind.

@@ -33,7 +33,7 @@ import {
   type Payout,
 } from "./gear";
 import { haptics } from "./haptics";
-import { ENDLESS_PLAN, endlessTheme, LEVELS, levelPlan } from "./levels";
+import { ENDLESS_PLAN, endlessTheme, LEVELS, levelPlan, WARMUP_FLOORS } from "./levels";
 import {
   type CourseId,
   DARK_PUSH,
@@ -252,7 +252,7 @@ const SKY_STONES: readonly string[] = [
 const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
-  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|THE DARK HEAVES|THE GROOVE WALKS|THE BEAT QUICKENS|THE RUSH|THE BREATH SHORTENS|THE GALE RISES|THE SKY DARKENS|THE COLUMN SPLITS|THE STONE BURNS|THE DARK FREEZES|THE STARS FALL|THE ROCK BRACES|THE WORLD STILLS|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|THE DARK HEAVES|THE GROOVE WALKS|THE BEAT QUICKENS|THE RUSH|THE BREATH SHORTENS|THE GALE RISES|THE SKY DARKENS|THE COLUMN SPLITS|THE STONE BURNS|THE DARK FREEZES|THE STARS FALL|THE ROCK BRACES|THE WORLD STILLS|WIND-TRUE|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
 /** A streak is only called out at these milestones. */
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
@@ -576,6 +576,10 @@ type Mover = {
   hover: number;
   /** Sideways distance the wind will carry it on the way down. */
   drift: number;
+  /** The wind's full carry for this drop; `drift` is what the wind is doing at the moment of release. */
+  baseDrift: number;
+  /** Let go in a gust: a true landing is a wind-true. */
+  gusted: boolean;
   guide: boolean;
   /** Seconds into the fall, or -1 while it is still hanging. */
   fallT: number;
@@ -667,6 +671,8 @@ export class SpireEngine {
     slowed: false,
     hover: 0,
     drift: 0,
+    baseDrift: 0,
+    gusted: false,
     guide: false,
     fallT: -1,
     fallTime: 0,
@@ -1685,6 +1691,8 @@ export class SpireEngine {
         this.tune.drift *
         (trial?.drift ?? 1) *
         (slipping && this.kit.slipCalm ? 0 : slowed ? 0.5 : 1),
+      baseDrift: 0,
+      gusted: false,
       guide: fall?.guide ?? false,
       fallT: -1,
       fallTime: fallDuration(fall?.hover ?? 0),
@@ -1698,6 +1706,9 @@ export class SpireEngine {
       dir2: -dir,
       x2: 0,
     };
+    // The Gale: the sky's full carry is kept; the hanging slab carries what the wind is doing now.
+    this.mover.baseDrift = this.mover.drift;
+    this.liveWind();
 
     if (this.floors === 2 && this.plan.darkRate > 0) this.explain("dark");
     this.syncMoverX();
@@ -2007,6 +2018,12 @@ export class SpireEngine {
     if (base?.body !== null && base?.body !== undefined) stage.setDrift(base.body, this.rimDrift());
     // A topple plays out slowly enough to watch.
     this.slowmo = Math.max(0, this.slowmo - dt);
+    if (this.plan.gale && this.phase === "play") {
+      // The full howl leans on what isn't set: the air itself pushes a loose stack.
+      const w = this.windNow();
+      const lean = Math.max(0, (w.strength - 0.75) / 0.5);
+      stage.sway = this.swayBase * (1 + 3 * lean);
+    }
     stage.step(this.slowmo > 0 ? dt * 0.3 : dt);
     if (stage.takeTopple() && this.phase === "play") {
       this.slowmo = 0.8;
@@ -2226,8 +2243,12 @@ export class SpireEngine {
   private applySway(): void {
     if (!this.stage) return;
     const trial = this.trial ? TRIALS[this.trial].sway : 1;
-    this.stage.sway = this.plan.sway * this.kit.sway * trial * (this.gift.broad > 0 ? 0.5 : 1);
+    this.swayBase = this.plan.sway * this.kit.sway * trial * (this.gift.broad > 0 ? 0.5 : 1);
+    this.stage.sway = this.swayBase;
   }
+
+  /** The sway in force before the wind leans on it. */
+  private swayBase = 0;
 
   /** Takes a landing's gift; the climb goes on. */
   private takeLanding(index: number): void {
@@ -3458,11 +3479,69 @@ export class SpireEngine {
     return this.mover.drift <= 0 || this.mover.guide;
   }
 
+  /**
+   * What the Gale's wind is doing now: its strength as a share of the sky's
+   * carry, whether a drop let go now counts as made in a gust, and whether it
+   * blows along the slide (a tailwind) rather than across it.
+   */
+  windNow(): { strength: number; gusting: boolean; along: boolean } {
+    let gale = this.plan.gale;
+    if (!gale) return { strength: 1, gusting: false, along: false };
+    if (gale === "eye") {
+      // The Eye: gusts, crosswinds, the howl, a stretch of each in turn.
+      const band = Math.floor(Math.max(0, this.floors - WARMUP_FLOORS) / 7) % 3;
+      gale = band === 0 ? "gusts" : band === 1 ? "cross" : "howl";
+    }
+    const t = this.runTime;
+    switch (gale) {
+      case "gusts": {
+        // Calm for three seconds, then a gust for a second and a half, with a short rise and fall.
+        const p = t % 4.5;
+        const env =
+          p < 3
+            ? 0.15
+            : p < 3.2
+              ? 0.15 + ((p - 3) / 0.2) * 1.1
+              : p < 4.3
+                ? 1.25
+                : 1.25 - ((p - 4.3) / 0.2) * 1.1;
+        return { strength: env, gusting: env > 0.8, along: false };
+      }
+      case "howl": {
+        // A long wave, its period shortening as you climb.
+        const period = Math.max(6, 12 - this.floors * 0.15);
+        const s = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin((t * Math.PI * 2) / period));
+        return { strength: s, gusting: false, along: false };
+      }
+      case "tail":
+        return { strength: 1, gusting: false, along: true };
+      default:
+        return { strength: 1, gusting: false, along: false };
+    }
+  }
+
+  /**
+   * The Gale: the hanging slab carries the wind as it is now, so the outline,
+   * the flag and the drop all agree. In a tailwind it blows the slide's way.
+   */
+  private liveWind(): void {
+    if (!this.plan.gale) return;
+    const m = this.mover;
+    const w = this.windNow();
+    m.drift = m.baseDrift * w.strength;
+    if (w.along) m.wind = m.dir;
+  }
+
   /** Lets go of a hanging slab. It lands, and is judged, where it comes down. */
   private release(): void {
     const m = this.mover;
     m.fallT = 0;
     m.fallFrom = m.x;
+    if (this.plan.gale) {
+      // The wind as it is this instant carries the drop.
+      this.liveWind();
+      m.gusted = this.windNow().gusting;
+    }
     this.hint = false;
     this.sfx.release();
     haptics.light();
@@ -3876,6 +3955,13 @@ export class SpireEngine {
     // A split landed home is two perfects, and pushes like it.
     if (result.perfect && this.mover.split) push += DARK_PUSH.perfect;
     if (fast) push += DARK_PUSH.fast;
+    if (result.perfect && this.mover.gusted) {
+      // A wind-true: let go in the gust and landed true. The light drives the Dark twice as far.
+      push += DARK_PUSH.perfect;
+      this.float("WIND-TRUE", cx, slab.y + 64, true, 24);
+      this.fx.rayBurst(cx, seam + VISUAL_H / 2, this.theme.accent, 200, 14);
+      this.sfx.chime();
+    }
     if (this.boss) {
       // In the fight only true light tells: a perfect burns it back twice
       // as far, a clean drop barely scratches it, and rubble feeds it.
@@ -4654,7 +4740,10 @@ export class SpireEngine {
     let inZone = false;
     if (aiming && this.freeze <= 0) {
       if (this.mover.fallT >= 0) this.advanceFall(dt);
-      else this.advanceMover(dt);
+      else {
+        this.advanceMover(dt);
+        this.liveWind();
+      }
       inZone = this.cued() && this.lined(this.peak());
       if (this.phase !== "menu") {
         if (inZone && !this.wasInZone) this.sfx.tick();
@@ -6428,21 +6517,51 @@ export class SpireEngine {
     const clock = this.reduceMotion ? 0.3 : this.clock;
     // The courses read from the world now: wind in the dust, the beat in the
     // groove, frost at the walls. Only the wind's dust is drawn here.
+    const wind = this.plan.gale ? this.windNow() : null;
+    const strength = wind ? wind.strength : 1;
+    const dir = wind && wind.along ? m.dir : m.wind;
+    if (wind && this.phase !== "menu") {
+      // The flag: a streamer on a pole at the lane's edge, blown the way the wind goes, as far as it blows.
+      const px0 = dir > 0 ? left - 18 : right + 18;
+      const top = lane.y - 24;
+      ctx.save();
+      ctx.strokeStyle = "rgba(230,215,190,0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px0, top + 54);
+      ctx.lineTo(px0, top);
+      ctx.stroke();
+      const len = (24 + 50 * Math.min(1.3, strength) * Math.min(1, m.baseDrift / 60)) * dir;
+      const flap = Math.sin(clock * (6 + 10 * strength)) * 4 * strength;
+      ctx.fillStyle = rgbCss(accent, 0.85);
+      ctx.beginPath();
+      ctx.moveTo(px0, top + 2);
+      ctx.quadraticCurveTo(px0 + len * 0.5, top + 2 + flap, px0 + len, top + 8 + flap);
+      ctx.lineTo(px0 + len * 0.9, top + 14 + flap);
+      ctx.quadraticCurveTo(px0 + len * 0.5, top + 20 + flap, px0, top + 22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     if (m.course === "gust" && !this.reduceMotion) {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 26; i++) {
+      const streaks = Math.round(8 + 18 * Math.min(1.3, strength));
+      for (let i = 0; i < streaks; i++) {
         const h = Math.sin(i * 51.3) * 43758.5453;
         const r = h - Math.floor(h);
         const span = right - left + 160;
         const x =
-          left - 80 + ((((r * span + clock * m.wind * (160 + r * 120)) % span) + span) % span);
+          left -
+          80 +
+          ((((r * span + clock * dir * (160 + r * 120) * (0.6 + 0.6 * strength)) % span) + span) %
+            span);
         const y = lane.y - 30 + r * (m.hover + 60) + Math.sin(clock * 3 + i) * 4;
-        ctx.strokeStyle = rgbCss(accent, 0.18 + r * 0.25);
+        ctx.strokeStyle = rgbCss(accent, (0.18 + r * 0.25) * (0.5 + 0.5 * Math.min(1.3, strength)));
         ctx.lineWidth = 1 + r;
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.lineTo(x - m.wind * (10 + r * 18), y);
+        ctx.lineTo(x - dir * (10 + r * 18) * (0.6 + 0.6 * strength), y);
         ctx.stroke();
       }
       ctx.restore();

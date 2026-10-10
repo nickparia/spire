@@ -124,6 +124,8 @@ export function fallShare(t: number, duration: number): number {
   return k * k;
 }
 
+export type Gale = "steady" | "gusts" | "cross" | "tail" | "howl" | "eye";
+
 export type Plan = {
   /** Floors to place to finish. 0 means the run never ends. */
   goal: number;
@@ -147,6 +149,14 @@ export type Plan = {
   descent?: boolean;
   /** Floors between the wind turning. */
   windTurn?: number;
+  /**
+   * The Gale: what the wind does on this sky. steady: as Gale Ridge. gusts:
+   * calm, then a gust you see arrive; a true drop in the gust is a wind-true.
+   * cross: it turns every floor, the flag first. tail: it blows along the
+   * slide, carrying a short drop in. howl: strength in a long wave, lulls
+   * shortening with height, the full howl leaning on loose slabs. eye: all in turn.
+   */
+  gale?: Gale;
   /** The cutting wheel: the goal is metres cut, not floors; the Dark follows from above. */
   cut?: boolean;
   /**
