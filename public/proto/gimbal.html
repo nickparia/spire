@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Gimbal feel test</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0a0608;
+        color: #e8dcc8;
+        font:
+          14px system-ui,
+          sans-serif;
+        overflow: hidden;
+        touch-action: manipulation;
+        user-select: none;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+      }
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        text-shadow: 0 1px 3px #000;
+      }
+      #hud b {
+        font-size: 28px;
+      }
+      #keys {
+        position: fixed;
+        bottom: 12px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div><b id="n">0</b>/<span id="goal">20</span> deep</div>
+      <div id="r"></div>
+    </div>
+    <div id="keys">
+      tap when the ring's shape matches the hole, and it drops through · R: restart
+    </div>
+    <script>
+      // ---------------------------------------------------------------------
+      // The Ring and the Descent, together. You look down a well. A ring turns
+      // at the surface carrying a spoke; tap to lock it to the ring below, and
+      // the locked ring SINKS: the whole string drops a step, and the rings
+      // you've locked recede beneath you as a tunnel. The bridge between two
+      // rings is only as wide as their spokes' overlap: true keeps it whole,
+      // off narrows it, too narrow and the ring can't lock and is lost. The
+      // Dark rises up the well toward your newest ring (it grows toward you);
+      // every lock drives it down. Reach the depth and you break through.
+      // Grey boxes: judge the control, not the look.
+      // ---------------------------------------------------------------------
+      const W = 440,
+        H = 956;
+      const CX = W / 2,
+        CY = H * 0.52;
+      const R0 = 170,
+        RING_W = 26; // the surface ring's radius and band width
+      const K = 0.86; // each ring deeper is this much smaller: the well's perspective
+      // How far from the hole's shape still drops through, and what counts as true.
+      const TOL = 0.16,
+        PERFECT = 0.025;
+      const GOAL = 20;
+      const DARK_RATE = 0.055; // the Dark's rise, in rings per second
+      const DARK_PUSH = { perfect: 1.15, off: 0.4 };
+      const cv = document.getElementById("c");
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      cv.width = W * dpr;
+      cv.height = H * dpr;
+      cv.style.width = W + "px";
+      cv.style.height = H + "px";
+      const ctx = cv.getContext("2d");
+
+      let rings, mover, dark, time, over, floats, flashT, shake, sink, wellA, depth;
+      function reset() {
+        // rings, top (newest) last: { a: spoke angle, w: bridge width }. rings[0] is the bedrock ring.
+        // Each ring remembers the depth it sits at: a true lock sinks the string two steps, an off lock one.
+        // Each lodged ring: its tumble axis `th`, how flat it lodged `f` (1 round, 0 edge-on), its depth.
+        rings = [{ th: 0, f: 1, d: 0 }];
+        depth = 0;
+        spawn();
+        dark = -7; // in rings below the newest: negative is deep
+        time = 0;
+        over = null;
+        floats = [];
+        flashT = 0;
+        shake = 0;
+        sink = 0;
+        wellA = 0;
+      }
+      function spawn() {
+        const i = rings.length;
+        const dir = i % 2 ? -1 : 1;
+        // A new ring tumbles about its own axis, quicker as you go down.
+        mover = {
+          th: Math.random() * Math.PI,
+          tau: Math.random() * Math.PI * 2,
+          speed: (1.1 + i * 0.08) * dir,
+        };
+      }
+      const flat = (tau) => Math.abs(Math.cos(tau));
+      function wrap(a) {
+        while (a > Math.PI) a -= 2 * Math.PI;
+        while (a < -Math.PI) a += 2 * Math.PI;
+        return a;
+      }
+
+      function tap() {
+        if (over || sink > 0) return;
+        const hole = rings[rings.length - 1];
+        const f = flat(mover.tau);
+        const err = f - hole.f; // how much rounder (+) or flatter (−) than the hole
+        if (Math.abs(err) > TOL) {
+          // Too round for the hole, or far too flat: it clangs on the rim and is lost.
+          floats.push({ t: err > 0 ? "TOO WIDE" : "LOST", c: "#c44", y: 0 });
+          dark += 0.8;
+          shake = 0.7;
+          spawn();
+          return;
+        }
+        const perfect = Math.abs(err) < PERFECT;
+        const gain = perfect ? 2 : 1;
+        depth += gain;
+        // A clean drop opens the hole a touch; an off drop lodges tilted and the hole becomes its shape.
+        rings.push({ th: mover.th, f: perfect ? Math.min(1, hole.f + 0.03) : f, d: depth });
+        dark -= perfect ? DARK_PUSH.perfect : DARK_PUSH.off;
+        floats.push({
+          t: perfect ? "TRUE · SINKS TWO" : "LODGED " + Math.round((1 - f) * 100) + "° OFF",
+          c: perfect ? "#ffd27a" : "#caa",
+          y: 0,
+        });
+        flashT = perfect ? 0.3 : 0;
+        shake = perfect ? 0.35 : 0.2;
+        sink = gain;
+        if (depth >= GOAL) over = "through";
+        else spawn();
+      }
+
+      function step(dt) {
+        time += dt;
+        wellA += dt * 0.04;
+        if (!over) {
+          mover.tau += mover.speed * dt;
+          dark += DARK_RATE * dt;
+          if (dark >= 0) over = "taken";
+        }
+        sink = Math.max(0, sink - dt * 3.6);
+        flashT = Math.max(0, flashT - dt);
+        shake = Math.max(0, shake - dt * 2);
+        for (const f of floats) f.y += dt;
+        floats = floats.filter((f) => f.y < 1);
+        document.getElementById("n").textContent = depth;
+        document.getElementById("r").innerHTML =
+          `Dark <b>${Math.max(0, (-dark).toFixed(1))}</b> rings below${over ? " · " + over : ""}<br>${time.toFixed(1)} s`;
+      }
+
+      // The radius of the ring `below` steps beneath the surface, with the string mid-drop.
+      function radiusAt(below) {
+        return R0 * Math.pow(K, below - sink);
+      }
+      function band(r, a0, a1, w) {
+        ctx.beginPath();
+        ctx.arc(CX, CY, r + w / 2, a0, a1);
+        ctx.arc(CX, CY, Math.max(1, r - w / 2), a1, a0, true);
+        ctx.closePath();
+      }
+      function draw() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = "#0b0709";
+        ctx.fillRect(0, 0, W, H);
+        ctx.save();
+        if (shake > 0)
+          ctx.translate(Math.sin(time * 60) * shake * 5, Math.cos(time * 53) * shake * 3);
+        ctx.translate(CX, CY);
+        ctx.rotate(wellA);
+        ctx.translate(-CX, -CY);
+        // The ground around the well's mouth.
+        ctx.fillStyle = "#2a1c17";
+        ctx.fillRect(-200, -200, W + 400, H + 400);
+        ctx.fillStyle = "#07050a";
+        ctx.beginPath();
+        ctx.arc(CX, CY, R0 + RING_W, 0, Math.PI * 2);
+        ctx.fill();
+        // The Dark, rising: a disc deep in the well that grows toward you.
+        const darkR = radiusAt(Math.max(0.2, -dark) + (rings.length - 1) - (rings.length - 1));
+        const dg = ctx.createRadialGradient(CX, CY, 0, CX, CY, darkR);
+        dg.addColorStop(0, "#1a1026");
+        dg.addColorStop(0.8, "#1a1026");
+        dg.addColorStop(1, "rgba(26,16,38,0)");
+        ctx.fillStyle = dg;
+        ctx.beginPath();
+        ctx.arc(CX, CY, darkR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(170,110,255,0.55)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(CX, CY, darkR, 0, Math.PI * 2);
+        ctx.stroke();
+        // The lodged rings, receding beneath you, each the shape it lodged in.
+        const n = rings.length;
+        for (let i = 0; i < n; i++) {
+          const below = depth - rings[i].d;
+          const r = radiusAt(below + 1);
+          const w = RING_W * Math.pow(K, below + 1 - sink);
+          const depthShade = Math.max(0.25, 1 - below * 0.06);
+          ctx.fillStyle = `rgba(${Math.round(110 * depthShade)},${Math.round(84 * depthShade)},${Math.round(56 * depthShade)},1)`;
+          ctx.save();
+          ctx.translate(CX, CY);
+          ctx.rotate(rings[i].th);
+          ctx.scale(1, Math.max(0.04, rings[i].f));
+          ctx.beginPath();
+          ctx.arc(0, 0, r + w / 2, 0, Math.PI * 2);
+          ctx.arc(0, 0, Math.max(1, r - w / 2), 0, Math.PI * 2, true);
+          ctx.closePath();
+          ctx.restore();
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.5)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        if (!over) {
+          // The hole to fit: the last lodged ring's shape, drawn at the surface as a guide.
+          const hole = rings[n - 1];
+          ctx.strokeStyle = flashT > 0 ? "#fff0c0" : "rgba(255,210,120,0.45)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 6]);
+          ctx.save();
+          ctx.translate(CX, CY);
+          ctx.rotate(hole.th);
+          ctx.scale(1, Math.max(0.04, hole.f));
+          ctx.beginPath();
+          ctx.arc(0, 0, R0 + 0 / 2, 0, Math.PI * 2);
+          ctx.arc(0, 0, Math.max(1, R0 - 0 / 2), 0, Math.PI * 2, true);
+          ctx.closePath();
+          ctx.restore();
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // The tumbling ring.
+          const f = flat(mover.tau);
+          const err = Math.abs(f - hole.f);
+          ctx.fillStyle = err < PERFECT ? "#ffd27a" : err < TOL ? "#b07a48" : "#7a5a40";
+          ctx.save();
+          ctx.translate(CX, CY);
+          ctx.rotate(mover.th);
+          ctx.scale(1, Math.max(0.04, f));
+          ctx.beginPath();
+          ctx.arc(0, 0, R0 + RING_W / 2, 0, Math.PI * 2);
+          ctx.arc(0, 0, Math.max(1, R0 - RING_W / 2), 0, Math.PI * 2, true);
+          ctx.closePath();
+          ctx.restore();
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.font = "bold 22px system-ui";
+        ctx.textAlign = "center";
+        floats.forEach((f) => {
+          ctx.globalAlpha = 1 - f.y;
+          ctx.fillStyle = f.c;
+          ctx.fillText(f.t, CX, CY - R0 - 40 - f.y * 30);
+        });
+        ctx.globalAlpha = 1;
+        if (over) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 34px system-ui";
+          ctx.fillText(over === "taken" ? "THE LIGHT IS BURIED" : "BROKEN THROUGH", CX, H * 0.12);
+        }
+      }
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        step(dt);
+        draw();
+        requestAnimationFrame(frame);
+      }
+      addEventListener("pointerdown", (e) => {
+        if (e.target === cv) over ? reset() : tap();
+      });
+      addEventListener("keydown", (e) => {
+        if (e.key === "r") reset();
+        else if (e.key === " ") tap();
+      });
+      reset();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
