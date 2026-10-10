@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 97 — A kinder Gale (internal)
+
+- **The Updraft is on your side.** Sky 1's air draws every drop a third of the way back toward the groove and holds it up a little longer; Gusts keeps half that help. You learn the lead while the sky helps.
+- **The perfect-moment cue stays** the whole sky on the first three Gale skies, and until floor 12 on the last three. The skill is timing the drop, not guessing the carry.
+- **Gentler wind**: carry 20–36 on the Updraft rising to 40–68 at the Eye; gusts come every 5.4 s with four seconds of calm; the Dark is a tier slower across the world.
+- **A wind-true widens the next drop** by half: reward for reading the wind, not just surviving it.
+
 ## Build 96 — The wind, seen and heard (internal)
 
 - The flag is gone: it was a gauge dressed as scenery. The wind now shows in the world itself.

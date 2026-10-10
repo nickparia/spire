@@ -157,6 +157,8 @@ export type Plan = {
    * shortening with height, the full howl leaning on loose slabs. eye: all in turn.
    */
   gale?: Gale;
+  /** The Gale: a share of each drop's miss the updraft draws back toward the groove. */
+  lift?: number;
   /** The cutting wheel: the goal is metres cut, not floors; the Dark follows from above. */
   cut?: boolean;
   /**

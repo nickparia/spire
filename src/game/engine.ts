@@ -766,6 +766,8 @@ export class SpireEngine {
   private wasInZone = false;
   /** The last frame was in a gust: its rush plays once as it arrives. */
   private wasGusting = false;
+  /** The floor count after a wind-true: the drop made at it is judged more kindly. */
+  private boonFloor = -1;
   /** The wind this frame, read once in the update for everything drawn. */
   private lastWind: Wind = { strength: 1, gusting: false, along: false, front: null, howl: 0 };
   private freeze = 0;
@@ -1442,6 +1444,7 @@ export class SpireEngine {
     this.paused = false;
     this.hint = phase === "ready";
     this.floors = 0;
+    this.boonFloor = -1;
     this.score = 0;
     this.streak = 0;
     this.bestStreak = 0;
@@ -1714,7 +1717,8 @@ export class SpireEngine {
       gusted: false,
       guide: fall?.guide ?? false,
       fallT: -1,
-      fallTime: fallDuration(fall?.hover ?? 0),
+      // The Updraft holds a drop up a little longer.
+      fallTime: fallDuration(fall?.hover ?? 0) * (1 + 0.6 * (this.plan.lift ?? 0)),
       fallFrom: 0,
       w0: w,
       age: 0,
@@ -3476,8 +3480,12 @@ export class SpireEngine {
   /** Where the slab's left edge will be once it has landed. */
   private landingX(): number {
     const m = this.mover;
-    if (m.fallT >= 0) return m.fallFrom + m.wind * m.drift;
-    return m.x + m.wind * m.drift;
+    const base = (m.fallT >= 0 ? m.fallFrom : m.x) + m.wind * m.drift;
+    // The Updraft: the air under the tower draws a miss part of the way home.
+    const lift = this.plan.lift ?? 0;
+    const prev = lift > 0 ? this.peak() : undefined;
+    if (!prev) return base;
+    return base + lift * (prev.x + prev.w / 2 - m.w / 2 - base);
   }
 
   /** Whether dropping now would be a perfect. */
@@ -3509,18 +3517,18 @@ export class SpireEngine {
     const t = this.runTime;
     switch (gale) {
       case "gusts": {
-        // Calm for three seconds, then a gust for a second and a half, with a short rise and fall.
-        const p = t % 4.5;
+        // Calm for four seconds, then a gust for a second, with a short rise and fall.
+        const p = t % 5.4;
         const env =
-          p < 3
+          p < 4
             ? 0.15
-            : p < 3.2
-              ? 0.15 + ((p - 3) / 0.2) * 1.1
-              : p < 4.3
+            : p < 4.2
+              ? 0.15 + ((p - 4) / 0.2) * 1.1
+              : p < 5.2
                 ? 1.25
-                : 1.25 - ((p - 4.3) / 0.2) * 1.1;
+                : 1.25 - ((p - 5.2) / 0.2) * 1.1;
         // The gust is seen before it is felt: a front crosses the sky in the second before it hits.
-        const front = p >= 2.3 && p < 3.3 ? p - 2.3 : null;
+        const front = p >= 3.3 && p < 4.3 ? p - 3.3 : null;
         return { strength: env, gusting: env > 0.8, along: false, front, howl: 0 };
       }
       case "howl": {
@@ -3594,7 +3602,7 @@ export class SpireEngine {
     if (!prev) return;
     m.fallT += dt;
     const k = fallShare(m.fallT, m.fallTime);
-    m.x = m.fallFrom + m.wind * m.drift * k;
+    m.x = m.fallFrom + (this.landingX() - m.fallFrom) * k;
     m.y = prev.y + SLAB_H + m.hover * (1 - k);
     if (k >= 1) this.place();
   }
@@ -3644,7 +3652,9 @@ export class SpireEngine {
     const peak = m.course === "beat" ? base * 1.9 : m.course === "breath" ? base * 1.3 : 0;
     const px = Math.max(1, peak > 0 ? m.halfSpan * peak : m.pxSpeed);
     const tol = tolerance(px, this.plan.difficulty + this.floors, m.w);
-    return (m.keystone ? tol * 0.68 : tol) * windowFor(this.tune, this.streak);
+    // A wind-true read the wind: the next drop is judged half again as kindly.
+    const boon = this.boonFloor === this.floors ? 1.5 : 1;
+    return (m.keystone ? tol * 0.68 : tol) * windowFor(this.tune, this.streak) * boon;
   }
 
   private advanceMover(dt: number): void {
@@ -3998,6 +4008,7 @@ export class SpireEngine {
     if (result.perfect && this.mover.gusted) {
       // A wind-true: let go in the gust and landed true. The light drives the Dark twice as far.
       push += DARK_PUSH.perfect;
+      this.boonFloor = this.floors;
       this.float("WIND-TRUE", cx, slab.y + 64, true, 24);
       this.fx.rayBurst(cx, seam + VISUAL_H / 2, this.theme.accent, 200, 14);
       this.sfx.chime();
