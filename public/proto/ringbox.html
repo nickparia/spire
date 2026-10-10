@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ring grey box</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0a0608;
+        color: #e8dcc8;
+        font:
+          14px system-ui,
+          sans-serif;
+        overflow: hidden;
+        touch-action: manipulation;
+        user-select: none;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+      }
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        text-shadow: 0 1px 3px #000;
+      }
+      #hud b {
+        font-size: 28px;
+      }
+      #keys {
+        position: fixed;
+        bottom: 12px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div><b id="n">0</b>/<span id="goal">20</span> floors</div>
+      <div id="r"></div>
+    </div>
+    <div id="keys">
+      tap to drop · the wheel turns under your tower · R: restart · ?roll=0.3&amp;period=8
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/planck@1.5.0/dist/planck.min.js"></script>
+    <script>
+      // ---------------------------------------------------------------------
+      // The Ring in grey boxes. Your tower stands on the rim of a vast wheel
+      // that rolls back and forth beneath it. As it rolls, the whole tower
+      // is carried sideways and leans with the rim (gravity turns with the
+      // world); the crane above stays put. Drop slabs to build; a loose slab
+      // slides and tips with the roll, a true column rides it. The Dark rises
+      // from below; the summit is the goal. Nothing but shapes: judge control.
+      // ---------------------------------------------------------------------
+      const { World, Vec2, Box, WeldJoint } = planck;
+      const params = new URLSearchParams(location.search);
+      const PPM = 40;
+      const W = 440,
+        H = 956;
+      const SLAB_W = 140,
+        SLAB_H = 26;
+      const WHEEL_R = 380; // px, the wheel the rim belongs to
+      const ROLL = Number(params.get("roll") || 0.26); // radians either way
+      const PERIOD = Number(params.get("period") || 8);
+      const GOAL = Number(params.get("goal") || 20);
+      const SLIDE = 1.1; // half-spans per second
+      const DARK_RATE = 20,
+        DARK_PUSH = { perfect: 42, off: 12 };
+      const PERFECT = 12;
+      const cv = document.getElementById("c");
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      cv.width = W * dpr;
+      cv.height = H * dpr;
+      cv.style.width = W + "px";
+      cv.style.height = H + "px";
+      const ctx = cv.getContext("2d");
+      const m = (p) => p / PPM,
+        px = (q) => q * PPM;
+
+      let world, rim, slabs, mover, dark, time, over, floats, flash, shake, camY, phi, lost;
+      function reset() {
+        world = new World({ gravity: Vec2(0, 9.8) });
+        // The rim: a kinematic bar the tower stands on, carried and rotated by the wheel.
+        rim = world.createBody({ type: "kinematic", position: Vec2(0, 0) });
+        rim.createFixture(Box(m(SLAB_W * 1.4), m(10)), { friction: 1 });
+        slabs = [];
+        lost = 0;
+        dark = 170; // px below the rim's top
+        time = 0;
+        over = null;
+        floats = [];
+        flash = 0;
+        shake = 0;
+        camY = 0;
+        phi = 0;
+        spawn();
+      }
+      function towerTop() {
+        if (slabs.length === 0) return { x: 0, y: -10, w: SLAB_W * 1.2 };
+        const s = slabs[slabs.length - 1];
+        const p = s.body.getPosition();
+        return { x: px(p.x), y: px(p.y) - SLAB_H / 2, w: s.w, angle: s.body.getAngle() };
+      }
+      function spawn() {
+        const t = towerTop();
+        const dir = slabs.length % 2 ? -1 : 1;
+        mover = {
+          u: -dir,
+          dir,
+          w: slabs.length ? slabs[slabs.length - 1].w : SLAB_W,
+          y: t.y - SLAB_H * 3.2,
+          center: t.x,
+          half: SLAB_W * 0.9,
+        };
+      }
+      function tap() {
+        if (over) return;
+        const t = towerTop();
+        const x = mover.center + mover.u * mover.half;
+        // Overhang: the part of the slab not over the top narrows it, as in Hearth.
+        const err = x - t.x;
+        const overlap = mover.w - Math.abs(err);
+        if (overlap < 24) {
+          floats.push({ t: "MISSED", c: "#c44", y: 0 });
+          lost += 1;
+          dark += 30;
+          shake = 0.6;
+          spawn();
+          if (lost >= 3) over = "fallen";
+          return;
+        }
+        const perfect = Math.abs(err) < PERFECT;
+        const w = perfect ? mover.w : overlap;
+        const cx = perfect ? t.x : x - (Math.sign(err) * (mover.w - overlap)) / 2;
+        const body = world.createBody({
+          type: "dynamic",
+          position: Vec2(m(cx), m(mover.y + SLAB_H / 2)),
+          angle: slabs.length ? towerTop().angle : phi,
+          linearDamping: 0.1,
+          angularDamping: 0.3,
+          bullet: true,
+        });
+        body.createFixture(Box(m(w / 2), m(SLAB_H / 2)), { density: 1, friction: 0.7 });
+        // Start it moving with the rim so it lands where it was aimed.
+        const v = rim.getLinearVelocity();
+        body.setLinearVelocity(Vec2(v.x, 0));
+        slabs.push({ body, w, perfect });
+        if (perfect) {
+          // A true drop sets to the one below once it lands: welded, it rides the roll as one.
+          setTimeout(() => {
+            const below = slabs.length >= 2 ? slabs[slabs.length - 2].body : rim;
+            if (slabs.includes(slabs[slabs.length - 1]) && body.isDynamic())
+              world.createJoint(WeldJoint({}, below, body, body.getWorldCenter()));
+          }, 450);
+        }
+        dark += perfect ? DARK_PUSH.perfect : DARK_PUSH.off;
+        floats.push({ t: perfect ? "PERFECT" : "", c: "#ffd27a", y: 0 });
+        flash = perfect ? 0.3 : 0;
+        if (slabs.length >= GOAL) over = "summit";
+        else spawn();
+      }
+
+      function step(dt) {
+        time += dt;
+        if (!over) {
+          // The wheel rolls: the rim carried to R·sin φ and turned by φ, gravity turning with it.
+          const w = (Math.PI * 2) / PERIOD;
+          phi = ROLL * Math.sin(time * w);
+          const dphi = ROLL * w * Math.cos(time * w);
+          rim.setLinearVelocity(Vec2(m(WHEEL_R * Math.cos(phi) * dphi), 0));
+          rim.setAngularVelocity(-dphi);
+          world.setGravity(Vec2(9.8 * Math.sin(phi), 9.8 * Math.cos(phi)));
+          mover.u += mover.dir * SLIDE * dt;
+          if (mover.u > 1) {
+            mover.u = 1;
+            mover.dir = -1;
+          } else if (mover.u < -1) {
+            mover.u = -1;
+            mover.dir = 1;
+          }
+          dark -= DARK_RATE * dt; // the Dark rises: its distance below the rim shrinks
+          dark = Math.min(dark, height + SLAB_H * 8); // never further than eight floors below the top
+          const t = towerTop();
+          const height = -t.y; // the tower's height above the rim, px
+          if (dark <= -height + SLAB_H) over = "taken";
+          // Slabs that fall off the rim are lost.
+          for (let i = slabs.length - 1; i >= 0; i--) {
+            const p = slabs[i].body.getPosition();
+            if (px(p.y) > 200 || Math.abs(px(p.x)) > 600) {
+              world.destroyBody(slabs[i].body);
+              slabs.splice(i, 1);
+              lost += 1;
+              floats.push({ t: "FELL", c: "#c44", y: 0 });
+              shake = 0.8;
+            }
+          }
+          if (lost >= 3) over = "fallen";
+        }
+        world.step(1 / 60, 10, 6);
+        // The crane follows the tower's top with a lag, as the real one would.
+        const t = towerTop();
+        mover.center += (t.x - mover.center) * Math.min(1, dt / 0.9);
+        camY += (H * 0.62 + Math.min(0, t.y + 120) - H * 0.62 - camY) * Math.min(1, dt * 3);
+        flash = Math.max(0, flash - dt);
+        shake = Math.max(0, shake - dt * 2);
+        for (const f of floats) f.y += dt;
+        floats = floats.filter((f) => f.y < 1);
+        document.getElementById("n").textContent = slabs.length;
+        document.getElementById("r").innerHTML =
+          `Dark <b>${Math.max(0, Math.round((dark + t.y) / SLAB_H))}</b> floors below${over ? " · " + over : ""}<br>${time.toFixed(1)} s`;
+      }
+
+      function draw() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = "#0b0709";
+        ctx.fillRect(0, 0, W, H);
+        const ox = W / 2 + (shake > 0 ? Math.sin(time * 60) * shake * 6 : 0);
+        const oy = H * 0.62 - camY;
+        // The sky holds still; a horizon line to read the roll against.
+        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.beginPath();
+        ctx.moveTo(0, oy - 260);
+        ctx.lineTo(W, oy - 260);
+        ctx.stroke();
+        const rp = rim.getPosition();
+        const rx = ox + px(rp.x),
+          ry = oy + px(rp.y);
+        // The wheel: its rim arc under the bar, turning with φ.
+        ctx.save();
+        ctx.translate(rx, ry);
+        ctx.rotate(rim.getAngle());
+        ctx.strokeStyle = "#6b5236";
+        ctx.lineWidth = 26;
+        ctx.beginPath();
+        ctx.arc(0, WHEEL_R + 13, WHEEL_R, -Math.PI / 2 - 0.9, -Math.PI / 2 + 0.9);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 2;
+        for (let k = -8; k <= 8; k++) {
+          const a = -Math.PI / 2 + k * 0.11;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * (WHEEL_R - 13), WHEEL_R + 13 + Math.sin(a) * (WHEEL_R - 13));
+          ctx.lineTo(Math.cos(a) * (WHEEL_R + 13), WHEEL_R + 13 + Math.sin(a) * (WHEEL_R + 13));
+          ctx.stroke();
+        }
+        // The rim bar the tower stands on.
+        ctx.fillStyle = "#8a6a46";
+        ctx.fillRect(-SLAB_W * 1.4, -10, SLAB_W * 2.8, 20);
+        ctx.restore();
+        // The Dark, rising from below the rim.
+        ctx.fillStyle = "rgba(40,20,60,0.85)";
+        ctx.fillRect(0, ry + dark, W, H);
+        ctx.strokeStyle = "rgba(170,110,255,0.6)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, ry + dark);
+        ctx.lineTo(W, ry + dark);
+        ctx.stroke();
+        // Slabs where the physics has them.
+        for (const s of slabs) {
+          const p = s.body.getPosition();
+          ctx.save();
+          ctx.translate(ox + px(p.x), oy + px(p.y));
+          ctx.rotate(s.body.getAngle());
+          ctx.fillStyle = s.perfect ? "#c9a56a" : "#b07a48";
+          ctx.fillRect(-s.w / 2, -SLAB_H / 2, s.w, SLAB_H);
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.fillRect(-s.w / 2, SLAB_H / 2 - 5, s.w, 5);
+          ctx.restore();
+        }
+        // The crane's slab, sliding above the top; and the summit line.
+        if (!over) {
+          const x = ox + mover.center + mover.u * mover.half,
+            y = oy + mover.y;
+          ctx.fillStyle = "#d9a060";
+          ctx.fillRect(x - mover.w / 2, y, mover.w, SLAB_H);
+          ctx.strokeStyle = "rgba(255,220,160,0.3)";
+          ctx.setLineDash([4, 5]);
+          ctx.beginPath();
+          ctx.moveTo(x, y + SLAB_H);
+          ctx.lineTo(x, oy + towerTop().y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.strokeStyle = "rgba(255,200,120,0.3)";
+        ctx.setLineDash([6, 8]);
+        ctx.beginPath();
+        ctx.moveTo(0, oy - GOAL * SLAB_H - 10);
+        ctx.lineTo(W, oy - GOAL * SLAB_H - 10);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (flash > 0) {
+          ctx.fillStyle = `rgba(255,230,190,${flash * 0.3})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+        ctx.font = "bold 22px system-ui";
+        ctx.textAlign = "center";
+        floats.forEach((f) => {
+          if (!f.t) return;
+          ctx.globalAlpha = 1 - f.y;
+          ctx.fillStyle = f.c;
+          ctx.fillText(f.t, W / 2, oy + towerTop().y - 60 - f.y * 30);
+        });
+        ctx.globalAlpha = 1;
+        if (over) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 34px system-ui";
+          ctx.fillText(
+            over === "summit"
+              ? "SUMMIT"
+              : over === "taken"
+                ? "TAKEN BY THE DARK"
+                : "THE TOWER FELL",
+            W / 2,
+            H * 0.14,
+          );
+        }
+      }
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        step(dt);
+        draw();
+        requestAnimationFrame(frame);
+      }
+      addEventListener("pointerdown", (e) => {
+        if (e.target === cv) over ? reset() : tap();
+      });
+      addEventListener("keydown", (e) => {
+        if (e.key === "r") reset();
+        else if (e.key === " ") tap();
+      });
+      reset();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

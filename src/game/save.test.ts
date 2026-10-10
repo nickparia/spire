@@ -141,7 +141,7 @@ describe("progress", () => {
       recordRun(save, level.id, 20, 0.9, { clear: true, precise: false, swift: false });
     }
     // The last level of the last offered world, never a parked world's.
-    expect(LEVELS[nextLevelIndex(save)]!.id).toBe("hub");
+    expect(LEVELS[nextLevelIndex(save)]!.id).toBe("apex");
   });
 });
 
@@ -172,20 +172,8 @@ describe("isUnlocked", () => {
     const { LEVELS } = await import("./levels");
     const at = (id: string) => LEVELS.findIndex((l) => l.id === id);
     const save = emptySave();
-    // The Ring's first sky opens with the Ring (a grey box, never gated), with nothing cleared.
-    expect(isUnlocked(save, at("rim"))).toBe(true);
-    // Its second waits for its first, not for the parked Descent's last depth.
-    expect(isUnlocked(save, at("spoke"))).toBe(false);
-    save.levels.rim = {
-      clear: true,
-      precise: false,
-      swift: false,
-      bestTime: 1,
-      bestAccuracy: 1,
-      runs: 1,
-    };
-    expect(isUnlocked(save, at("spoke"))).toBe(true);
-    // A parked world's depths are never playable.
+    // A parked world's levels are never playable, however the master list orders them.
+    expect(isUnlocked(save, at("rim"))).toBe(false);
     expect(isUnlocked(save, at("roots"))).toBe(false);
     // Hearth still gates sky by sky.
     expect(isUnlocked(save, at("foundry"))).toBe(true);

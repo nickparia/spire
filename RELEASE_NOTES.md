@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 90 — The Ring, parked (internal)
+
+- **The Ring is off the carousel.** Builds 85–89 put an unjudged mechanic in the game under Hearth's full art, which is the opposite of how we agreed to work: gameplay loop first, in plain shapes, then a look. It sits on the map as a world to come until its grey-box page is fun. Nothing else changes.
+
 ## Build 89 — The wheel (internal)
 
 - **The Ring is a wheel now, not a see-saw.** One rotation does everything: the tower rides the rim of a vast stone wheel (drawn as the arc under you, spokes running to a hub far below), and as the wheel rolls the tower is carried sideways *and* leans by the same angle — ±9° on the Rim, ±13° on the Spoke, ±15° on the Hub (on the beat, no gale) — while the crane and the sky hold still. A true column rides it; a loose stack lags and leans. Still grey boxes, still borrowed art: judge whether the world turning under you makes your taps matter.
