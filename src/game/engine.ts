@@ -72,6 +72,7 @@ import {
   tolerance,
   travelRate,
 } from "./logic";
+import type { Gale } from "./logic";
 import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { CRADLE_STOP, LEVEL_TILT, Stage } from "./physics";
@@ -557,6 +558,20 @@ type Floater = {
   coin: boolean;
 };
 
+/** What the Gale's wind is doing this instant (see Engine.windNow). */
+interface Wind {
+  /** Strength as a share of the sky's carry. */
+  strength: number;
+  /** A drop let go now counts as made in a gust. */
+  gusting: boolean;
+  /** It blows along the slide (a tailwind), not across it. */
+  along: boolean;
+  /** A gust front crossing the sky, 0 at the windward edge to 1 past the slab; null between gusts. */
+  front: number | null;
+  /** The howl's strength, 0 on any other wind. */
+  howl: number;
+}
+
 type Mover = {
   u: number;
   x: number;
@@ -749,6 +764,10 @@ export class SpireEngine {
 
   private tol = 12;
   private wasInZone = false;
+  /** The last frame was in a gust: its rush plays once as it arrives. */
+  private wasGusting = false;
+  /** The wind this frame, read once in the update for everything drawn. */
+  private lastWind: Wind = { strength: 1, gusting: false, along: false, front: null, howl: 0 };
   private freeze = 0;
   private fallAge = 0;
   private wonAge = 0;
@@ -3484,14 +3503,9 @@ export class SpireEngine {
    * carry, whether a drop let go now counts as made in a gust, and whether it
    * blows along the slide (a tailwind) rather than across it.
    */
-  windNow(): { strength: number; gusting: boolean; along: boolean } {
-    let gale = this.plan.gale;
-    if (!gale) return { strength: 1, gusting: false, along: false };
-    if (gale === "eye") {
-      // The Eye: gusts, crosswinds, the howl, a stretch of each in turn.
-      const band = Math.floor(Math.max(0, this.floors - WARMUP_FLOORS) / 7) % 3;
-      gale = band === 0 ? "gusts" : band === 1 ? "cross" : "howl";
-    }
+  windNow(): Wind {
+    const gale = this.galeNow();
+    if (!gale) return { strength: 1, gusting: false, along: false, front: null, howl: 0 };
     const t = this.runTime;
     switch (gale) {
       case "gusts": {
@@ -3505,19 +3519,45 @@ export class SpireEngine {
               : p < 4.3
                 ? 1.25
                 : 1.25 - ((p - 4.3) / 0.2) * 1.1;
-        return { strength: env, gusting: env > 0.8, along: false };
+        // The gust is seen before it is felt: a front crosses the sky in the second before it hits.
+        const front = p >= 2.3 && p < 3.3 ? p - 2.3 : null;
+        return { strength: env, gusting: env > 0.8, along: false, front, howl: 0 };
       }
       case "howl": {
         // A long wave, its period shortening as you climb.
         const period = Math.max(6, 12 - this.floors * 0.15);
         const s = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin((t * Math.PI * 2) / period));
-        return { strength: s, gusting: false, along: false };
+        return { strength: s, gusting: false, along: false, front: null, howl: s };
       }
       case "tail":
-        return { strength: 1, gusting: false, along: true };
+        return { strength: 1, gusting: false, along: true, front: null, howl: 0 };
       default:
-        return { strength: 1, gusting: false, along: false };
+        return { strength: 1, gusting: false, along: false, front: null, howl: 0 };
     }
+  }
+
+  /** Which wind this sky has now: the Eye runs gusts, crosswinds and the howl in turn. */
+  private galeNow(): Gale | undefined {
+    const gale = this.plan.gale;
+    if (gale !== "eye") return gale;
+    const band = Math.floor(Math.max(0, this.floors - WARMUP_FLOORS) / 7) % 3;
+    return band === 0 ? "gusts" : band === 1 ? "cross" : "howl";
+  }
+
+  /** The Gale heard: air swelling with the wind, a gust's rush as it arrives, the howl's moan. */
+  private windSound(): void {
+    const live =
+      this.plan.gale && !this.paused && (this.phase === "play" || this.phase === "ready");
+    if (!live) {
+      this.sfx.wind(0, 0);
+      this.wasGusting = false;
+      return;
+    }
+    const w = this.windNow();
+    this.lastWind = w;
+    this.sfx.wind(w.strength, Math.max(0, (w.howl - 0.5) / 0.5));
+    if (w.gusting && !this.wasGusting) this.sfx.gust();
+    this.wasGusting = w.gusting;
   }
 
   /**
@@ -4734,6 +4774,7 @@ export class SpireEngine {
       }
     }
     if (this.cut && this.phase === "play" && !this.ascent) this.stepCut(dt);
+    this.windSound();
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
     const prev = this.peak();
@@ -6308,6 +6349,7 @@ export class SpireEngine {
       ctx.translate(c.x, c.y);
       ctx.rotate(-slab.rot);
       this.paintSlab(ctx, -slab.w / 2, SLAB_H / 2, slab.w, VISUAL_H, body, 1, 0, hotGroove);
+      this.drawStreamers(ctx, -slab.w / 2, SLAB_H / 2, slab.floor);
       if (slab.loose) this.drawCrack(ctx, slab.w);
       ctx.restore();
       return;
@@ -6344,6 +6386,43 @@ export class SpireEngine {
       return;
     }
     this.paintSlab(ctx, s.x, s.y, slab.w, VISUAL_H, body, scaleY, slab.rot, hotGroove);
+    if (settled) this.drawStreamers(ctx, s.x, s.y, slab.floor);
+  }
+
+  /**
+   * The Gale: the cloth knotted to each slab's end streams with the wind as it
+   * is now, hanging in a calm, flapping out level in a gust. The whole spire
+   * tells the wind; nothing is drawn that isn't part of it.
+   */
+  private drawStreamers(
+    ctx: CanvasRenderingContext2D,
+    sx: number,
+    syBottom: number,
+    seed: number,
+  ): void {
+    if (!this.plan.gale || this.reduceMotion) return;
+    const w = this.lastWind;
+    const m = this.mover;
+    const dir = w.along ? m.dir : m.wind;
+    const force = Math.min(1.3, w.strength) * Math.min(1, m.baseDrift / 56);
+    const kx = sx + 11;
+    const ky = syBottom - VISUAL_H + 5;
+    ctx.save();
+    ctx.lineCap = "round";
+    for (let i = 0; i < 3; i++) {
+      const ph = seed * 1.7 + i * 2.1;
+      const flap = Math.sin(this.clock * (5 + 9 * force) + ph) * (2 + 6 * force);
+      const reach = dir * (6 + 30 * force) + flap;
+      const drop = 4 + 16 * (1 - Math.min(1, force)) + i * 3;
+      const sag = drop * 0.6 + Math.sin(this.clock * 3 + ph) * 2;
+      ctx.strokeStyle = i === 1 ? "rgba(178,46,40,0.95)" : "rgba(130,28,30,0.9)";
+      ctx.lineWidth = 2.2 - i * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(kx, ky);
+      ctx.quadraticCurveTo(kx + reach * 0.45, ky + sag, kx + reach, ky + drop + flap * 0.3);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private drawMover(ctx: CanvasRenderingContext2D, inZone: boolean): void {
@@ -6374,10 +6453,13 @@ export class SpireEngine {
     const falling = m.fallT >= 0;
     const share = falling ? fallShare(m.fallT, m.fallTime) : 0;
     // Wind tips a falling slab over, then it rights itself as it lands.
+    // Hanging in the Gale it leans with the wind as it is now.
     const tilt =
       falling && !this.reduceMotion
         ? m.wind * m.drift * 0.0022 * Math.sin(Math.sqrt(share) * Math.PI)
-        : 0;
+        : this.plan.gale && !this.reduceMotion
+          ? (this.plan.gale && this.lastWind.along ? m.dir : m.wind) * m.drift * 0.0012
+          : 0;
     if (falling && !this.reduceMotion) {
       for (let i = 3; i >= 1; i--) {
         const s = this.worldToScreen(m.x - m.wind * m.drift * 0.03 * i, m.y + i * 9);
@@ -6463,13 +6545,14 @@ export class SpireEngine {
         VISUAL_H,
         mix(rgb, [255, 255, 255], 0.35),
         squash,
-        0,
+        tilt,
         true,
       );
       ctx.restore();
     } else {
       this.paintSlab(ctx, s.x, s.y, m.w, VISUAL_H, rgb, squash, tilt, false);
     }
+    if (!hidden) this.drawStreamers(ctx, s.x, s.y, this.floors + 1);
     if (m.keystone) {
       ctx.fillStyle = "#f6f1e8";
       ctx.fillRect(s.x + 8, s.y - VISUAL_H + 6, Math.max(8, m.w - 16), 3);
@@ -6520,30 +6603,32 @@ export class SpireEngine {
     const wind = this.plan.gale ? this.windNow() : null;
     const strength = wind ? wind.strength : 1;
     const dir = wind && wind.along ? m.dir : m.wind;
-    if (wind && this.phase !== "menu") {
-      // The flag: a streamer on a pole at the lane's edge, blown the way the wind goes, as far as it blows.
-      const px0 = dir > 0 ? left - 18 : right + 18;
-      const top = lane.y - 24;
+    if (wind && wind.front !== null && !this.reduceMotion && this.phase !== "menu") {
+      // The gust front: a wall of dust rushing across the sky from windward, reaching the slab as the gust does.
+      const x0 = dir > 0 ? -60 : this.vw + 60;
+      const x1 = dir > 0 ? this.vw + 60 : -60;
+      const fx = x0 + (x1 - x0) * wind.front;
+      const near = 1 - Math.min(1, Math.abs(fx - lane.x) / (this.vw * 0.6));
       ctx.save();
-      ctx.strokeStyle = "rgba(230,215,190,0.8)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(px0, top + 54);
-      ctx.lineTo(px0, top);
-      ctx.stroke();
-      const len = (24 + 50 * Math.min(1.3, strength) * Math.min(1, m.baseDrift / 60)) * dir;
-      const flap = Math.sin(clock * (6 + 10 * strength)) * 4 * strength;
-      ctx.fillStyle = rgbCss(accent, 0.85);
-      ctx.beginPath();
-      ctx.moveTo(px0, top + 2);
-      ctx.quadraticCurveTo(px0 + len * 0.5, top + 2 + flap, px0 + len, top + 8 + flap);
-      ctx.lineTo(px0 + len * 0.9, top + 14 + flap);
-      ctx.quadraticCurveTo(px0 + len * 0.5, top + 20 + flap, px0, top + 22);
-      ctx.closePath();
-      ctx.fill();
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 70; i++) {
+        const h = Math.sin(i * 73.7) * 43758.5453;
+        const r = h - Math.floor(h);
+        const h2 = Math.sin(i * 19.1 + 3) * 27183.1;
+        const r2 = h2 - Math.floor(h2);
+        const y = lane.y - 260 + r * 520 + Math.sin(clock * 5 + i) * 6;
+        const x = fx - dir * r2 * r2 * 140;
+        const len = (14 + r2 * 46) * (0.6 + near);
+        ctx.strokeStyle = rgbCss(accent, (0.1 + r * 0.3) * (0.4 + 0.6 * near));
+        ctx.lineWidth = 1 + r * 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - dir * len, y);
+        ctx.stroke();
+      }
       ctx.restore();
     }
-    if (m.course === "gust" && !this.reduceMotion) {
+    if ((m.course === "gust" || wind) && !this.reduceMotion) {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       const streaks = Math.round(8 + 18 * Math.min(1.3, strength));

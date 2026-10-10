@@ -35,6 +35,14 @@ export class Sfx {
   private rig: AudioRig;
   private samples = new Map<Sample, AudioBuffer>();
   private loading = false;
+  /** The Gale's wind loop, built once per audio context. */
+  private air: {
+    ctx: AudioContext;
+    gain: GainNode;
+    filter: BiquadFilterNode;
+    moan: GainNode;
+    osc: OscillatorNode;
+  } | null = null;
 
   constructor(rig: AudioRig) {
     this.rig = rig;
@@ -300,6 +308,66 @@ export class Sfx {
     this.noise(0.32, 0.2, 7000);
     this.tone(1568, 0.3, "triangle", 0.1, 196);
     this.tone(880, 0.22, "square", 0.04, 110, 0.03);
+  }
+
+  /**
+   * The Gale's air: a loop of wind that swells and brightens with its strength,
+   * and under it the howl's moan when that wind is up. Called every frame;
+   * silent at zero.
+   */
+  wind(strength: number, howl: number): void {
+    const { ctx, sfxBus } = this.rig;
+    if (!ctx || !sfxBus) return;
+    if (this.air && this.air.ctx !== ctx) this.air = null;
+    if (!this.air) {
+      if (strength <= 0) return;
+      const n = ctx.sampleRate * 2;
+      const buffer = ctx.createBuffer(1, n, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 400;
+      filter.Q.value = 0.6;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(sfxBus);
+      src.start();
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.value = 96;
+      const wobble = ctx.createOscillator();
+      wobble.frequency.value = 0.7;
+      const depth = ctx.createGain();
+      depth.gain.value = 5;
+      wobble.connect(depth);
+      depth.connect(osc.frequency);
+      wobble.start();
+      const moan = ctx.createGain();
+      moan.gain.value = 0;
+      osc.connect(moan);
+      moan.connect(sfxBus);
+      osc.start();
+      this.air = { ctx, gain, filter, moan, osc };
+    }
+    const on = this.rig.sfxEnabled ? 1 : 0;
+    const s = Math.min(1.3, Math.max(0, strength));
+    const t = ctx.currentTime;
+    this.air.gain.gain.setTargetAtTime(on * 0.13 * s, t, 0.12);
+    this.air.filter.frequency.setTargetAtTime(220 + 640 * s, t, 0.15);
+    this.air.moan.gain.setTargetAtTime(on * 0.07 * howl, t, 0.3);
+    this.air.osc.frequency.setTargetAtTime(88 + 44 * howl, t, 0.3);
+  }
+
+  /** A gust arriving: a rush of air. */
+  gust(): void {
+    this.noise(0.75, 0.26, 1500);
+    this.noise(0.3, 0.1, 4000, 0.05);
   }
 
   /** Time winding down. */

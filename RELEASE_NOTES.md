@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 96 — The wind, seen and heard (internal)
+
+- The flag is gone: it was a gauge dressed as scenery. The wind now shows in the world itself.
+  - **The tassels** knotted to every slab stream with the wind as it is now — hanging in a calm, flapping out level in a gust. The whole spire tells the wind.
+  - **The gust front**: a wall of dust rushes across the sky from windward in the second before the gust hits, so you see it coming and can hold or go.
+  - **The hanging slab leans** with the wind, and its own tassel streams.
+  - **Sound**: a bed of air that swells and brightens with the wind, a rush as each gust arrives, and the howl's low moan when it's up.
+
 ## Build 95 — The Gale, six winds (internal)
 
 - **Each sky of the Gale is a different thing the wind does, and you can always see it.** A flag on the ridge shows the wind's direction and strength; the streaks thicken with it.

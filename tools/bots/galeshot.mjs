@@ -59,18 +59,22 @@ await page.evaluate((level) => {
 }, level);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let shots = 0;
-for (let i = 0; i < 600 && shots < 2; i++) {
+for (let i = 0; i < 600 && shots < 3; i++) {
   await wait(100);
   const s = await page.evaluate(() => {
     const e = window.__spire;
     const w = e.windNow();
-    return { strength: w.strength, floors: e.floors, phase: e.phase };
+    return { strength: w.strength, front: w.front, floors: e.floors, phase: e.phase };
   });
   if (s.floors >= 4 && s.strength > 1 && shots === 0) {
     shots++;
     await page.screenshot({ path: `${out}/g${level}-strong.png` });
   }
-  if (s.floors >= 6 && s.strength < 0.4 && shots === 1) {
+  if (s.floors >= 5 && s.front !== null && s.front > 0.55 && shots === 1) {
+    shots++;
+    await page.screenshot({ path: `${out}/g${level}-front.png` });
+  }
+  if (s.floors >= 6 && s.strength < 0.4 && shots === 2) {
     shots++;
     await page.screenshot({ path: `${out}/g${level}-calm.png` });
   }
