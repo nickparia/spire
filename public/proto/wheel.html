@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Wheel feel test</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0a0608;
+        color: #e8dcc8;
+        font:
+          14px system-ui,
+          sans-serif;
+        overflow: hidden;
+        touch-action: manipulation;
+        user-select: none;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+      }
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        text-shadow: 0 1px 3px #000;
+      }
+      #hud b {
+        font-size: 28px;
+      }
+      #keys {
+        position: fixed;
+        bottom: 12px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div><b id="n">0</b>/<span id="goal">20</span> rings</div>
+      <div id="r"></div>
+    </div>
+    <div id="keys">tap: lock the ring when its spoke meets the one below · R: restart</div>
+    <script>
+      // ---------------------------------------------------------------------
+      // The Ring, face on. A hub with a spoke. Each new ring turns around the
+      // hub carrying a spoke; tap to lock it. The bridge between a ring's spoke
+      // and the one below is only as wide as their overlap: a true lock keeps
+      // the full width, an off lock narrows it, and a bridge too narrow to hold
+      // breaks and the ring falls away. The Dark closes in from the rim; you
+      // build outward toward it. Grey boxes: judge the control, not the look.
+      // ---------------------------------------------------------------------
+      const W = 440,
+        H = 956;
+      const CX = W / 2,
+        CY = H * 0.56;
+      const HUB_R = 34,
+        RING_W = 22,
+        GAP = 3;
+      const SPOKE_W = 0.52; // radians of arc the hub's spoke spans
+      const MIN_W = 0.12; // a bridge narrower than this breaks
+      const PERFECT = 0.07; // within this of true: a true lock, full width restored a little
+      const GOAL = 20;
+      const DARK_RATE = 9; // px/s the Dark closes in, from the rim
+      const DARK_PUSH = { perfect: 34, off: 10 };
+      const cv = document.getElementById("c");
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      cv.width = W * dpr;
+      cv.height = H * dpr;
+      cv.style.width = W + "px";
+      cv.style.height = H + "px";
+      const ctx = cv.getContext("2d");
+
+      let rings, mover, dark, time, over, floats, flashT, shake, wheelA;
+      function reset() {
+        // rings: locked rings from the hub out: { a: spoke centre angle, w: bridge width (radians) }
+        rings = [{ a: 0, w: SPOKE_W }];
+        spawn();
+        dark = H * 0.62; // the Dark's radius, shrinking toward the hub
+        time = 0;
+        over = null;
+        floats = [];
+        flashT = 0;
+        shake = 0;
+        wheelA = 0;
+      }
+      function radiusOf(i) {
+        return HUB_R + i * (RING_W + GAP);
+      }
+      function spawn() {
+        const i = rings.length;
+        const dir = i % 2 ? -1 : 1;
+        // Quicker as you go out, like Hearth's period.
+        const speed = (1.6 + i * 0.11) * dir;
+        const last = rings[rings.length - 1];
+        mover = { a: last.a + Math.PI * (0.6 + Math.random() * 0.8) * dir, speed, w: last.w };
+      }
+      function wrap(a) {
+        while (a > Math.PI) a -= 2 * Math.PI;
+        while (a < -Math.PI) a += 2 * Math.PI;
+        return a;
+      }
+
+      function tap() {
+        if (over) return;
+        const last = rings[rings.length - 1];
+        const err = wrap(mover.a - last.a);
+        const overlap = last.w - Math.abs(err);
+        if (overlap < MIN_W) {
+          // The spokes miss: the ring can't hold and falls away. The Dark gains.
+          floats.push({ t: "LOST", c: "#c44", y: 0 });
+          dark -= 24;
+          shake = 0.7;
+          spawn();
+          return;
+        }
+        const perfect = Math.abs(err) < PERFECT;
+        const w = perfect ? Math.min(SPOKE_W, last.w + 0.02) : overlap;
+        // The locked ring sits where it was stopped; its bridge is the overlap, centred on it.
+        const a = perfect
+          ? last.a
+          : last.a + err / 2 + (err > 0 ? -(last.w - overlap) / 2 : (last.w - overlap) / 2) * 0;
+        rings.push({ a: perfect ? last.a : last.a + Math.sign(err) * (Math.abs(err) / 2), w });
+        dark += perfect ? DARK_PUSH.perfect : DARK_PUSH.off;
+        floats.push({
+          t: perfect ? "TRUE" : "OFF " + Math.round((Math.abs(err) / last.w) * 100) + "%",
+          c: perfect ? "#ffd27a" : "#caa",
+          y: 0,
+        });
+        flashT = perfect ? 0.25 : 0;
+        if (rings.length - 1 >= GOAL) over = "the rim";
+        else spawn();
+      }
+
+      function step(dt) {
+        time += dt;
+        wheelA += dt * 0.05; // the whole wheel turns, slowly: the world moves
+        if (!over) {
+          mover.a += mover.speed * dt;
+          dark -= DARK_RATE * dt;
+          const outer = radiusOf(rings.length - 1) + RING_W;
+          if (dark <= outer) over = "taken";
+        }
+        flashT = Math.max(0, flashT - dt);
+        shake = Math.max(0, shake - dt * 2);
+        for (const f of floats) f.y += dt;
+        floats = floats.filter((f) => f.y < 1);
+        document.getElementById("n").textContent = rings.length - 1;
+        document.getElementById("r").innerHTML =
+          `Dark <b>${Math.max(0, Math.round((dark - (radiusOf(rings.length - 1) + RING_W)) / (RING_W + GAP)))}</b> rings out${over ? " · " + over : ""}<br>${time.toFixed(1)} s`;
+      }
+
+      function arcRing(r, a0, a1, w) {
+        ctx.beginPath();
+        ctx.arc(CX, CY, r + w / 2, a0, a1);
+        ctx.arc(CX, CY, r - w / 2, a1, a0, true);
+        ctx.closePath();
+      }
+      function draw() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = "#0b0709";
+        ctx.fillRect(0, 0, W, H);
+        ctx.save();
+        if (shake > 0) ctx.translate(Math.sin(time * 60) * shake * 6, 0);
+        ctx.translate(CX, CY);
+        ctx.rotate(wheelA);
+        ctx.translate(-CX, -CY);
+        // The Dark, closing from the rim.
+        ctx.fillStyle = "#1a1020";
+        ctx.beginPath();
+        ctx.rect(-200, -200, W + 400, H + 400);
+        ctx.arc(CX, CY, Math.max(0, dark), 0, Math.PI * 2, true);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(170,110,255,0.5)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(CX, CY, Math.max(0, dark), 0, Math.PI * 2);
+        ctx.stroke();
+        // The rim to reach.
+        ctx.strokeStyle = "rgba(255,200,120,0.25)";
+        ctx.setLineDash([6, 8]);
+        ctx.beginPath();
+        ctx.arc(CX, CY, radiusOf(GOAL) + RING_W / 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // The hub.
+        ctx.fillStyle = "#6b5236";
+        ctx.beginPath();
+        ctx.arc(CX, CY, HUB_R, 0, Math.PI * 2);
+        ctx.fill();
+        // Locked rings: the stone, then the bridge (spoke) in gold, as wide as it held.
+        rings.forEach((rg, i) => {
+          const r = radiusOf(i) + RING_W / 2;
+          if (i > 0) {
+            ctx.fillStyle = i === rings.length - 1 ? "#8a6a46" : "#5a4634";
+            arcRing(r, 0, Math.PI * 2, RING_W);
+            ctx.fill();
+          }
+          // The bridge between this ring and the one inside it.
+          ctx.fillStyle = flashT > 0 && i === rings.length - 1 ? "#fff0c0" : "#ffd27a";
+          const rIn = i === 0 ? HUB_R * 0.5 : radiusOf(i) - GAP - 1;
+          const rOut = i === 0 ? HUB_R : radiusOf(i) + RING_W + 1;
+          ctx.beginPath();
+          ctx.arc(CX, CY, rOut, rg.a - rg.w / 2, rg.a + rg.w / 2);
+          ctx.arc(CX, CY, rIn, rg.a + rg.w / 2, rg.a - rg.w / 2, true);
+          ctx.closePath();
+          ctx.fill();
+        });
+        // The turning ring, with its spoke: the ghost of where a true lock sits.
+        if (!over) {
+          const i = rings.length;
+          const r = radiusOf(i) + RING_W / 2;
+          const last = rings[rings.length - 1];
+          ctx.strokeStyle = "rgba(255,210,120,0.35)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(CX, CY, radiusOf(i) + RING_W + 4, last.a - last.w / 2, last.a + last.w / 2);
+          ctx.stroke();
+          ctx.fillStyle = "#b07a48";
+          arcRing(r, 0, Math.PI * 2, RING_W);
+          ctx.fill();
+          ctx.fillStyle = "#ffd27a";
+          ctx.beginPath();
+          ctx.arc(CX, CY, radiusOf(i) + RING_W, mover.a - mover.w / 2, mover.a + mover.w / 2);
+          ctx.arc(CX, CY, radiusOf(i) - GAP, mover.a + mover.w / 2, mover.a - mover.w / 2, true);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.font = "bold 22px system-ui";
+        ctx.textAlign = "center";
+        floats.forEach((f) => {
+          ctx.globalAlpha = 1 - f.y;
+          ctx.fillStyle = f.c;
+          ctx.fillText(f.t, CX, CY - 40 - f.y * 40);
+        });
+        ctx.globalAlpha = 1;
+        if (over) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 34px system-ui";
+          ctx.fillText(over === "taken" ? "TAKEN BY THE DARK" : "THE RIM", CX, H * 0.18);
+        }
+      }
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        step(dt);
+        draw();
+        requestAnimationFrame(frame);
+      }
+      addEventListener("pointerdown", (e) => {
+        if (e.target === cv) over ? reset() : tap();
+      });
+      addEventListener("keydown", (e) => {
+        if (e.key === "r") reset();
+        else if (e.key === " ") tap();
+      });
+      reset();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
