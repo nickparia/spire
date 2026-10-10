@@ -4,7 +4,8 @@ import { cleanName, newPlayerId } from "./board";
 import { isWeaponId, type WeaponId } from "./build";
 import { refundDevices, type Levels, type Tracks } from "./gear";
 import { LEVELS } from "./levels";
-import { WORLDS } from "./worlds";
+import { WORLDS, worldOf } from "./worlds";
+import { worldOpen } from "./progress";
 import { starCount, type Ghost, type Goals } from "./logic";
 
 const SAVE_KEY = "spire-v2";
@@ -320,10 +321,21 @@ export function skiesLit(save: Save): number {
 }
 
 /** A level opens once the one before it has been cleared. */
+/**
+ * A level is playable when its world is open and the level before it in
+ * that world is cleared (its first level needs only the world). Gating runs
+ * within a world, never across the master list: a parked world's levels sit
+ * in LEVELS too, and must not lock the world after them.
+ */
 export function isUnlocked(save: Save, index: number): boolean {
-  if (index <= 0 || save.tester) return true;
-  const before = LEVELS[index - 1];
-  return Boolean(before && save.levels[before.id]?.clear);
+  if (save.tester) return true;
+  const level = LEVELS[index];
+  if (!level) return false;
+  const world = worldOf(level.id);
+  const wi = WORLDS.indexOf(world);
+  if (wi < 0 || !worldOpen(save, wi)) return false;
+  const at = world.levelIds.indexOf(level.id);
+  return at === 0 || Boolean(save.levels[world.levelIds[at - 1]!]?.clear);
 }
 
 /** Where "Play" should drop you: the first level not yet cleared. */

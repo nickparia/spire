@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 87 — Begin on the Ring (internal)
+
+- **Fixed: Begin on the Ring did nothing** unless the tester switch was on. A sky unlocked only when the sky before it in the master list was relit — and the one before the Rim is the parked Descent's last depth, which no one can play. Skies now unlock within their own world: the first with the world, each next one with the one before it.
+
 ## Build 86 — The Ring, open to all testers (internal)
 
 - **Fixed: the Ring was locked** ("Relight the world before it to open") unless every Hearth sky was relit or the tester switch was on. A grey box is for everyone testing: it's open now.

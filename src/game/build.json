@@ -1,7 +1,7 @@
 {
-  "build": 86,
-  "title": "The Ring, open to all testers",
+  "build": 87,
+  "title": "Begin on the Ring",
   "notes": [
-    "Fixed: the Ring was locked unless every Hearth sky was relit. It's open to everyone testing now."
+    "Fixed: Begin on the Ring did nothing unless the tester switch was on. Skies now unlock within their own world."
   ]
 }
