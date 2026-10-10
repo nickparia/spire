@@ -145,6 +145,13 @@ export type Plan = {
    * Dark becomes things climbing up from below, and what is cut off falls on them.
    */
   descent?: boolean;
+  /**
+   * The Ring: the rim the tower stands on tilts, swinging to this many radians
+   * either way over `tiltPeriod` seconds. Gravity tilts with it, so an
+   * off-centre stack leans with the world. 0 for a level world.
+   */
+  tilt?: number;
+  tiltPeriod?: number;
   hazardsAt: (floors: number) => Hazards;
   /** Floors one sky lasts, which paces how its backdrop deepens. */
   span: number;

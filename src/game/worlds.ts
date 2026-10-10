@@ -41,6 +41,19 @@ export const WORLDS: WorldDef[] = [
       [0.78, 0.1],
     ],
   },
+  {
+    id: "ring",
+    name: "The Ring",
+    blurb: "A world that turns. The rim tilts under your tower.",
+    concept: "A wheel of stone the size of a city, turning in the sky. You build on its rim.",
+    levelIds: ["rim", "spoke", "hub"],
+    revelation: "It was never turning for us.",
+    stars: [
+      [0.22, 0.22],
+      [0.3, 0.16],
+      [0.38, 0.12],
+    ],
+  },
 ];
 
 /**
@@ -70,7 +83,6 @@ export const DESCENT: WorldDef = {
 /** Worlds yet to be written sit on the map as dark patches. */
 export const WORLDS_TO_COME = [
   { id: "descent", name: "The Descent", blurb: "A world that goes down.", at: [0.78, 0.62] },
-  { id: "wheel", name: "The Wheel", blurb: "A world that turns.", at: [0.22, 0.22] },
 ] as const;
 
 export function levelsOf(world: WorldDef): LevelDef[] {
@@ -94,6 +106,8 @@ export function skyNumber(levelId: string): number {
 
 export function isBoss(levelId: string): boolean {
   const w = worldOf(levelId);
+  // A grey-box world has no boss yet: its last level is just its last level.
+  if (w.id === "ring") return false;
   return w.levelIds[w.levelIds.length - 1] === levelId;
 }
 

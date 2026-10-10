@@ -34,6 +34,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Pinned ideas (not scheduled)
 
+- **Transitions from live key frames** (Nick, Oct 10): for a visual transition, capture the game's own frame at that moment (the canvas as an image), give it to Higgsfield as the start image and have it alter the entire scene (the summit lighting, a break-through, the Dark taking the tower), then play the clip as the transition. The painting starts from exactly what the player sees.
+
 - **The solar system arc** (Nick): each world is a planet with its own source-boss; a mega boss in the black hole at the centre; through it into their dimension as the next arc. Recorded in STORY.md.
 - **Cosmic horror theme** (user, Oct 7): lean into it — the source above is Lovecraftian (eyes, tentacles, the sky swallowed). Every world's boss is an inversion of its climb and shows more of the source.
 - **More worlds** from the four dials (direction, slab behaviour, enemy, goal): low moon (slow falling, the tender world), heavy world (double gravity), the deep (underwater, currents), twin suns (gravity tilts through the run), ice (slabs slide to a lip), seed (slabs sprout ledges), the tide (waves surge and pull back), the watcher (the Dark drawn to loose slabs), hold-out and squash goals.
@@ -42,6 +44,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 - **Resume a half-built run** after the app is killed (save every slab's position and weld). Only if testers ask.
 
 ## Done (most recent first)
+
+- 85 The Ring grey box (Nick: "grey-box the ring first" — judge control before any art): `Plan.tilt/tiltPeriod` from `LevelDef.tilt: [rad, s]`; `Stage.setTilt(theta)` rotates gravity (30 m/s² at theta) and wakes bodies; `Engine.rimTilt()` = tilt·sin(2π·runTime/period) (0 in the menu), applied in `settle` and as a canvas rotation about the foundation's screen point in `render` (the Dark and backdrop rotate too — grey box). Levels `rim`/`spoke`/`hub` (tier 0–2, Gale Ridge's theme, tilt 0.12/10 s, 0.2/8, 0.28/7); world `ring` offered after Hearth (tester opens it); `isBoss` false for the ring; the "wheel" placeholder removed from the map. Bot `ring.mjs <out> <level 16|17|18> <aim>`: Rim tight/loose both win (~24 s); Hub tight wins (41 s), Hub loose taken at floor 12 (46 s); Foundry loose wins — tilt makes precision matter. Next if Nick feels it: the slide with a cause (the rim turning under the crane), the fallen towers overhead as the stakes, then and only then the R2 frame as art.
 
 - 84 Title taps — **confirmed fixed by Nick on his phone, Oct 10.** (regression, Nick: "the video is over the tap to play action… regressed this many many times"): (1) `nextLevelIndex` only ever returns a level of an offered world (`WORLDS`), so a complete Hearth no longer puts a parked Descent depth behind the title; (2) `Engine.restArt()` in `showMenu` pauses **and removes from the DOM** every behind-the-canvas video (`darkArt`, `sourceArt`, `dDark`, all `skies`); `wakeVideo(v)` re-appends and plays when a sky uses one (`loadDarkArt`/`loadSourceArt`/`paintedSky`/`descentDark`). Rule: nothing but the title's own `ArtLoop` may be a playing `<video>` while `phase === "menu"`. Bot `menuvideo.mjs` (Hearth-complete save → menu plan + the page's videos before/in/after a run) is the regression check; the simulator title check must use a Hearth-complete save (the fresh-save check passed while Nick's phone failed).
 

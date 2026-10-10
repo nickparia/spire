@@ -1868,10 +1868,18 @@ export class SpireEngine {
     return n;
   }
 
+  /** The rim's tilt now, radians: a slow roll either way on the Ring, none elsewhere. */
+  rimTilt(): number {
+    const t = this.plan.tilt ?? 0;
+    if (t <= 0 || this.phase === "menu") return 0;
+    return t * Math.sin((this.runTime * Math.PI * 2) / (this.plan.tiltPeriod ?? 10));
+  }
+
   /** Steps the stage and reads the bodies back into their slabs. */
   private settle(dt: number): void {
     const stage = this.stage;
     if (!stage) return;
+    stage.setTilt(this.rimTilt());
     // A topple plays out slowly enough to watch.
     this.slowmo = Math.max(0, this.slowmo - dt);
     stage.step(this.slowmo > 0 ? dt * 0.3 : dt);
@@ -5135,6 +5143,14 @@ export class SpireEngine {
       ctx.translate(vw / 2, vh * 0.72);
       ctx.rotate(Math.sin(this.clock * 1.55) * 0.014);
       ctx.translate(-vw / 2, -vh * 0.72);
+    }
+    // The Ring: the rim, and everything standing on it, rolls with the world's tilt.
+    const tilt = this.rimTilt();
+    if (tilt !== 0) {
+      const foot = this.worldToScreen(0, 0);
+      ctx.translate(foot.x, foot.y);
+      ctx.rotate(-tilt);
+      ctx.translate(-foot.x, -foot.y);
     }
 
     this.fx.down = 1;

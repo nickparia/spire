@@ -3,6 +3,15 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 85 — The Ring, in grey boxes (internal)
+
+- **A third world to feel, not to look at.** The Ring is three skies on Hearth's engine with one change: **the rim you stand on tilts**, rolling slowly either way, and gravity tilts with it. A true column holds through any tilt; an off-centre stack leans with the world and goes over. Nothing new is painted — it borrows Gale Ridge's sky and stone on purpose, so the only thing to judge is whether the tilt makes your taps matter more.
+  - **The Rim:** a gentle roll (±7°, ten-second swing), the even slide.
+  - **The Spoke:** further and faster (±11°, eight seconds), the groove walks.
+  - **The Hub:** ±16° every seven seconds, with the gale.
+- It sits on the world carousel after Hearth (open to testers). No boss, no chapter, no finish yet.
+- Bots: a tight-aim player clears all three; a loose-aim player who clears the Foundry is taken on the Hub at floor 12.
+
 ## Build 84 — The title answers again (internal)
 
 - **Fixed: the title (and the menus) stopped taking taps once every Hearth sky was relit.** Two causes, both ours. With Hearth complete the menu picked the next uncleared level to run behind the title — the first Descent depth, a parked world — and its paths got in the way. And no video behind the canvas was ever paused or taken out of the page when you came back to a menu; it only stopped being drawn. On iPhone a playing video behind the page swallows taps whatever it's told, which is the bug build 64 fixed for the first launch and this build fixes for every launch and every return: the menu never runs a parked world, and entering any menu pauses and removes every behind-the-canvas video (they come back when a sky starts).

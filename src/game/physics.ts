@@ -60,6 +60,16 @@ export class Stage {
   private clock = 0;
   /** Sideways force per metre of height, swinging slowly from side to side. */
   sway = 0;
+  /** The world's tilt, radians: gravity leans with the rim the tower stands on. */
+  private tilt = 0;
+
+  /** Tilts gravity: the rim has rolled by `theta` (anticlockwise positive). */
+  setTilt(theta: number): void {
+    if (theta === this.tilt) return;
+    this.tilt = theta;
+    this.world.setGravity(new Vec2(30 * Math.sin(theta), -30 * Math.cos(theta)));
+    for (const body of this.bodies.values()) if (body.isDynamic()) body.setAwake(true);
+  }
 
   constructor() {
     this.world = new World({ gravity: new Vec2(0, -30) });

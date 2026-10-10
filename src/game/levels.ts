@@ -39,6 +39,8 @@ export type LevelDef = {
   descent?: boolean;
   /** Its own painting and stone (art/sky/<paint>.mp4, art/slabs/<paint>.webp); defaults to the theme's. */
   paint?: string;
+  /** The Ring: the rim's tilt, radians either way, and its period in seconds. */
+  tilt?: [number, number];
 };
 
 /** Every level opens with a few plain floors so the new rhythm is a reveal. */
@@ -319,6 +321,61 @@ export const LEVELS: LevelDef[] = [
     descent: true,
     paint: "floor",
   },
+  // ---- The Ring (grey box, Oct 2026): Hearth's climb on a rim that tilts.
+  {
+    id: "rim",
+    name: "The Rim",
+    blurb: "The world tilts under you. Build true.",
+    line: "The wheel was turning before there was anyone to watch it.",
+    theme: "ridge",
+    floors: 20,
+    courses: ["slide"],
+    period: [0.94, 0.83],
+    keystones: false,
+    motes: false,
+    bombs: false,
+    parTime: 34,
+    parAccuracy: 0.86,
+    tier: 0,
+    tilt: [0.12, 10],
+  },
+  {
+    id: "spoke",
+    name: "The Spoke",
+    blurb: "It leans further, and faster. The groove walks with it.",
+    line: "Every tower on the rim fell the same way: a little, then all at once.",
+    theme: "ridge",
+    floors: 26,
+    courses: ["sway"],
+    period: [0.88, 0.76],
+    picks: 8,
+    keystones: false,
+    motes: true,
+    bombs: false,
+    parTime: 44,
+    parAccuracy: 0.87,
+    tier: 1,
+    tilt: [0.2, 8],
+  },
+  {
+    id: "hub",
+    name: "The Hub",
+    blurb: "The wind and the tilt together.",
+    line: "At the centre, something turns the wheel. It has never once stopped.",
+    theme: "ridge",
+    floors: 30,
+    courses: ["gust"],
+    period: [0.86, 0.72],
+    wind: [30, 48],
+    picks: 10,
+    keystones: true,
+    motes: true,
+    bombs: false,
+    parTime: 56,
+    parAccuracy: 0.85,
+    tier: 2,
+    tilt: [0.28, 7],
+  },
 ];
 
 export function levelCourseAt(level: LevelDef, floors: number): CourseId {
@@ -370,6 +427,8 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
     darkRate: Math.min(32, 18 + index * 1.8),
     physics: true,
     descent: level.descent ?? false,
+    tilt: level.tilt?.[0] ?? 0,
+    tiltPeriod: level.tilt?.[1] ?? 10,
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
     themeAt: () => level.theme,
