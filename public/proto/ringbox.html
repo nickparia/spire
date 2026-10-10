@@ -82,6 +82,7 @@
         DARK_PUSH = { perfect: 42, off: 12 },
         DARK_REACH = 8;
       const PERFECT = 12;
+      const LEVEL = Number(params.get("level") || 0.07); // radians within level that count as a square landing
       const cv = document.getElementById("c");
       const dpr = Math.min(2, devicePixelRatio || 1);
       cv.width = W * dpr;
@@ -149,13 +150,14 @@
           if (lost >= 3) over = "fallen";
           return;
         }
-        const perfect = Math.abs(err) < PERFECT;
-        const w = perfect ? mover.w : overlap;
-        const cx = perfect ? t.x : x - (Math.sign(err) * (mover.w - overlap)) / 2;
+        // The crane holds the slab level with the world: on a leaning rim it lands tilted.
+        // Whether it was true is judged when it lands, not now (see land).
+        const w = Math.abs(err) < PERFECT ? mover.w : overlap;
+        const cx = Math.abs(err) < PERFECT ? t.x : x - (Math.sign(err) * (mover.w - overlap)) / 2;
         const body = world.createBody({
           type: "dynamic",
           position: Vec2(m(cx), m(mover.y + SLAB_H / 2)),
-          angle: t.angle,
+          angle: 0,
           linearDamping: 0.1,
           angularDamping: 0.3,
           bullet: true,
@@ -163,7 +165,7 @@
         body.createFixture(Box(m(w / 2), m(SLAB_H / 2)), { density: 1, friction: 0.7 });
         // It starts moving with the rim, so it lands where it was aimed.
         body.setLinearVelocity(Vec2(rim.getLinearVelocity().x, 0));
-        falling = { body, w, perfect, age: 0 };
+        falling = { body, w, age: 0 };
         mover = null;
       }
       /** The falling slab has come to rest on the tower: it counts; a true drop sets to what it landed on. */
@@ -171,10 +173,23 @@
         const f = falling;
         falling = null;
         const below = slabs.length ? slabs[slabs.length - 1].body : rim;
+        // True only if it came down centred on where the tower IS now (leading the drift),
+        // and square to it (the rim near level when it landed).
+        const bp = below.getWorldCenter();
+        const fp = f.body.getWorldCenter();
+        const ba = below.getAngle();
+        const along = Math.cos(ba) * (fp.x - bp.x) + Math.sin(ba) * (fp.y - bp.y);
+        const centred = Math.abs(px(along)) < PERFECT;
+        const square = Math.abs(f.body.getAngle() - ba) < LEVEL;
+        f.perfect = centred && square;
         if (f.perfect) world.createJoint(WeldJoint({}, below, f.body, f.body.getWorldCenter()));
         slabs.push({ body: f.body, w: f.w, perfect: f.perfect });
         dark += f.perfect ? DARK_PUSH.perfect : DARK_PUSH.off;
-        if (f.perfect) floats.push({ t: "PERFECT", c: "#ffd27a", y: 0 });
+        floats.push({
+          t: f.perfect ? "TRUE" : centred ? "TILTED" : square ? "OFF" : "",
+          c: f.perfect ? "#ffd27a" : "#caa",
+          y: 0,
+        });
         flash = f.perfect ? 0.3 : 0;
         if (slabs.length >= GOAL) over = "summit";
         else spawn();
@@ -293,7 +308,7 @@
           ctx.lineTo(Math.cos(a) * (WHEEL_R + 13), WHEEL_R + 13 + Math.sin(a) * (WHEEL_R + 13));
           ctx.stroke();
         }
-        ctx.fillStyle = "#8a6a46";
+        ctx.fillStyle = Math.abs(phi) < LEVEL ? "#d9b070" : "#8a6a46"; // the rim glows when level: the square moment
         ctx.fillRect(-SLAB_W * 1.4, -10, SLAB_W * 2.8, 20);
         ctx.restore();
         ctx.fillStyle = "rgba(40,20,60,0.85)";

@@ -34,6 +34,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Pinned ideas (not scheduled)
 
+- **The Ring: agreed loop and look (Nick, Oct 10).** Loop: Hearth's drop onto the rim of a wheel that rolls under the tower (welded perfects ride it, loose slabs tip), plus two new skills still one tap — *timing the roll* (drop when the rim is level: a centred slab lands square; at full lean it lands tilted and slides) and *leading the drift* (a perfect is judged on where the tower is when the slab lands, not when you tap). Look, only after the page passes: (1) in-engine depth — the rim as a tilted ellipse seen from above, the painted world rotating and parallaxing against the roll while the tower stays put; (2) Higgsfield loops of the inside of a vast machine in forced perspective (Nick's gyroscope: cogs and wheels turning, the far rim with fallen towers, a black sun), turning on the roll's clock; (3) key-frame transitions from the live canvas (summit pull-back, topple off the rim). Not: a 3D renderer, or a video under the gameplay.
+
 - **Transitions from live key frames** (Nick, Oct 10): for a visual transition, capture the game's own frame at that moment (the canvas as an image), give it to Higgsfield as the start image and have it alter the entire scene (the summit lighting, a break-through, the Dark taking the tower), then play the clip as the transition. The painting starts from exactly what the player sees.
 
 - **The solar system arc** (Nick): each world is a planet with its own source-boss; a mega boss in the black hole at the centre; through it into their dimension as the next arc. Recorded in STORY.md.
