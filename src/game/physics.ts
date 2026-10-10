@@ -62,6 +62,24 @@ export class Stage {
   sway = 0;
   /** The world's tilt, radians: gravity leans with the rim the tower stands on. */
   private tilt = 0;
+  /** The rim's drift, m/s: what the foundation is being carried at, so speeds are read relative to it. */
+  private drift = 0;
+
+  /**
+   * Carries a fixed body sideways at `vx` px/s: the rim turning under the
+   * tower. The body becomes kinematic (a static with a velocity); what
+   * stands on it rides along by friction or by its weld.
+   */
+  setDrift(id: number, vx: number): void {
+    const body = this.bodies.get(id);
+    if (!body || body.isDynamic()) return;
+    const v = vx / SCALE;
+    if (v === 0 && this.drift === 0) return;
+    if (!body.isKinematic()) body.setType("kinematic");
+    body.setLinearVelocity(new Vec2(v, 0));
+    this.drift = v;
+    if (v !== 0) for (const b of this.bodies.values()) if (b.isDynamic()) b.setAwake(true);
+  }
 
   /** Tilts gravity: the rim has rolled by `theta` (anticlockwise positive). */
   setTilt(theta: number): void {
@@ -176,7 +194,8 @@ export class Stage {
         }
       } else this.crooked.set(id, 0);
       const v = body.getLinearVelocity();
-      const speed = Math.hypot(v.x, v.y) * SCALE;
+      // Speed relative to the rim: a stack carried along is still a stack at rest.
+      const speed = Math.hypot(v.x - this.drift, v.y) * SCALE;
       const spin = Math.abs(body.getAngularVelocity());
       // Landed: it rests on something that is itself landed, the ground or
       // the foundation or a slab that got there first. Two slabs meeting in
@@ -296,7 +315,7 @@ export class Stage {
       w: size.w,
       h: size.h,
       angle: body.getAngle(),
-      speed: Math.hypot(v.x, v.y) * SCALE,
+      speed: Math.hypot(v.x - this.drift, v.y) * SCALE,
       landed: !body.isDynamic() || this.landed.has(id),
       resting: !body.isDynamic() || (this.still.get(id) ?? 0) >= REST_TIME,
     };

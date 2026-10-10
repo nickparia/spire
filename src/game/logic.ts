@@ -152,6 +152,14 @@ export type Plan = {
    */
   tilt?: number;
   tiltPeriod?: number;
+  /**
+   * The Ring: the rim turns under the tower, carrying the foundation
+   * sideways `turn` px either way over `turnPeriod` seconds. Welded slabs
+   * ride with it; loose ones are dragged by friction and lag. The crane
+   * stays put, so the landing spot drifts while the slab slides.
+   */
+  turn?: number;
+  turnPeriod?: number;
   hazardsAt: (floors: number) => Hazards;
   /** Floors one sky lasts, which paces how its backdrop deepens. */
   span: number;

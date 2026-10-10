@@ -1875,11 +1875,21 @@ export class SpireEngine {
     return t * Math.sin((this.runTime * Math.PI * 2) / (this.plan.tiltPeriod ?? 10));
   }
 
+  /** The rim's sideways speed now, px/s: it carries the tower back and forth on the Ring. */
+  rimDrift(): number {
+    const a = this.plan.turn ?? 0;
+    if (a <= 0 || this.phase !== "play") return 0;
+    const w = (Math.PI * 2) / (this.plan.turnPeriod ?? 10);
+    return a * w * Math.cos(this.runTime * w);
+  }
+
   /** Steps the stage and reads the bodies back into their slabs. */
   private settle(dt: number): void {
     const stage = this.stage;
     if (!stage) return;
     stage.setTilt(this.rimTilt());
+    const base = this.stack[0];
+    if (base?.body !== null && base?.body !== undefined) stage.setDrift(base.body, this.rimDrift());
     // A topple plays out slowly enough to watch.
     this.slowmo = Math.max(0, this.slowmo - dt);
     stage.step(this.slowmo > 0 ? dt * 0.3 : dt);

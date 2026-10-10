@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 88 — The rim turns (internal)
+
+- **The Ring's rim now turns under the tower as well as tilting.** The foundation is carried sideways and back (±40 px on the Rim, ±55 on the Spoke, ±70 on the Hub); a true column rides with it, loose slabs are dragged by friction and lag into a lean. The crane stays put, so the landing spot drifts while your slab slides: a moving target under a moving slab. Still grey boxes — judge the feel.
+
 ## Build 87 — Begin on the Ring (internal)
 
 - **Fixed: Begin on the Ring did nothing** unless the tester switch was on. A sky unlocked only when the sky before it in the master list was relit — and the one before the Rim is the parked Descent's last depth, which no one can play. Skies now unlock within their own world: the first with the world, each next one with the one before it.

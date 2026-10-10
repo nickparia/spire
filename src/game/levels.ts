@@ -41,6 +41,8 @@ export type LevelDef = {
   paint?: string;
   /** The Ring: the rim's tilt, radians either way, and its period in seconds. */
   tilt?: [number, number];
+  /** The Ring: how far the rim carries the tower sideways, px either way, and its period. */
+  turn?: [number, number];
 };
 
 /** Every level opens with a few plain floors so the new rhythm is a reveal. */
@@ -325,7 +327,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: "rim",
     name: "The Rim",
-    blurb: "The world tilts under you. Build true.",
+    blurb: "The rim turns and tilts under you. Build true.",
     line: "The wheel was turning before there was anyone to watch it.",
     theme: "ridge",
     floors: 20,
@@ -338,6 +340,7 @@ export const LEVELS: LevelDef[] = [
     parAccuracy: 0.86,
     tier: 0,
     tilt: [0.12, 10],
+    turn: [40, 10],
   },
   {
     id: "spoke",
@@ -356,6 +359,7 @@ export const LEVELS: LevelDef[] = [
     parAccuracy: 0.87,
     tier: 1,
     tilt: [0.2, 8],
+    turn: [55, 8],
   },
   {
     id: "hub",
@@ -375,6 +379,7 @@ export const LEVELS: LevelDef[] = [
     parAccuracy: 0.85,
     tier: 2,
     tilt: [0.28, 7],
+    turn: [70, 7],
   },
 ];
 
@@ -429,6 +434,8 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
     descent: level.descent ?? false,
     tilt: level.tilt?.[0] ?? 0,
     tiltPeriod: level.tilt?.[1] ?? 10,
+    turn: level.turn?.[0] ?? 0,
+    turnPeriod: level.turn?.[1] ?? 10,
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
     themeAt: () => level.theme,

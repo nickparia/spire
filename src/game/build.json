@@ -1,7 +1,7 @@
 {
-  "build": 87,
-  "title": "Begin on the Ring",
+  "build": 88,
+  "title": "The rim turns",
   "notes": [
-    "Fixed: Begin on the Ring did nothing unless the tester switch was on. Skies now unlock within their own world."
+    "The Ring's rim turns under the tower as well as tilting: the foundation is carried sideways and back, a true column rides with it, loose slabs lag and lean, and the landing spot drifts while your slab slides. Grey boxes still."
   ]
 }
