@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 93 — World 2 parked (internal)
+
+- **The Descent is off the carousel again.** The cutting wheel didn't survive contact with a phone. Hearth is the game; the work goes back to it.
+
 ## Build 92 — The cutting wheel (internal)
 
 - **World 2 is the cutting wheel, and it's in the game.** Eight depths on Hearth's engine with one change at the foundation: your tower stands on a **cradle** on the axle of a spiked wheel sunk in the earth. Drop a slab **over the axle** (the pale groove) and it's true: the cradle steadies. Drop it **on a treadle pad** (the orange marks, riding slowly in and out along the cradle) and it kicks the wheel; the wheel cuts the earth and the depth's painting scrolls past as you go down. Spin fades in a couple of seconds, so you keep feeding it — and every kick leans the cradle, which you balance by alternating sides. Lean on its stop for a moment and the tower goes over.

@@ -41,25 +41,27 @@ export const WORLDS: WorldDef[] = [
       [0.78, 0.1],
     ],
   },
-  {
-    id: "descent",
-    name: "The Descent",
-    blurb: "The cutting wheel. Weight on its edge drives it down through the earth.",
-    concept: "The Spire's roots, hung down a shaft into stone older than the tower.",
-    levelIds: ["roots", "ossuary", "drowned", "crystal", "furnace", "quiet", "hollow", "floor"],
-    revelation: "They stopped. That is all. The builders stopped.",
-    stars: [
-      [0.72, 0.5],
-      [0.78, 0.56],
-      [0.74, 0.63],
-      [0.81, 0.68],
-      [0.77, 0.75],
-      [0.84, 0.8],
-      [0.8, 0.87],
-      [0.86, 0.93],
-    ],
-  },
 ];
+
+/** The Descent, parked again (Oct 10, 2026) after the cutting-wheel build: see BACKLOG. Its depths stay in LEVELS. */
+export const DESCENT: WorldDef = {
+  id: "descent",
+  name: "The Descent",
+  blurb: "The cutting wheel. Weight on its edge drives it down through the earth.",
+  concept: "The Spire's roots, hung down a shaft into stone older than the tower.",
+  levelIds: ["roots", "ossuary", "drowned", "crystal", "furnace", "quiet", "hollow", "floor"],
+  revelation: "They stopped. That is all. The builders stopped.",
+  stars: [
+    [0.72, 0.5],
+    [0.78, 0.56],
+    [0.74, 0.63],
+    [0.81, 0.68],
+    [0.77, 0.75],
+    [0.84, 0.8],
+    [0.8, 0.87],
+    [0.86, 0.93],
+  ],
+};
 
 /** The Ring, parked (Oct 2026) until its grey-box page is judged fun. Its skies stay in LEVELS. */
 export const RING: WorldDef = {
@@ -78,6 +80,7 @@ export const RING: WorldDef = {
 
 /** Worlds yet to be written sit on the map as dark patches. */
 export const WORLDS_TO_COME = [
+  { id: "descent", name: "The Descent", blurb: "A world that goes down.", at: [0.78, 0.62] },
   { id: "ring", name: "The Ring", blurb: "A world that turns.", at: [0.22, 0.22] },
 ] as const;
 
@@ -86,6 +89,7 @@ export function levelsOf(world: WorldDef): LevelDef[] {
 }
 
 export function worldOf(levelId: string): WorldDef {
+  if (DESCENT.levelIds.includes(levelId)) return DESCENT;
   if (RING.levelIds.includes(levelId)) return RING;
   return WORLDS.find((w) => w.levelIds.includes(levelId)) ?? WORLDS[0]!;
 }
