@@ -5360,7 +5360,10 @@ export class SpireEngine {
       this.slabLookNow = null;
     }
     if (live && this.mote) this.drawMote(ctx);
-    if (this.cut) this.drawCutArm(ctx);
+    if (this.cut) {
+      this.drawPads(ctx);
+      this.drawCutArm(ctx);
+    }
     this.fx.draw(ctx, this.worldToScreen);
     this.drawBolts(ctx);
     this.drawFlares(ctx);
@@ -5781,7 +5784,14 @@ export class SpireEngine {
       ctx.stroke();
     }
     ctx.restore();
-    // The pads and the groove, on the cradle, turning with it.
+  }
+
+  /** The pads and the groove on the cradle's front face, drawn over the slab so they can be seen. */
+  private drawPads(ctx: CanvasRenderingContext2D): void {
+    const c = this.cut;
+    const base = this.stack[0];
+    if (!c || !base || base.body === null || !this.stage) return;
+    const clock = this.reduceMotion ? 0 : this.clock;
     const view = this.stage.read(base.body);
     if (!view) return;
     const cp = this.worldToScreen(view.cx, view.cy);
