@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Cutting wheel grey box</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0a0608;
+        color: #e8dcc8;
+        font:
+          14px system-ui,
+          sans-serif;
+        overflow: hidden;
+        touch-action: manipulation;
+        user-select: none;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+      }
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        text-shadow: 0 1px 3px #000;
+      }
+      #hud b {
+        font-size: 28px;
+      }
+      #keys {
+        position: fixed;
+        bottom: 12px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div><b id="n">0</b>/<span id="goal">40</span> m cut</div>
+      <div id="r"></div>
+    </div>
+    <div id="keys">tap to drop · weight on the edge kicks the wheel · R: restart</div>
+    <script src="https://cdn.jsdelivr.net/npm/planck@1.5.0/dist/planck.min.js"></script>
+    <script>
+      // ---------------------------------------------------------------------
+      // The cutting wheel, in grey boxes. A spiked wheel sits in the earth
+      // below; above it, on its axle, a cradle the tower stands on. The
+      // cradle is a treadle: a slab landing off-centre tips it, and each tip
+      // kicks the wheel round through a pawl. Spin cuts the earth (the strata
+      // scroll up past you); spin decays, so you keep feeding it. A centred
+      // drop welds and re-levels the cradle: safe, but it buys no spin. The
+      // Dark follows you down from above; cut faster than it falls. Reach the
+      // depth and you break through. Lean too far and the tower slides off.
+      // ---------------------------------------------------------------------
+      const { World, Vec2, Box, RevoluteJoint, WeldJoint } = planck;
+      const params = new URLSearchParams(location.search);
+      const PPM = 40;
+      const W = 440,
+        H = 956;
+      const SLAB_W = 140,
+        SLAB_H = 26;
+      const WHEEL_R = 150,
+        CRADLE_W = 220;
+      const GOAL = Number(params.get("goal") || 40); // metres of earth to cut
+      const KICK = Number(params.get("kick") || 2.6); // spin per px of off-centre landing (×0.01)
+      const SPIN_DECAY = Number(params.get("decay") || 2.6); // seconds for spin to fall by e
+      const CUT = 0.7; // metres cut per second per unit of spin
+      const DARK_RATE = Number(params.get("dark") || 0.55); // metres per second the Dark falls
+      const SLIDE = 1.4; // half-spans per second
+      const PERFECT = 12;
+      const cv = document.getElementById("c");
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      cv.width = W * dpr;
+      cv.height = H * dpr;
+      cv.style.width = W + "px";
+      cv.style.height = H + "px";
+      const ctx = cv.getContext("2d");
+      const m = (p) => p / PPM,
+        px = (q) => q * PPM;
+
+      let world,
+        axle,
+        cradle,
+        slabs,
+        mover,
+        falling,
+        spin,
+        wheelA,
+        depth,
+        darkGap,
+        time,
+        over,
+        floats,
+        flash,
+        shake,
+        lost,
+        kickT,
+        camY,
+        tipT;
+      function reset() {
+        world = new World({ gravity: Vec2(0, 9.8) });
+        axle = world.createBody({ type: "static", position: Vec2(0, 0) });
+        // The cradle: a bar pivoting on the axle, sprung to level, the tower's foundation.
+        // The cradle pivots about its own centre, on a post up from the axle; it can tip ±20°.
+        cradle = world.createBody({
+          type: "dynamic",
+          position: Vec2(0, m(-WHEEL_R - 16)),
+          angularDamping: 3,
+        });
+        cradle.createFixture(Box(m(CRADLE_W / 2), m(10)), { density: 4, friction: 1 });
+        world.createJoint(
+          RevoluteJoint(
+            { enableLimit: true, lowerAngle: -0.35, upperAngle: 0.35 },
+            axle,
+            cradle,
+            Vec2(0, m(-WHEEL_R - 16)),
+          ),
+        );
+        slabs = [];
+        falling = null;
+        lost = 0;
+        spin = 0;
+        wheelA = 0;
+        depth = 0;
+        darkGap = 9;
+        kickT = 0;
+        camY = 0;
+        tipT = 0;
+        time = 0;
+        over = null;
+        floats = [];
+        flash = 0;
+        shake = 0;
+        spawn();
+      }
+      function towerTop() {
+        const b = slabs.length ? slabs[slabs.length - 1].body : cradle;
+        const p = b.getPosition();
+        const h = slabs.length ? SLAB_H / 2 : 10;
+        return {
+          x: px(p.x),
+          y: px(p.y) - h,
+          w: slabs.length ? slabs[slabs.length - 1].w : CRADLE_W,
+          angle: b.getAngle(),
+          body: b,
+        };
+      }
+      function spawn() {
+        const t = towerTop();
+        const dir = slabs.length % 2 ? -1 : 1;
+        const w = slabs.length ? slabs[slabs.length - 1].w : SLAB_W;
+        mover = {
+          u: -dir,
+          dir,
+          w,
+          y: t.y - SLAB_H * 3.2,
+          center: t.x,
+          half: Math.max(100, t.w * 0.9),
+        };
+      }
+      function tap() {
+        if (over || !mover) return;
+        const t = towerTop();
+        const x = mover.center + mover.u * mover.half;
+        const err = x - t.x;
+        const overlap = t.w - Math.abs(err);
+        if (overlap < 24) {
+          floats.push({ t: "MISSED", c: "#c44", y: 0 });
+          lost += 1;
+          shake = 0.6;
+          if (lost >= 3) over = "fallen";
+          return;
+        }
+        const body = world.createBody({
+          type: "dynamic",
+          position: Vec2(m(x), m(mover.y + SLAB_H / 2)),
+          angle: 0,
+          linearDamping: 0.1,
+          angularDamping: 0.3,
+          bullet: true,
+        });
+        body.createFixture(Box(m(mover.w / 2), m(SLAB_H / 2)), { density: 1, friction: 0.8 });
+        falling = { body, w: mover.w, age: 0 };
+        mover = null;
+      }
+      /** The slab has come to rest: centred welds and steadies the cradle; off-centre kicks the wheel. */
+      function land() {
+        const f = falling;
+        falling = null;
+        const t = towerTop();
+        const below = t.body;
+        const bp = below.getWorldCenter();
+        const fp = f.body.getWorldCenter();
+        const ba = below.getAngle();
+        const along = px(Math.cos(ba) * (fp.x - bp.x) + Math.sin(ba) * (fp.y - bp.y));
+        // Off the cradle's centre line: the kick, and the risk. Measured from the axle, not the slab below.
+        const offAxle = px(fp.x);
+        // Centred means over the axle: no lever arm, nothing to kick, and the cradle steadies.
+        const centred = Math.abs(offAxle) < PERFECT;
+        void along;
+        // Every slab that lands sets to what it's on: the tower is one stone. The risk is
+        // the cradle's lean (its weight against the axle), which you balance by alternating sides.
+        f.body.setAngularVelocity(0);
+        f.body.setLinearVelocity(Vec2(0, 0));
+        world.createJoint(WeldJoint({}, below, f.body, f.body.getWorldCenter()));
+        if (centred) {
+          // Steadies the cradle: the crew re-levels the tower.
+          cradle.setAngularVelocity(cradle.getAngularVelocity() * 0.3);
+          floats.push({ t: "TRUE · STEADY", c: "#ffd27a", y: 0 });
+          flash = 0.3;
+        } else {
+          const kick = Math.abs(offAxle) * KICK * 0.01;
+          spin += kick;
+          kickT = 0.25;
+          floats.push({ t: "KICK " + kick.toFixed(1), c: "#ffb060", y: 0 });
+          shake = 0.3;
+        }
+        slabs.push({ body: f.body, w: f.w, centred });
+        spawn();
+      }
+
+      function step(dt) {
+        time += dt;
+        if (!over) {
+          // The cradle is sprung to level; the tower's weight fights it.
+          // Sprung to level, scaled to what it carries: an unbalanced tower still wins slowly.
+          const I = cradle.getInertia() + slabs.reduce((a, s) => a + s.body.getMass() * 0.6, 0);
+          cradle.applyTorque((-cradle.getAngle() * 60 - cradle.getAngularVelocity() * 8) * I, true);
+          if (mover) {
+            mover.u += mover.dir * SLIDE * dt;
+            if (mover.u > 1) {
+              mover.u = 1;
+              mover.dir = -1;
+            } else if (mover.u < -1) {
+              mover.u = -1;
+              mover.dir = 1;
+            }
+          }
+          // Spin cuts and decays; the Dark falls; the cut carries you down away from it.
+          spin = Math.max(0, spin - (spin / SPIN_DECAY) * dt);
+          const cut = spin * CUT * dt;
+          depth += cut;
+          wheelA += spin * dt * 2.2;
+          darkGap += cut - DARK_RATE * dt;
+          if (darkGap <= 0) over = "taken";
+          if (depth >= GOAL) over = "through";
+          // Leaning on its stop for a moment, the tower goes over: it comes loose and falls.
+          if (Math.abs(cradle.getAngle()) > 0.33) tipT += dt;
+          else tipT = Math.max(0, tipT - dt * 2);
+          if (tipT > 0.6) {
+            over = "fallen";
+            for (let j = world.getJointList(); j; j = j.getNext())
+              if (j.getType() === "weld-joint") world.destroyJoint(j);
+            shake = 1;
+          }
+        }
+        world.step(1 / 60, 10, 6);
+        if (!over && falling) {
+          falling.age += dt;
+          const v = falling.body.getLinearVelocity();
+          const p = falling.body.getPosition();
+          if (px(p.y) > 0 || Math.abs(px(p.x)) > 500) {
+            world.destroyBody(falling.body);
+            falling = null;
+            lost += 1;
+            shake = 0.8;
+            floats.push({ t: "FELL", c: "#c44", y: 0 });
+            if (lost >= 3) over = "fallen";
+            else spawn();
+          } else {
+            // Landed only when it is touching something and at rest: a slab sliding off is never counted.
+            let touching = false;
+            for (let ce = falling.body.getContactList(); ce; ce = ce.next)
+              if (ce.contact.isTouching()) touching = true;
+            if (touching && falling.age > 0.15) {
+              // On first contact: its centre over the stone below and it sets at once, part of the
+              // tower before the cradle can tip it off; its centre past the edge and it goes over.
+              const t = towerTop();
+              const bp = t.body.getWorldCenter();
+              const ba = t.body.getAngle();
+              const along = px(Math.cos(ba) * (p.x - bp.x) + Math.sin(ba) * (p.y - bp.y));
+              const resting =
+                Math.hypot(v.x, v.y) < 0.2 && Math.abs(falling.body.getAngularVelocity()) < 0.4;
+              if (Math.abs(along) < t.w / 2 - 6 || (falling.age > 0.4 && resting)) land();
+            }
+          }
+        }
+        if (!over) {
+          for (let i = slabs.length - 1; i >= 0; i--) {
+            const p = slabs[i].body.getPosition();
+            if (px(p.y) > 0 || Math.abs(px(p.x)) > 500) {
+              world.destroyBody(slabs[i].body);
+              slabs.splice(i, 1);
+              lost += 1;
+              shake = 0.8;
+              floats.push({ t: "FELL", c: "#c44", y: 0 });
+            }
+          }
+          if (lost >= 3) over = "fallen";
+        }
+        const t = towerTop();
+        if (mover) mover.center += (t.x - mover.center) * Math.min(1, dt / 0.9);
+        camY += (Math.min(0, t.y + WHEEL_R + 160) - camY) * Math.min(1, dt * 3);
+        kickT = Math.max(0, kickT - dt);
+        flash = Math.max(0, flash - dt);
+        shake = Math.max(0, shake - dt * 2);
+        for (const f of floats) f.y += dt;
+        floats = floats.filter((f) => f.y < 1);
+        document.getElementById("n").textContent = Math.floor(depth);
+        document.getElementById("r").innerHTML =
+          `spin <b>${spin.toFixed(1)}</b> · Dark <b>${Math.max(0, darkGap).toFixed(1)}</b> m above${over ? " · " + over : ""}<br>${time.toFixed(1)} s`;
+      }
+
+      function slabRect(body, w, color) {
+        const p = body.getPosition();
+        ctx.save();
+        ctx.translate(px(p.x), px(p.y));
+        ctx.rotate(body.getAngle());
+        ctx.fillStyle = color;
+        ctx.fillRect(-w / 2, -SLAB_H / 2, w, SLAB_H);
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillRect(-w / 2, SLAB_H / 2 - 5, w, 5);
+        ctx.restore();
+      }
+      function draw() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = "#0b0709";
+        ctx.fillRect(0, 0, W, H);
+        const ox = W / 2 + (shake > 0 ? Math.sin(time * 60) * shake * 6 : 0);
+        const oy = H * 0.66 - camY; // the axle's screen y
+        // The earth: strata scrolling up as you cut down; the shaft the wheel has cut is clear.
+        const stratum = 90;
+        const scroll = (depth * PPM) % stratum;
+        for (let y = oy - 60 - stratum * 3 + scroll; y < H + stratum; y += stratum) {
+          ctx.fillStyle = Math.round((y - scroll) / stratum) % 2 ? "#2a1c17" : "#352521";
+          ctx.fillRect(0, y, W, stratum);
+        }
+        ctx.fillStyle = "#0b0709";
+        ctx.fillRect(ox - WHEEL_R - 30, -20, WHEEL_R * 2 + 60, oy + 20);
+        // The Dark, pouring down the shaft from above: its front is darkGap metres above the tower's top.
+        const t = towerTop();
+        const darkY = oy + t.y - darkGap * PPM * 1.2;
+        const dg = ctx.createLinearGradient(0, darkY - 80, 0, darkY);
+        dg.addColorStop(0, "rgba(40,20,60,0.95)");
+        dg.addColorStop(1, "rgba(40,20,60,0.75)");
+        ctx.fillStyle = dg;
+        ctx.fillRect(0, -20, W, darkY + 20);
+        ctx.strokeStyle = "rgba(170,110,255,0.6)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, darkY);
+        ctx.lineTo(W, darkY);
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(ox, oy);
+        // The wheel, spiked, turning with its spin; blurred spokes when fast.
+        ctx.save();
+        ctx.rotate(wheelA);
+        ctx.fillStyle = "#4a3a2e";
+        ctx.beginPath();
+        ctx.arc(0, 0, WHEEL_R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#8a7050";
+        for (let i = 0; i < 18; i++) {
+          const a = (i / 18) * Math.PI * 2;
+          ctx.save();
+          ctx.rotate(a);
+          ctx.beginPath();
+          ctx.moveTo(WHEEL_R - 6, -9);
+          ctx.lineTo(WHEEL_R + 18, 0);
+          ctx.lineTo(WHEEL_R - 6, 9);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.strokeStyle = `rgba(255,200,130,${Math.max(0.15, 0.5 - spin * 0.08)})`;
+        ctx.lineWidth = 4;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a) * WHEEL_R, Math.sin(a) * WHEEL_R);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#2a1c17";
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        // The pawl: it kicks when a slab lands off-centre.
+        ctx.strokeStyle = kickT > 0 ? "#ffd27a" : "#9a7a50";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(-CRADLE_W / 2 - 20, -WHEEL_R - 16);
+        ctx.lineTo(-WHEEL_R - 10, -(kickT > 0 ? 20 : 40));
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(CRADLE_W / 2 + 20, -WHEEL_R - 16);
+        ctx.lineTo(WHEEL_R + 10, -(kickT > 0 ? 20 : 40));
+        ctx.stroke();
+        // The cradle, with its lever bands either side and the groove at the centre.
+        const cp = cradle.getPosition();
+        ctx.save();
+        ctx.translate(px(cp.x), px(cp.y));
+        ctx.rotate(cradle.getAngle());
+        ctx.fillStyle = "#8a6a46";
+        ctx.fillRect(-CRADLE_W / 2, -10, CRADLE_W, 20);
+        const mx = mover ? mover.center + mover.u * mover.half - px(cp.x) : 999;
+        const onBand = Math.abs(mx) > PERFECT && Math.abs(mx) < CRADLE_W / 2;
+        ctx.fillStyle = onBand ? "rgba(255,176,96,0.9)" : "rgba(255,176,96,0.35)";
+        ctx.fillRect(-CRADLE_W / 2, -14, CRADLE_W / 2 - PERFECT, 4);
+        ctx.fillRect(PERFECT, -14, CRADLE_W / 2 - PERFECT, 4);
+        ctx.fillStyle = Math.abs(mx) <= PERFECT ? "#fff0c0" : "rgba(255,240,192,0.4)";
+        ctx.fillRect(-PERFECT, -16, PERFECT * 2, 6);
+        ctx.restore();
+        for (const s of slabs) slabRect(s.body, s.w, s.centred ? "#c9a56a" : "#b07a48");
+        if (falling) slabRect(falling.body, falling.w, "#d9a060");
+        if (!over && mover) {
+          const x = mover.center + mover.u * mover.half,
+            y = mover.y;
+          ctx.fillStyle = "#d9a060";
+          ctx.fillRect(x - mover.w / 2, y, mover.w, SLAB_H);
+          ctx.strokeStyle = "rgba(255,220,160,0.3)";
+          ctx.setLineDash([4, 5]);
+          ctx.beginPath();
+          ctx.moveTo(x, y + SLAB_H);
+          ctx.lineTo(x, t.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+        if (flash > 0) {
+          ctx.fillStyle = `rgba(255,230,190,${flash * 0.3})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+        ctx.font = "bold 22px system-ui";
+        ctx.textAlign = "center";
+        floats.forEach((f) => {
+          ctx.globalAlpha = 1 - f.y;
+          ctx.fillStyle = f.c;
+          ctx.fillText(f.t, W / 2, oy + t.y - 60 - f.y * 30);
+        });
+        ctx.globalAlpha = 1;
+        if (over) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 34px system-ui";
+          ctx.fillText(
+            over === "through"
+              ? "BROKEN THROUGH"
+              : over === "taken"
+                ? "THE LIGHT IS BURIED"
+                : "THE TOWER FELL",
+            W / 2,
+            H * 0.14,
+          );
+        }
+      }
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        step(dt);
+        draw();
+        requestAnimationFrame(frame);
+      }
+      addEventListener("pointerdown", (e) => {
+        if (e.target === cv) over ? reset() : tap();
+      });
+      addEventListener("keydown", (e) => {
+        if (e.key === "r") reset();
+        else if (e.key === " ") tap();
+      });
+      reset();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
