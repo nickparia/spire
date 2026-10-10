@@ -1,7 +1,9 @@
 {
-  "build": 90,
-  "title": "The Ring, parked",
+  "build": 91,
+  "title": "The cutting wheel",
   "notes": [
-    "The Ring is off the carousel until its gameplay is right in plain shapes. It sits on the map as a world to come."
+    "World 2 is the cutting wheel: your tower stands on a cradle on the axle of a spiked wheel. Drop over the axle to steady it; drop on a treadle pad to kick the wheel and cut down through the earth, balancing the lean.",
+    "The Dark follows from above; its arm takes anything dropped on its side for a while.",
+    "Grey-box art on purpose until the loop is right in your hands."
   ]
 }

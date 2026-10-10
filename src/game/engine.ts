@@ -74,7 +74,7 @@ import {
 } from "./logic";
 import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
-import { LEVEL_TILT, Stage } from "./physics";
+import { CRADLE_STOP, LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
 import { finishWorn, trailWorn, type FinishId, type TrailId } from "./finishes";
 import {
@@ -290,6 +290,24 @@ const ESCAPE_STING = 5;
 const ESCAPE_CHAIN_STEP = 0.07;
 /** Floors below the top that light can drive the Dark, and no further. */
 const DARK_REACH = 8;
+/** The cutting wheel: the cradle's width; the wheel's radius; metres the Dark starts above the top. */
+const CRADLE_W = 220;
+const WHEEL_R = 150;
+const CUT_GAP0 = 9;
+/** Spin bought per px of a pad's lever arm (×0.01); seconds for spin to fall by e; metres cut per second per spin. */
+const CUT_KICK = 3.4;
+const CUT_DECAY = 2.6;
+const CUT_RATE = 0.35;
+/** The Dark's fall, metres per second, and how often (s) and how long (s) its arm is out. */
+const CUT_DARK = 0.2;
+const CUT_ARM_EVERY = 9;
+const CUT_ARM_DUR = 6;
+/** The treadle pads' reach from the axle, px, and their half width. */
+const PAD_MIN = 34;
+const PAD_MAX = 88;
+const PAD_HALF = 18;
+/** Px per metre of earth, for the Dark's distance on screen. */
+const CUT_PPM = 40;
 /** Seconds a landing's omen plays before the cards are dealt. */
 const OMEN_SECONDS = 1.6;
 /** Past par, the Dark climbs this much faster per second over, called out every QUICKEN_EVERY seconds. */
@@ -484,6 +502,8 @@ type Slab = {
   body: number | null;
   /** On the stage: landed off the groove, so it sits unset, a hinge in the tower. */
   loose: boolean;
+  /** The cutting wheel: what this slab owes the wheel once it lands. */
+  kick?: "due" | "steady" | "done";
   /** On the stage: landed close enough to the groove to be a floor. Anything else is rubble. */
   counts: boolean;
   /** Laid under a gift: it keeps that element's living look. */
@@ -833,9 +853,23 @@ export class SpireEngine {
   private dDark: HTMLVideoElement | null = null;
   private lightReach = 0.6;
   private rockShake = 0;
-  /** The Descent: the Dark's arms out of the shaft walls, for the view (side, world y, age), and their clock. */
-  private arms: { side: number; y: number; t: number }[] = [];
-  private armT = 0;
+  /**
+   * The cutting wheel: its spin, the metres cut, the Dark's distance above
+   * the tower's top (metres), the wheel's angle, the pawls' flash, how long
+   * the cradle has leant on its stop, the two treadle pads (each riding in
+   * and out on its own slow sine) and the Dark's arm out of one wall.
+   */
+  private cut: {
+    spin: number;
+    depth: number;
+    gap: number;
+    wheelA: number;
+    kickT: number;
+    tipT: number;
+    pads: { side: number; ph: number; rate: number }[];
+    arm: { side: number; t: number } | null;
+    armT: number;
+  } | null = null;
   /** Seconds until the drill's HUD (depth, the oil's gap) is sent again. */
   private emitCooldown = 0;
   /** How the slab being painted looks: alight, frozen, charged, or plain. */
@@ -1350,8 +1384,22 @@ export class SpireEngine {
     this.loadSourceArt();
     this.loadDarkArt();
     this.resetRun("ready", true);
-    this.arms = [];
-    this.armT = this.armEvery() * 0.8;
+    this.cut = this.plan.cut
+      ? {
+          spin: 0,
+          depth: 0,
+          gap: CUT_GAP0,
+          wheelA: 0,
+          kickT: 0,
+          tipT: 0,
+          pads: [
+            { side: -1, ph: Math.random() * 6, rate: 0.35 },
+            { side: 1, ph: Math.random() * 6, rate: 0.27 },
+          ],
+          arm: null,
+          armT: CUT_ARM_EVERY,
+        }
+      : null;
     this.music.setTrack(this.theme.track);
     this.music.setMood("play");
     this.music.setTension(0);
@@ -1442,7 +1490,13 @@ export class SpireEngine {
       this.stage = new Stage();
       this.trial = null;
       this.applySway();
-      this.stack[0]!.body = this.stage.addStatic(-this.startW / 2, 0, this.startW, SLAB_H);
+      this.stack[0]!.body = this.plan.cut
+        ? this.stage.addCradle(-CRADLE_W / 2, 0, CRADLE_W, SLAB_H)
+        : this.stage.addStatic(-this.startW / 2, 0, this.startW, SLAB_H);
+      if (this.plan.cut) {
+        this.stack[0]!.x = -CRADLE_W / 2;
+        this.stack[0]!.w = CRADLE_W;
+      }
     }
     this.seat = { x: 0, y: SLAB_H };
     this.slowmo = 0;
@@ -1589,8 +1643,9 @@ export class SpireEngine {
       }
     }
     const course: CourseId = this.boss ? "slide" : this.plan.courseAt(this.floors);
-    const halfSpan = Math.max(w * 0.98, 80);
-    const center = prev.x + prev.w / 2;
+    // On the cutting wheel the crane swings over the whole cradle, about the axle.
+    const halfSpan = this.plan.cut ? CRADLE_W * 0.6 : Math.max(w * 0.98, 80);
+    const center = this.plan.cut ? 0 : prev.x + prev.w / 2;
     this.dir = -this.dir;
     const dir = this.dir;
     const fall = this.plan.fallAt(this.floors);
@@ -2022,6 +2077,7 @@ export class SpireEngine {
       const want = this.seat.y + SLAB_H * 2;
       this.mover.y += (want - this.mover.y) * Math.min(1, dt * 6);
     }
+    if (this.plan.cut && this.phase === "play") this.judgeCut();
     if (this.phase === "play") {
       const reached = this.floorsNow();
       if (reached !== this.floors) {
@@ -2041,7 +2097,10 @@ export class SpireEngine {
       // The summit counts once the top has stood at goal height for a
       // moment: not in passing, and not while a crooked slab beneath it is
       // about to crumble.
-      this.summitHold = this.plan.goal > 0 && reached >= this.plan.goal ? this.summitHold + dt : 0;
+      this.summitHold =
+        this.plan.goal > 0 && reached >= this.plan.goal && !this.plan.cut
+          ? this.summitHold + dt
+          : 0;
       if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD && !this.boss) {
         if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.lightTheSky();
         else this.win();
@@ -3273,6 +3332,7 @@ export class SpireEngine {
 
   /** Floors of tower still above the Dark. */
   private darkGap(): number {
+    if (this.cut) return Math.max(0, Math.round(this.cut.gap));
     return (this.crownY() - this.dark) / SLAB_H;
   }
 
@@ -3309,6 +3369,7 @@ export class SpireEngine {
     if (
       !practice &&
       this.plan.darkRate > 0 &&
+      !this.plan.cut &&
       this.phase === "play" &&
       this.freeze <= 0 &&
       this.breather <= 0
@@ -3656,6 +3717,12 @@ export class SpireEngine {
           x: perfect ? prev.x + prev.w / 2 : m.x2,
           w: m.w / 2,
         };
+      } else if (this.plan.cut) {
+        // Over the axle is true: nothing to kick, and the cradle steadies. Everything
+        // else is a weight on a lever, judged by where it lands (see settle).
+        const offAxle = m.x + m.w / 2;
+        perfect = Math.abs(offAxle) <= this.tol;
+        x = perfect ? -m.w / 2 : m.x;
       } else {
         perfect = Math.abs(dx) <= this.tol;
         x = perfect ? prev.x + prev.w / 2 - m.w / 2 : m.x;
@@ -3725,10 +3792,13 @@ export class SpireEngine {
       // Set Stone from a landing: the next few slabs set and count wherever they land.
       const gifted = this.gift.set > 0;
       if (gifted) this.gift.set -= 1;
-      const onto = result.perfect || braced || gifted ? prev.body : null;
+      // On the cutting wheel every slab sets to what it lands on: the tower is one stone,
+      // and the cradle's lean is the whole of the risk.
+      const onto = result.perfect || braced || gifted || this.plan.cut ? prev.body : null;
       slab.body = this.stage.drop(result.x, this.mover.y, result.w, SLAB_H, onto);
-      slab.loose = !result.perfect && !braced && !gifted;
-      slab.counts = result.perfect || braced || gifted || result.close;
+      slab.loose = !result.perfect && !braced && !gifted && !this.plan.cut;
+      slab.counts = result.perfect || braced || gifted || result.close || !!this.plan.cut;
+      if (this.plan.cut) slab.kick = result.perfect ? "steady" : "due";
       if (gifted && !result.perfect)
         this.float("SET", result.x + result.w / 2, this.mover.y + 40, true, 20);
     }
@@ -4289,7 +4359,7 @@ export class SpireEngine {
 
   private win(): void {
     const level = LEVELS[this.levelIndex]!;
-    if (this.plan.descent) this.breakThrough();
+    if (this.cut) this.breakThrough();
     const accuracy = this.accuracy();
     const goals = goalsFor(this.runTime, accuracy, level.parTime, level.parAccuracy);
     // A rebuilt run can still light the sky, but it was not a clean climb.
@@ -4458,7 +4528,7 @@ export class SpireEngine {
       paused: this.paused,
       mode: this.mode,
       levelIndex: this.levelIndex,
-      floors: this.floors,
+      floors: this.cut ? Math.floor(this.cut.depth) : this.floors,
       goal: this.plan.goal,
       score: this.score,
       streak: this.streak,
@@ -4577,7 +4647,7 @@ export class SpireEngine {
         this.emit();
       }
     }
-    if (this.plan.descent && this.phase === "play" && !this.ascent) this.stepArms(dt);
+    if (this.cut && this.phase === "play" && !this.ascent) this.stepCut(dt);
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
     const prev = this.peak();
@@ -5197,7 +5267,9 @@ export class SpireEngine {
       horizon: this.horizonY,
       camX: this.camX + this.look,
       camY: this.camY - this.anchor,
-      altitude: clamp01((this.camY - this.anchor) / Math.max(1, this.climb() - this.viewH * LEAD)),
+      altitude: this.cut
+        ? clamp01(this.cut.depth / Math.max(1, this.plan.goal))
+        : clamp01((this.camY - this.anchor) / Math.max(1, this.climb() - this.viewH * LEAD)),
       clock: this.clock,
       pulse: this.pulse,
       flare: this.flare,
@@ -5230,13 +5302,13 @@ export class SpireEngine {
     }
 
     this.fx.down = 1;
-    if (this.plan.descent) this.drawLift(ctx);
+    if (this.cut) this.drawWheel(ctx);
     else if (this.paintedSky()) this.drawPaintedGround(ctx);
     else this.drawGround(ctx);
     this.drawGhost(ctx);
     if (!this.escape) this.drawSummitLine(ctx);
     if (this.kit.sight && !this.mover.split) this.drawSight(ctx);
-    if (!this.plan.descent) this.drawPlinth(ctx);
+    if (!this.plan.descent && !this.cut) this.drawPlinth(ctx);
     if (this.bedrockGone >= 0) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - this.bedrockGone / 1.2);
@@ -5258,14 +5330,13 @@ export class SpireEngine {
       this.drawSlab(ctx, slab, (inZone || beat) && slab === prev);
     }
     this.slabLookNow = null;
-    if (this.plan.descent) this.drawArms(ctx);
     if (this.stage && aiming && this.phase !== "menu") this.drawPlumb(ctx, prev);
     if (this.phase === "play" && this.ghost) this.drawGhostLine(ctx);
     for (const scrap of this.scraps) this.drawScrap(ctx, scrap);
     const live = aiming && this.phase !== "menu";
     // Once the sky is won the Dark is gone: the pull-back must not reveal it.
     if (this.plan.darkRate > 0 && this.phase !== "menu" && this.phase !== "won" && !this.escape) {
-      if (this.plan.descent) this.drawDarkAbove(ctx);
+      if (this.cut) this.drawCutDark(ctx);
       else if (this.ascent && this.blindArt) this.drawBlind(ctx);
       else this.drawDark(ctx);
     }
@@ -5289,6 +5360,7 @@ export class SpireEngine {
       this.slabLookNow = null;
     }
     if (live && this.mote) this.drawMote(ctx);
+    if (this.cut) this.drawCutArm(ctx);
     this.fx.draw(ctx, this.worldToScreen);
     this.drawBolts(ctx);
     this.drawFlares(ctx);
@@ -5516,201 +5588,6 @@ export class SpireEngine {
     ctx.restore();
   }
 
-  /** The Descent's shaft half width at this depth, px: it narrows with every depth. */
-  private shaftHalf(): number {
-    const tier = this.mode === "level" ? (LEVELS[this.levelIndex]?.tier ?? 0) : 0;
-    return 200 - tier * 10;
-  }
-
-  /** Seconds between the Dark's arms at this depth; 0 for none. */
-  private armEvery(): number {
-    if (!this.plan.descent) return 0;
-    const tier = this.mode === "level" ? (LEVELS[this.levelIndex]?.tier ?? 0) : 0;
-    return [0, 0, 9, 8, 7, 7, 6, 5][tier] ?? 5;
-  }
-
-  /**
-   * The Dark's arms: out of a shaft wall, a shove at one of the top slabs,
-   * then gone. The stack has to take it; the topple is the risk.
-   */
-  private stepArms(dt: number): void {
-    for (const a of this.arms) a.t += dt;
-    this.arms = this.arms.filter((a) => a.t < 1);
-    const every = this.armEvery();
-    if (every <= 0 || !this.stage || this.stack.length < 3 || this.freeze > 0) return;
-    this.armT -= dt;
-    if (this.armT > 0) return;
-    this.armT = every * (0.7 + Math.random() * 0.6);
-    const tier = LEVELS[this.levelIndex]?.tier ?? 0;
-    const side = Math.random() < 0.5 ? -1 : 1;
-    const i =
-      this.stack.length - 1 - Math.floor(Math.random() * Math.min(3, this.stack.length - 1));
-    const slab = this.stack[i]!;
-    if (slab.body === null) return;
-    this.stage.shove(slab.body, -side * (120 + tier * 14));
-    this.arms.push({ side, y: slab.y + SLAB_H / 2, t: 0 });
-    const wall = this.shaftHalf() + 20;
-    this.fx.burst(side * wall, slab.y + SLAB_H / 2, this.rockRgb(), 14, 180);
-    this.sfx.rubble();
-    this.trauma = Math.min(1, this.trauma + 0.35);
-    haptics.medium();
-  }
-
-  /** The arm as it comes: the painted sheet, mirrored for the right wall. */
-  private drawArms(ctx: CanvasRenderingContext2D): void {
-    if (this.arms.length === 0) return;
-    const claw = this.sprite("claw");
-    const shaft = this.shaftHalf();
-    for (const a of this.arms) {
-      const p = this.worldToScreen(a.side * (shaft + 40), a.y);
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.scale(-a.side, 1);
-      ctx.globalAlpha = a.t < 0.1 ? a.t / 0.1 : a.t > 0.85 ? (1 - a.t) / 0.15 : 1;
-      if (claw) {
-        const size = shaft * 1.9;
-        const frame = Math.min(claw.frames - 1, Math.floor(a.t * claw.frames));
-        ctx.drawImage(
-          claw.img,
-          frame * claw.cell,
-          0,
-          claw.cell,
-          claw.cell,
-          -size * 0.08,
-          -size / 2,
-          size,
-          size,
-        );
-      } else {
-        const reach = Math.sin(Math.min(1, a.t) * Math.PI) * shaft * 0.75;
-        ctx.fillStyle = "rgb(30,14,46)";
-        ctx.beginPath();
-        ctx.moveTo(0, -30);
-        ctx.quadraticCurveTo(reach * 0.5, -26, reach, -6);
-        ctx.lineTo(reach * 0.9, 8);
-        ctx.quadraticCurveTo(reach * 0.5, 28, 0, 32);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-  }
-
-  /**
-   * The lift: the drill's platform the tower stands on, hung on two chains
-   * from the winch above, the machine under it with its bit pointing down
-   * the shaft. It's what's being lowered; the tower rides it.
-   */
-  private drawLift(ctx: CanvasRenderingContext2D): void {
-    const base = this.stack[0];
-    if (!base) return;
-    const w = this.startW + 60;
-    const c = this.worldToScreen(0, 0);
-    const left = c.x - w / 2;
-    // The chains, up out of sight. They sway a little with the lift.
-    const sway = this.reduceMotion ? 0 : Math.sin(this.clock * 0.7) * 3;
-    ctx.save();
-    ctx.lineCap = "round";
-    for (const x of [left + 10, left + w - 10]) {
-      for (let y = c.y - 6; y > -40; y -= 14) {
-        const cx = x + sway * ((c.y - y) / 400);
-        ctx.strokeStyle = "rgb(118,92,60)";
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(cx, y);
-        ctx.lineTo(cx, y - 12);
-        ctx.stroke();
-        ctx.fillStyle = "rgb(196,160,104)";
-        ctx.fillRect(cx - 4, y - 3, 8, 3);
-      }
-    }
-    ctx.restore();
-    // The machine under the plate, bit down.
-    let rig = this.sprites.get("drill-rig");
-    if (!rig) {
-      rig = Object.assign(new Image(), { src: "art/drill-rig.webp" });
-      this.sprites.set("drill-rig", rig);
-    }
-    if (rig.complete && rig.naturalWidth > 0 && c.y < this.vh + 60) {
-      const rw = w * 1.9;
-      const rh = rw * (rig.naturalHeight / rig.naturalWidth);
-      ctx.drawImage(rig, c.x - rw / 2, c.y + 8, rw, rh);
-    }
-    // The plate.
-    ctx.fillStyle = "rgba(0,0,0,0.4)";
-    ctx.fillRect(left - 6, c.y + 6, w + 12, 10);
-    this.paintSlab(ctx, left, c.y + 4, w, 22, [78, 58, 38], 1, 0, false);
-    ctx.fillStyle = "rgba(255,190,120,0.18)";
-    ctx.fillRect(left, c.y - 18, w, 2);
-  }
-
-  /**
-   * The Dark down the Descent: it pours down the shaft from above, its
-   * fringe of tendrils hanging the Dark's gap above the top of the tower.
-   * Same race as Hearth's, mirrored: the lift descends with every floor,
-   * the Dark follows.
-   */
-  private drawDarkAbove(ctx: CanvasRenderingContext2D): void {
-    const gap = Math.max(0, this.crownY() - this.darkShown);
-    const front = this.worldToScreen(0, this.crownY() + gap + SLAB_H * 0.5).y;
-    if (front > this.vh + 200) return;
-    const w = this.vw;
-    const bottom = Math.max(0, Math.min(this.vh, front + 70));
-    const v = this.descentDark();
-    const art = v ? this.frameOf(v, "art/dark-descent.jpg") : null;
-    const k = ctx.getTransform().a || 1;
-    const layer = this.scratch(0, Math.ceil(w * k), Math.ceil(Math.max(1, bottom) * k));
-    const lc = layer.getContext("2d")!;
-    lc.setTransform(k, 0, 0, k, 0, 0);
-    lc.globalCompositeOperation = "source-over";
-    lc.clearRect(0, 0, w, bottom);
-    lc.fillStyle = "rgb(6,3,10)";
-    lc.fillRect(-120, 0, w + 240, bottom);
-    if (art) {
-      const ow = w * 1.3;
-      const oh = ow * 1.78;
-      const breathe = this.reduceMotion ? 0 : Math.sin(this.clock * 0.8) * 6;
-      lc.drawImage(art, w / 2 - ow / 2, front + 60 + breathe - oh, ow, oh);
-    }
-    // Its fringe fades out, ragged, so there's no cut line against the shaft.
-    const mask = this.scratch(1, Math.ceil(w * k), Math.ceil(Math.max(1, bottom) * k));
-    const mc = mask.getContext("2d")!;
-    mc.setTransform(k, 0, 0, k, 0, 0);
-    mc.globalCompositeOperation = "source-over";
-    mc.clearRect(0, 0, w, bottom);
-    const clock = this.reduceMotion ? 0 : this.clock;
-    for (let x = -12; x < w + 12; x += 12) {
-      const rag = Math.sin(x * 0.17 + 1.3) * 10 + Math.sin(x * 0.043 + clock * 0.5) * 12;
-      const f = mc.createLinearGradient(0, front - 50 + rag, 0, front + 60 + rag);
-      f.addColorStop(0, "rgba(0,0,0,1)");
-      f.addColorStop(0.4, "rgba(0,0,0,1)");
-      f.addColorStop(1, "rgba(0,0,0,0)");
-      mc.fillStyle = f;
-      mc.fillRect(x, 0, 12, bottom);
-    }
-    lc.globalCompositeOperation = "destination-in";
-    lc.setTransform(1, 0, 0, 1, 0, 0);
-    lc.drawImage(mask, 0, 0);
-    lc.globalCompositeOperation = "source-over";
-    ctx.drawImage(layer, 0, 0, w * k, bottom * k, 0, 0, w, bottom);
-    // Its shadow on the shaft below the fringe.
-    const sh = ctx.createLinearGradient(0, front, 0, front + 100);
-    sh.addColorStop(0, "rgba(4,2,8,0.55)");
-    sh.addColorStop(1, "rgba(4,2,8,0)");
-    ctx.fillStyle = sh;
-    ctx.fillRect(-120, front, w + 240, 100);
-    // Motes drifting down off it when it is close.
-    if (!this.reduceMotion && this.darkGap() < 4 && Math.random() < 0.3) {
-      this.fx.sparkle(
-        this.camX + (Math.random() - 0.5) * this.vw * 0.6,
-        this.crownY() + gap,
-        40,
-        [170, 110, 255],
-        1,
-      );
-    }
-  }
-
   private scratches: HTMLCanvasElement[] = [];
 
   /** A scratch canvas at least this size, kept between frames. */
@@ -5734,6 +5611,271 @@ export class SpireEngine {
     this.trauma = 1;
     this.flash = Math.max(this.flash, 0.6);
     haptics.heavy();
+  }
+
+  /** Where a treadle pad sits now, px from the axle (signed). */
+  private padX(pad: { side: number; ph: number; rate: number }): number {
+    const u = 0.5 + 0.5 * Math.sin(this.runTime * pad.rate + pad.ph);
+    return pad.side * (PAD_MIN + (PAD_MAX - PAD_MIN) * u);
+  }
+
+  /**
+   * A slab that has just landed on the wheel's tower pays what it owes: over
+   * the axle it steadies the cradle; on a pad it kicks the wheel; on the
+   * arm's side it is taken. Judged where it came to rest, not where it was let go.
+   */
+  private judgeCut(): void {
+    const c = this.cut;
+    const stage = this.stage;
+    if (!c || !stage) return;
+    for (let i = this.stack.length - 1; i >= 1; i--) {
+      const slab = this.stack[i]!;
+      if (slab.kick !== "due" && slab.kick !== "steady") continue;
+      if (slab.body === null) continue;
+      const view = stage.read(slab.body);
+      if (!view || !view.landed) continue;
+      const offAxle = view.cx;
+      const centred = slab.kick === "steady" || Math.abs(offAxle) <= this.tol;
+      slab.kick = "done";
+      if (c.arm && !centred && Math.sign(offAxle) === c.arm.side) {
+        // Into the arm's reach: taken. The Dark gains.
+        this.fx.blood(view.cx, view.cy, [120, 60, 170], 24, 220, false);
+        stage.remove(slab.body);
+        this.stack.splice(i, 1);
+        c.gap -= 1.2;
+        this.trauma = Math.min(1, this.trauma + 0.4);
+        this.sfx.hiss();
+        this.float("TAKEN", view.cx, view.cy + 40, false, 20);
+        continue;
+      }
+      if (centred) {
+        stage.steadyCradle();
+        this.fx.ring(view.cx, view.cy, BONE, 90, 3);
+        continue;
+      }
+      const pad = c.pads.find((p) => Math.abs(offAxle - this.padX(p)) < PAD_HALF);
+      if (pad) {
+        const kick = Math.abs(this.padX(pad)) * CUT_KICK * 0.01;
+        c.spin += kick;
+        c.kickT = 0.25;
+        this.fx.sparkle(this.padX(pad), 0, 40, [255, 176, 96], 14);
+        this.sfx.bedrock();
+        this.trauma = Math.min(1, this.trauma + 0.15);
+        haptics.medium();
+      }
+    }
+  }
+
+  /** The wheel's clock: spin fades and cuts, the Dark falls, the pads ride, the arm comes and goes. */
+  private stepCut(dt: number): void {
+    const c = this.cut!;
+    c.spin = Math.max(0, c.spin - (c.spin / CUT_DECAY) * dt);
+    const cutNow = c.spin * CUT_RATE * dt;
+    c.depth += cutNow;
+    c.wheelA += c.spin * dt * 2.2;
+    c.gap += cutNow - CUT_DARK * dt;
+    c.kickT = Math.max(0, c.kickT - dt);
+    if (c.arm) {
+      c.arm.t += dt;
+      if (c.arm.t > CUT_ARM_DUR) {
+        c.arm = null;
+        c.armT = CUT_ARM_EVERY * (0.7 + Math.random() * 0.6);
+      }
+    } else {
+      c.armT -= dt;
+      if (c.armT <= 0) {
+        c.arm = { side: Math.random() < 0.5 ? -1 : 1, t: 0 };
+        this.sfx.rubble();
+        this.trauma = Math.min(1, this.trauma + 0.3);
+      }
+    }
+    // The score follows the fight: spin as the climb, the Dark's nearness as the danger.
+    const danger = clamp01(1 - c.gap / CUT_GAP0);
+    this.strain = Math.max(this.strain * 0.95, danger);
+    this.music.setClimb({
+      progress: clamp01(c.depth / Math.max(1, this.plan.goal)),
+      danger,
+      streak: this.streak,
+      landings: 2,
+    });
+    if (this.stage) {
+      // Leaning on its stop for a moment, the tower goes over.
+      if (Math.abs(this.stage.cradleAngle()) > CRADLE_STOP - 0.02) c.tipT += dt;
+      else c.tipT = Math.max(0, c.tipT - dt * 2);
+      if (c.tipT > 0.6) {
+        this.stage.loosen();
+        this.sfx.topple();
+        this.die();
+        return;
+      }
+    }
+    if (c.gap <= 0) {
+      const top = this.peak();
+      this.float("THE LIGHT IS BURIED", top.x + top.w / 2, this.crownY() + 60, false, 24);
+      this.taken = true;
+      this.sfx.fail();
+      this.trauma = 1;
+      this.phase = "fall";
+      this.fallAge = 0;
+      this.keepGhost();
+      this.emit();
+      return;
+    }
+    if (c.depth >= this.plan.goal) {
+      if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.beginAscent(true);
+      else this.win();
+    }
+  }
+
+  /** The spiked wheel under the cradle, its pawls, and the pads on the cradle. */
+  private drawWheel(ctx: CanvasRenderingContext2D): void {
+    const c = this.cut;
+    const base = this.stack[0];
+    if (!c || !base || base.body === null || !this.stage) return;
+    const axle = this.worldToScreen(0, -8);
+    const clock = this.reduceMotion ? 0 : this.clock;
+    ctx.save();
+    ctx.translate(axle.x, axle.y + WHEEL_R);
+    // The shaft the wheel has cut: dark, with the wheel in it.
+    ctx.fillStyle = "rgba(6,3,8,0.6)";
+    ctx.fillRect(-WHEEL_R - 40, -WHEEL_R - 60, WHEEL_R * 2 + 80, WHEEL_R * 2 + 400);
+    ctx.save();
+    ctx.rotate(-c.wheelA);
+    ctx.fillStyle = "rgb(58,46,38)";
+    ctx.beginPath();
+    ctx.arc(0, 0, WHEEL_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgb(140,112,80)";
+    for (let i = 0; i < 18; i++) {
+      ctx.save();
+      ctx.rotate((i / 18) * Math.PI * 2);
+      ctx.beginPath();
+      ctx.moveTo(WHEEL_R - 6, -9);
+      ctx.lineTo(WHEEL_R + 18, 0);
+      ctx.lineTo(WHEEL_R - 6, 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.strokeStyle = `rgba(255,200,130,${Math.max(0.15, 0.5 - c.spin * 0.08)})`;
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a) * WHEEL_R, Math.sin(a) * WHEEL_R);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgb(40,28,24)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // The pawls, kicking when a slab lands on a pad.
+    ctx.strokeStyle = c.kickT > 0 ? "#ffd27a" : "rgb(154,122,80)";
+    ctx.lineWidth = 6;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * (CRADLE_W / 2 + 20), -WHEEL_R - 8);
+      ctx.lineTo(side * (WHEEL_R + 10), -(c.kickT > 0 ? 20 : 40));
+      ctx.stroke();
+    }
+    ctx.restore();
+    // The pads and the groove, on the cradle, turning with it.
+    const view = this.stage.read(base.body);
+    if (!view) return;
+    const cp = this.worldToScreen(view.cx, view.cy);
+    const m = this.mover;
+    const mx = this.phase === "play" && m.fallT < 0 ? m.x + m.w / 2 : 999;
+    ctx.save();
+    ctx.translate(cp.x, cp.y);
+    ctx.rotate(-view.angle);
+    for (const p of c.pads) {
+      const x = this.padX(p);
+      const on = Math.abs(mx - x) < PAD_HALF;
+      ctx.fillStyle = on
+        ? "rgba(255,176,96,0.95)"
+        : `rgba(255,176,96,${0.35 + 0.1 * Math.sin(clock * 3)})`;
+      ctx.fillRect(x - PAD_HALF, 2, PAD_HALF * 2, SLAB_H / 2 - 4);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(x - 2, 0, 4, SLAB_H / 2);
+    }
+    ctx.fillStyle = Math.abs(mx) <= this.tol ? "#fff0c0" : "rgba(255,240,192,0.45)";
+    ctx.fillRect(-this.tol, 2, this.tol * 2, SLAB_H / 2 - 4);
+    ctx.restore();
+  }
+
+  /** The Dark's arm out of one wall at the tower's height, and its shadow over the side it guards. */
+  private drawCutArm(ctx: CanvasRenderingContext2D): void {
+    const c = this.cut;
+    if (!c || !c.arm) return;
+    const a = c.arm;
+    const top = this.worldToScreen(0, this.crownY());
+    const grow = Math.min(1, a.t / 0.5) * (a.t > CUT_ARM_DUR - 0.5 ? (CUT_ARM_DUR - a.t) / 0.5 : 1);
+    const claw = this.sprite("claw");
+    const x0 = this.vw / 2 + a.side * (this.vw / 2 + 10);
+    ctx.save();
+    ctx.globalAlpha = grow;
+    ctx.fillStyle = "rgba(60,30,90,0.22)";
+    if (a.side > 0) ctx.fillRect(this.vw / 2 + this.tol, top.y - 420, this.vw, 440);
+    else ctx.fillRect(-this.vw / 2, top.y - 420, this.vw - this.tol, 440);
+    ctx.translate(x0, top.y + 10);
+    ctx.scale(-a.side, 1);
+    if (claw) {
+      const size = 380;
+      const frame = Math.min(claw.frames - 1, Math.floor((a.t / CUT_ARM_DUR) * claw.frames));
+      ctx.drawImage(
+        claw.img,
+        frame * claw.cell,
+        0,
+        claw.cell,
+        claw.cell,
+        -size * 0.08,
+        -size / 2,
+        size,
+        size,
+      );
+    } else {
+      const reach = 170 * grow;
+      ctx.fillStyle = "rgb(36,18,54)";
+      ctx.beginPath();
+      ctx.moveTo(0, -34);
+      ctx.quadraticCurveTo(reach * 0.5, -30, reach, -10);
+      ctx.lineTo(reach * 0.9, 12);
+      ctx.quadraticCurveTo(reach * 0.5, 30, 0, 36);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** The Dark above, pouring down the shaft: its fringe hangs the gap above the tower's top. */
+  private drawCutDark(ctx: CanvasRenderingContext2D): void {
+    const c = this.cut;
+    if (!c) return;
+    const front = this.worldToScreen(0, this.crownY() + c.gap * CUT_PPM).y;
+    if (front < -200) return;
+    const v = this.descentDark();
+    const art = v ? this.frameOf(v, "art/dark-descent.jpg") : null;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-120, -200, this.vw + 240, Math.max(0, front + 200));
+    ctx.clip();
+    ctx.fillStyle = "rgb(6,3,10)";
+    ctx.fillRect(-120, -200, this.vw + 240, front + 200);
+    if (art) {
+      const ow = this.vw * 1.3;
+      const oh = ow * 1.78;
+      const breathe = this.reduceMotion ? 0 : Math.sin(this.clock * 0.8) * 6;
+      ctx.drawImage(art, this.vw / 2 - ow / 2, front + 60 + breathe - oh, ow, oh);
+    }
+    ctx.restore();
+    const sh = ctx.createLinearGradient(0, front - 40, 0, front + 100);
+    sh.addColorStop(0, "rgba(6,3,10,1)");
+    sh.addColorStop(0.3, "rgba(4,2,8,0.6)");
+    sh.addColorStop(1, "rgba(4,2,8,0)");
+    ctx.fillStyle = sh;
+    ctx.fillRect(-120, front - 40, this.vw + 240, 140);
   }
 
   private drawPlinth(ctx: CanvasRenderingContext2D): void {

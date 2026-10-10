@@ -141,7 +141,7 @@ describe("progress", () => {
       recordRun(save, level.id, 20, 0.9, { clear: true, precise: false, swift: false });
     }
     // The last level of the last offered world, never a parked world's.
-    expect(LEVELS[nextLevelIndex(save)]!.id).toBe("apex");
+    expect(LEVELS[nextLevelIndex(save)]!.id).toBe("floor");
   });
 });
 

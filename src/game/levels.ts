@@ -431,6 +431,7 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
     darkRate: Math.min(32, 18 + index * 1.8),
     physics: true,
     descent: level.descent ?? false,
+    cut: level.descent ?? false,
     tilt: level.tilt?.[0] ?? 0,
     tiltPeriod: level.tilt?.[1] ?? 10,
     turn: level.turn ?? 0,

@@ -1,4 +1,4 @@
-import { Body, Box, Vec2, WeldJoint, World } from "planck";
+import { Body, Box, RevoluteJoint, Vec2, WeldJoint, World } from "planck";
 
 /**
  * A rigid-body stage for the spire: slabs are boxes with weight and
@@ -24,6 +24,8 @@ const SWAY_REACH = 5;
 const CROOKED_TIME = 0.6;
 /** Spin, in rad/s, that turns a resting slab into a topple. */
 const TOPPLE_SPIN = 1.2;
+/** The cradle's stops, radians either way. */
+export const CRADLE_STOP = 0.35;
 
 export type BodyView = {
   /** Centre, world px. */
@@ -64,6 +66,53 @@ export class Stage {
   private tilt = 0;
   /** The rim's drift, m/s: what the foundation is being carried at, so speeds are read relative to it. */
   private drift = 0;
+  /** The cutting wheel's cradle: the tower's foundation, pivoting on the axle, sprung to level. */
+  private cradle: Body | null = null;
+
+  /**
+   * A cradle as the foundation: a bar pivoting about its own centre on a
+   * post up from the wheel's axle, with stops at ±20°, sprung to level and
+   * fighting the weight it carries. Bottom-left corner in px, like addStatic.
+   */
+  addCradle(x: number, y: number, w: number, h: number): number {
+    const id = this.nextId++;
+    const centre = new Vec2((x + w / 2) / SCALE, (y + h / 2) / SCALE);
+    const post = this.world.createBody({ position: centre });
+    const bar = this.world.createBody({ type: "dynamic", position: centre, angularDamping: 3 });
+    bar.createFixture(new Box(w / 2 / SCALE, h / 2 / SCALE), { density: 4, friction: 1 });
+    this.world.createJoint(
+      new RevoluteJoint(
+        { enableLimit: true, lowerAngle: -CRADLE_STOP, upperAngle: CRADLE_STOP },
+        post,
+        bar,
+        centre,
+      ),
+    );
+    this.bodies.set(id, bar);
+    this.sizes.set(id, { w, h });
+    // The foundation counts as landed: what rests on it has landed.
+    this.landed.add(id);
+    this.landedBodies.add(bar);
+    this.cradle = bar;
+    return id;
+  }
+
+  /** The cradle's lean, radians; 0 without one. */
+  cradleAngle(): number {
+    return this.cradle ? this.cradle.getAngle() : 0;
+  }
+
+  /** Steadies the cradle: the crew re-levelling the tower after a centred drop. */
+  steadyCradle(): void {
+    if (this.cradle) this.cradle.setAngularVelocity(this.cradle.getAngularVelocity() * 0.3);
+  }
+
+  /** Every weld let go: the tower comes apart and falls. */
+  loosen(): void {
+    for (let j = this.world.getJointList(); j; j = j.getNext()) {
+      if (j.getType() === "weld-joint") this.world.destroyJoint(j);
+    }
+  }
 
   /**
    * Carries a fixed body sideways at `vx` px/s: the rim turning under the
@@ -175,6 +224,16 @@ export class Stage {
           body.applyForceToCenter(new Vec2(push * lift * body.getMass(), 0), true);
         }
       }
+      if (this.cradle) {
+        // Sprung to level, scaled to what it carries: an unbalanced tower still wins, slowly.
+        let carried = this.cradle.getInertia();
+        for (const b of this.bodies.values())
+          if (b.isDynamic() && b !== this.cradle) carried += b.getMass() * 0.6;
+        this.cradle.applyTorque(
+          (-this.cradle.getAngle() * 60 - this.cradle.getAngularVelocity() * 8) * carried,
+          true,
+        );
+      }
       this.world.step(STEP, 10, 4);
       this.carry -= STEP;
       steps++;
@@ -182,7 +241,7 @@ export class Stage {
     if (steps === 12) this.carry = 0;
     const sim = steps * STEP;
     for (const [id, body] of this.bodies) {
-      if (!body.isDynamic()) continue;
+      if (!body.isDynamic() || body === this.cradle) continue;
       // Crooked for long enough, resting or not, and it crumbles: a slab
       // balanced askew on the column is not a floor and must not block one.
       if (Math.abs(body.getAngle()) > LEVEL_TILT) {
