@@ -41,8 +41,8 @@ export type LevelDef = {
   paint?: string;
   /** The Ring: the rim's tilt, radians either way, and its period in seconds. */
   tilt?: [number, number];
-  /** The Ring: how far the rim carries the tower sideways, px either way, and its period. */
-  turn?: [number, number];
+  /** The Ring: the wheel's radius, px. The rim rolls to the tilt's angle, carrying the tower R·sin(tilt) sideways. */
+  turn?: number;
 };
 
 /** Every level opens with a few plain floors so the new rhythm is a reveal. */
@@ -339,8 +339,8 @@ export const LEVELS: LevelDef[] = [
     parTime: 34,
     parAccuracy: 0.86,
     tier: 0,
-    tilt: [0.12, 10],
-    turn: [40, 10],
+    tilt: [0.16, 10],
+    turn: 300,
   },
   {
     id: "spoke",
@@ -358,19 +358,18 @@ export const LEVELS: LevelDef[] = [
     parTime: 44,
     parAccuracy: 0.87,
     tier: 1,
-    tilt: [0.2, 8],
-    turn: [55, 8],
+    tilt: [0.22, 8],
+    turn: 280,
   },
   {
     id: "hub",
     name: "The Hub",
-    blurb: "The wind and the tilt together.",
+    blurb: "The wheel rolls hardest here.",
     line: "At the centre, something turns the wheel. It has never once stopped.",
     theme: "ridge",
     floors: 30,
-    courses: ["gust"],
-    period: [0.86, 0.72],
-    wind: [30, 48],
+    courses: ["beat"],
+    period: [0.86, 0.74],
     picks: 10,
     keystones: true,
     motes: true,
@@ -378,8 +377,8 @@ export const LEVELS: LevelDef[] = [
     parTime: 56,
     parAccuracy: 0.85,
     tier: 2,
-    tilt: [0.28, 7],
-    turn: [70, 7],
+    tilt: [0.26, 8],
+    turn: 260,
   },
 ];
 
@@ -434,8 +433,7 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
     descent: level.descent ?? false,
     tilt: level.tilt?.[0] ?? 0,
     tiltPeriod: level.tilt?.[1] ?? 10,
-    turn: level.turn?.[0] ?? 0,
-    turnPeriod: level.turn?.[1] ?? 10,
+    turn: level.turn ?? 0,
     hazardsAt: () => ({ keystones: level.keystones, motes: level.motes, bombs: level.bombs }),
     span: level.floors,
     themeAt: () => level.theme,

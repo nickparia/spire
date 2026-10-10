@@ -1875,12 +1875,72 @@ export class SpireEngine {
     return t * Math.sin((this.runTime * Math.PI * 2) / (this.plan.tiltPeriod ?? 10));
   }
 
-  /** The rim's sideways speed now, px/s: it carries the tower back and forth on the Ring. */
+  /**
+   * The rim's sideways speed now, px/s. One rotation does both: the tower
+   * rides a wheel of radius `turn`, so as it rolls to angle φ the tower is
+   * carried to R·sin φ and leans by φ. This is the x-velocity of that ride.
+   */
   rimDrift(): number {
-    const a = this.plan.turn ?? 0;
-    if (a <= 0 || this.phase !== "play") return 0;
-    const w = (Math.PI * 2) / (this.plan.turnPeriod ?? 10);
-    return a * w * Math.cos(this.runTime * w);
+    const R = this.plan.turn ?? 0;
+    const t = this.plan.tilt ?? 0;
+    if (R <= 0 || t <= 0 || this.phase !== "play") return 0;
+    const w = (Math.PI * 2) / (this.plan.tiltPeriod ?? 10);
+    const phi = t * Math.sin(this.runTime * w);
+    const dphi = t * w * Math.cos(this.runTime * w);
+    return R * Math.cos(phi) * dphi;
+  }
+
+  /**
+   * The rim as the arc of a vast wheel under the foundation. Drawn in the
+   * frame already rolled by the rim's tilt, so a circle straight below the
+   * foot has the right tangent; its spokes run to a hub far below.
+   */
+  private drawRim(ctx: CanvasRenderingContext2D): void {
+    const R = this.plan.turn ?? 0;
+    const base = this.stack[0];
+    if (R <= 0 || !base) return;
+    const foot = this.worldToScreen(base.x + base.w / 2, 0);
+    const cx = foot.x;
+    const cy = foot.y + R;
+    const half = Math.asin(Math.min(1, 240 / R)); // the rim shown ±240 px either side of the foot
+    const a0 = -Math.PI / 2 - half;
+    const a1 = -Math.PI / 2 + half;
+    const band = 34;
+    ctx.save();
+    // The rim: a band of stone following the wheel's curve, in front of the Dark.
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, a0, a1);
+    ctx.arc(cx, cy, R - band, a1, a0, true);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, foot.y, 0, foot.y + band);
+    g.addColorStop(0, "rgb(96,74,52)");
+    g.addColorStop(1, "rgb(44,32,26)");
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,200,130,0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R - 1, a0, a1);
+    ctx.stroke();
+    // Blocks along the rim, and spoke stubs beneath it, turning with the wheel.
+    const phi = this.rimTilt();
+    const step = 48 / R;
+    ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    for (let a = a0 + ((phi + 100) % step); a < a1; a += step) {
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+      ctx.lineTo(cx + Math.cos(a) * (R - band), cy + Math.sin(a) * (R - band));
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(255,190,120,0.22)";
+    ctx.lineWidth = 3;
+    for (let a = a0 + ((phi + 100) % (step * 4)); a < a1; a += step * 4) {
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * (R - band), cy + Math.sin(a) * (R - band));
+      ctx.lineTo(cx + Math.cos(a) * (R - band - 90), cy + Math.sin(a) * (R - band - 90));
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /** Steps the stage and reads the bodies back into their slabs. */
@@ -3440,6 +3500,12 @@ export class SpireEngine {
           m.crumb = 0;
         }
       }
+    }
+    // On the Ring the crane follows the rim with a lag: the tower is carried
+    // out from under the slide band, and the band comes after it.
+    if ((this.plan.turn ?? 0) > 0 && this.phase === "play") {
+      const prev = this.peak();
+      if (prev) m.center += (prev.x + prev.w / 2 - m.center) * Math.min(1, dt / 1.2);
     }
     const rate = travelRate(m.course, m.dir, m.wind, m.u, m.period, this.clock);
     m.pxSpeed = m.halfSpan * rate;
@@ -5203,6 +5269,7 @@ export class SpireEngine {
       else if (this.ascent && this.blindArt) this.drawBlind(ctx);
       else this.drawDark(ctx);
     }
+    if ((this.plan.turn ?? 0) > 0 && this.phase !== "menu") this.drawRim(ctx);
     if (this.escape) this.drawEscape(ctx);
     if (this.shields > 0 && prev && this.phase !== "fall") {
       const dome = this.worldToScreen(prev.x + prev.w / 2, prev.y + VISUAL_H / 2);

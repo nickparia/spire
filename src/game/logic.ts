@@ -159,7 +159,6 @@ export type Plan = {
    * stays put, so the landing spot drifts while the slab slides.
    */
   turn?: number;
-  turnPeriod?: number;
   hazardsAt: (floors: number) => Hazards;
   /** Floors one sky lasts, which paces how its backdrop deepens. */
   span: number;

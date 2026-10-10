@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 89 — The wheel (internal)
+
+- **The Ring is a wheel now, not a see-saw.** One rotation does everything: the tower rides the rim of a vast stone wheel (drawn as the arc under you, spokes running to a hub far below), and as the wheel rolls the tower is carried sideways *and* leans by the same angle — ±9° on the Rim, ±13° on the Spoke, ±15° on the Hub (on the beat, no gale) — while the crane and the sky hold still. A true column rides it; a loose stack lags and leans. Still grey boxes, still borrowed art: judge whether the world turning under you makes your taps matter.
+
 ## Build 88 — The rim turns (internal)
 
 - **The Ring's rim now turns under the tower as well as tilting.** The foundation is carried sideways and back (±40 px on the Rim, ±55 on the Spoke, ±70 on the Hub); a true column rides with it, loose slabs are dragged by friction and lag into a lean. The crane stays put, so the landing spot drifts while your slab slides: a moving target under a moving slab. Still grey boxes — judge the feel.
