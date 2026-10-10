@@ -86,10 +86,12 @@
       cv.style.height = H + "px";
       const ctx = cv.getContext("2d");
 
-      let rings, mover, dark, time, over, floats, flashT, shake, sink, wellA;
+      let rings, mover, dark, time, over, floats, flashT, shake, sink, wellA, depth;
       function reset() {
         // rings, top (newest) last: { a: spoke angle, w: bridge width }. rings[0] is the bedrock ring.
-        rings = [{ a: 0, w: SPOKE_W }];
+        // Each ring remembers the depth it sits at: a true lock sinks the string two steps, an off lock one.
+        rings = [{ a: 0, w: SPOKE_W, d: 0 }];
+        depth = 0;
         spawn();
         dark = -7; // in rings below the newest: negative is deep
         time = 0;
@@ -129,20 +131,25 @@
           return;
         }
         const perfect = Math.abs(err) < PERFECT;
+        const gain = perfect ? 2 : 1;
+        depth += gain;
         rings.push({
           a: perfect ? last.a : last.a + err / 2,
           w: perfect ? Math.min(SPOKE_W, last.w + 0.02) : overlap,
+          d: depth,
         });
         dark -= perfect ? DARK_PUSH.perfect : DARK_PUSH.off;
         floats.push({
-          t: perfect ? "TRUE" : "OFF " + Math.round((Math.abs(err) / last.w) * 100) + "%",
+          t: perfect
+            ? "TRUE · SINKS TWO"
+            : "OFF " + Math.round((Math.abs(err) / last.w) * 100) + "%",
           c: perfect ? "#ffd27a" : "#caa",
           y: 0,
         });
         flashT = perfect ? 0.3 : 0;
         shake = perfect ? 0.35 : 0.2;
-        sink = 1; // the string drops one step
-        if (rings.length - 1 >= GOAL) over = "through";
+        sink = gain; // the string drops this many steps
+        if (depth >= GOAL) over = "through";
         else spawn();
       }
 
@@ -154,12 +161,12 @@
           dark += DARK_RATE * dt;
           if (dark >= 0) over = "taken";
         }
-        sink = Math.max(0, sink - dt * 3.2);
+        sink = Math.max(0, sink - dt * 3.6);
         flashT = Math.max(0, flashT - dt);
         shake = Math.max(0, shake - dt * 2);
         for (const f of floats) f.y += dt;
         floats = floats.filter((f) => f.y < 1);
-        document.getElementById("n").textContent = rings.length - 1;
+        document.getElementById("n").textContent = depth;
         document.getElementById("r").innerHTML =
           `Dark <b>${Math.max(0, (-dark).toFixed(1))}</b> rings below${over ? " · " + over : ""}<br>${time.toFixed(1)} s`;
       }
@@ -209,7 +216,7 @@
         // The locked rings, deepest first, receding beneath you; each with its bridge to the one below.
         const n = rings.length;
         for (let i = 0; i < n; i++) {
-          const below = n - 1 - i; // steps beneath the newest ring
+          const below = depth - rings[i].d; // steps beneath the newest ring
           const r = radiusAt(below + 1); // the newest locked ring sits one step under the surface
           const w = RING_W * Math.pow(K, below + 1 - sink);
           const depthShade = Math.max(0.25, 1 - below * 0.06);
