@@ -1,45 +1,50 @@
 // Plays a Hearth sky like a player of a given skill: taps no sooner than `every` seconds, and only
 // when the slab is within `aim` tolerances of the groove (1 = decent, 2 = beginner). Does the Dark catch them?
-// Usage: node tools/bots/pace.mjs <level> <min seconds between taps> <aim> [max seconds]
+// Usage: node tools/bots/pace.mjs <level> <min seconds between taps> <aim> [max seconds] [sound]
+// `sound` turns music and sfx on in the save (the browser stays muted): every audio call runs.
 import puppeteer from "puppeteer-core";
-const [level = "0", every = "1.4", aim = "1", max = "120"] = process.argv.slice(2);
+const [level = "0", every = "1.4", aim = "1", max = "120", sound = ""] = process.argv.slice(2);
 const browser = await puppeteer.launch({
   executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   headless: "new",
-  args: ["--mute-audio"],
+  args: ["--mute-audio", "--autoplay-policy=no-user-gesture-required"],
 });
 const page = await browser.newPage();
 page.on("pageerror", (e) => console.log("pageerror", String(e).slice(0, 200)));
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
 await page.goto("http://localhost:8080/", { waitUntil: "networkidle0" });
-await page.evaluate(() =>
-  localStorage.setItem(
-    "spire-v2",
-    JSON.stringify({
-      v: 2,
-      music: false,
-      sfx: false,
-      levels: {},
-      endless: { best: 0, bestFloors: 0 },
-      tips: { dark: 9 },
-      coins: 0,
-      tracks: {},
-      levels2: {},
-      weapon: "buttress",
-      ghosts: {},
-      name: "",
-      feats: {},
-      whatsNewSeen: 99,
-      storySeen: true,
-      savedAt: 5,
-      tester: true,
-    }),
-  ),
+await page.evaluate(
+  (sound) =>
+    localStorage.setItem(
+      "spire-v2",
+      JSON.stringify({
+        v: 2,
+        music: !!sound,
+        sfx: !!sound,
+        levels: {},
+        endless: { best: 0, bestFloors: 0 },
+        tips: { dark: 9 },
+        coins: 0,
+        tracks: {},
+        levels2: {},
+        weapon: "buttress",
+        ghosts: {},
+        name: "",
+        feats: {},
+        whatsNewSeen: 99,
+        storySeen: true,
+        savedAt: 5,
+        tester: true,
+      }),
+    ),
+  sound,
 );
 await page.reload({ waitUntil: "networkidle0" });
 await page.evaluate(
   (level, every, aim) => {
     const e = window.__spire;
+    // A real player's first tap unlocks audio; the bot's does the same.
+    e.wake();
     e.startLevel(Number(level));
     let last = 0;
     const loop = () => {
@@ -70,7 +75,13 @@ for (let t = 0; t < Number(max); t += 5) {
   const s = await page.evaluate(() => {
     const e = window.__spire;
     const p = e.probe();
-    return { phase: p.phase, floors: p.floors, t: p.time.toFixed(1), gap: e.darkGap().toFixed(1) };
+    return {
+      phase: p.phase,
+      floors: p.floors,
+      t: p.time.toFixed(1),
+      gap: e.darkGap().toFixed(1),
+      audio: `${e.rig?.ctx?.state ?? "none"}/${e.rig?.sfxEnabled ? "sfx" : "nosfx"}/${e.sfx?.samples?.size ?? 0}`,
+    };
   });
   last = JSON.stringify(s);
   if (["won", "over", "menu"].includes(s.phase)) break;

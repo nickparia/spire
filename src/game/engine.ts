@@ -4778,8 +4778,14 @@ export class SpireEngine {
       this.acc += dt;
       let steps = 0;
       while (this.acc >= STEP && steps < 5) {
-        // The demo runs in slow time, so the move can be watched.
-        this.step(this.demo ? STEP * DEMO_TIME : STEP);
+        // The demo runs in slow time, so the move can be watched. A step that
+        // throws is logged and skipped: the loop must outlive any one mistake.
+        try {
+          this.step(this.demo ? STEP * DEMO_TIME : STEP);
+        } catch (err) {
+          trace(`step failed: ${err instanceof Error ? err.message : String(err)}`);
+          console.error(err);
+        }
         this.acc -= STEP;
         steps++;
       }
@@ -4789,6 +4795,7 @@ export class SpireEngine {
     try {
       this.render();
     } catch (err) {
+      trace(`render failed: ${err instanceof Error ? err.message : String(err)}`);
       console.error(err);
     }
     this.raf = requestAnimationFrame(this.frame);

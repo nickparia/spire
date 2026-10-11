@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 100 — The freeze, and a quieter wind (internal)
+
+- **The freeze is fixed.** Build 98's faded-out sounds (a topple's sting, a wind-true's chime) scheduled their stop before their start, which the audio engine rejects — and on a phone that error landed inside the game loop and stopped it, with the wind still blowing. Found by running the bots with sound on, which they now can; the game loop also survives any single bad frame from here on.
+- **The Gale's wind bed is at less than half the volume** (0.055 from 0.13), the howl's moan likewise.
+
 ## Build 99 — The title can't be stranded, and testers get a trace (internal)
 
 - **The title.** The way into the worlds is now booked before anything else the tap does (waking audio, the score), so nothing that fails on a phone can keep the title on screen; and if the worlds haven't opened well after they should have, a second tap opens them.

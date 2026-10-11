@@ -86,15 +86,17 @@ export class Sfx {
     const g = ctx.createGain();
     g.gain.value = gain;
     const t = ctx.currentTime + delay;
+    src.connect(g);
+    g.connect(sfxBus);
+    src.start(t);
     if (cut > 0) {
       // A long sample cut short: faded out over its last third of a second.
+      // (stop() only after start(): the other way round throws, and on a phone
+      // that threw inside the frame and froze the game.)
       g.gain.setValueAtTime(gain, t + cut - 0.3);
       g.gain.linearRampToValueAtTime(0, t + cut);
       src.stop(t + cut + 0.02);
     }
-    src.connect(g);
-    g.connect(sfxBus);
-    src.start(t);
     src.onended = () => {
       src.disconnect();
       g.disconnect();
@@ -401,9 +403,9 @@ export class Sfx {
     const on = this.rig.sfxEnabled ? 1 : 0;
     const s = Math.min(1.3, Math.max(0, strength));
     const t = ctx.currentTime;
-    this.air.gain.gain.setTargetAtTime(on * 0.13 * s, t, 0.12);
+    this.air.gain.gain.setTargetAtTime(on * 0.055 * s, t, 0.12);
     this.air.filter.frequency.setTargetAtTime(220 + 640 * s, t, 0.15);
-    this.air.moan.gain.setTargetAtTime(on * 0.07 * howl, t, 0.3);
+    this.air.moan.gain.setTargetAtTime(on * 0.04 * howl, t, 0.3);
     this.air.osc.frequency.setTargetAtTime(88 + 44 * howl, t, 0.3);
   }
 

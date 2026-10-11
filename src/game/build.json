@@ -1,8 +1,8 @@
 {
-  "build": 99,
-  "title": "The title can't be stranded",
+  "build": 100,
+  "title": "The freeze, and a quieter wind",
   "notes": [
-    "The way into the worlds is booked before anything else the title tap does, so nothing that fails on a phone can keep the title on screen; a second tap opens them regardless.",
-    "Tester tools: Relight Hearth (three stars on every Hearth sky, one tap) and a trace of what the game just did. If the title sticks: Options, screenshot the trace, send it."
+    "The freeze is fixed: a faded-out sound (a topple's sting, a wind-true's chime) was scheduled wrongly and the error stopped the game loop while the wind played on. The loop now survives any single bad frame.",
+    "The Gale's wind bed is at less than half the volume."
   ]
 }
