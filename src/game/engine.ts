@@ -5499,6 +5499,7 @@ export class SpireEngine {
     const prev = this.peak();
     const inZone = aiming && this.phase !== "menu" && this.cued() && this.lined(prev);
 
+    if (aiming && !this.escape && this.phase !== "menu") this.drawWindFar(ctx);
     const burning = this.burning();
     for (let i = 0; i < this.stack.length; i++) {
       const slab = this.stack[i]!;
@@ -6658,46 +6659,163 @@ export class SpireEngine {
       const near = 1 - Math.min(1, Math.abs(fx - lane.x) / (this.vw * 0.6));
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 70; i++) {
+      for (let i = 0; i < 44; i++) {
         const h = Math.sin(i * 73.7) * 43758.5453;
         const r = h - Math.floor(h);
         const h2 = Math.sin(i * 19.1 + 3) * 27183.1;
         const r2 = h2 - Math.floor(h2);
-        const y = lane.y - 260 + r * 520 + Math.sin(clock * 5 + i) * 6;
+        const y = lane.y - 260 + r * 520;
         const x = fx - dir * r2 * r2 * 140;
-        const len = (14 + r2 * 46) * (0.6 + near);
-        ctx.strokeStyle = rgbCss(accent, (0.1 + r * 0.3) * (0.4 + 0.6 * near));
-        ctx.lineWidth = 1 + r * 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - dir * len, y);
-        ctx.stroke();
+        this.wisp(
+          ctx,
+          x,
+          y,
+          dir,
+          (60 + r2 * 110) * (0.6 + near),
+          5 + r * 10,
+          1 + r * 1.6,
+          (0.12 + r * 0.3) * (0.4 + 0.6 * near),
+          clock * 6 + i * 1.7,
+          accent,
+        );
       }
       ctx.restore();
     }
     if ((m.course === "gust" || wind) && !this.reduceMotion) {
+      // The wind in the slab's lane: quick wisps of air, curving and tapered,
+      // flowing the wind's way and swelling with it. (The far wisps and the
+      // dust are drawn behind the tower: drawWindFar.)
+      const s = Math.min(1.3, strength);
+      const gate = m.course === "gust" ? 1 : Math.min(1, m.baseDrift / 40);
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const streaks = Math.round(8 + 18 * Math.min(1.3, strength));
-      for (let i = 0; i < streaks; i++) {
+      const flow = (r: number, span: number, from: number, speed: number) =>
+        from + ((((r * span + clock * dir * speed) % span) + span) % span);
+      const near = Math.round((6 + 12 * s) * gate);
+      for (let i = 0; i < near; i++) {
         const h = Math.sin(i * 51.3) * 43758.5453;
         const r = h - Math.floor(h);
-        const span = right - left + 160;
-        const x =
-          left -
-          80 +
-          ((((r * span + clock * dir * (160 + r * 120) * (0.6 + 0.6 * strength)) % span) + span) %
-            span);
-        const y = lane.y - 30 + r * (m.hover + 60) + Math.sin(clock * 3 + i) * 4;
-        ctx.strokeStyle = rgbCss(accent, (0.18 + r * 0.25) * (0.5 + 0.5 * Math.min(1.3, strength)));
-        ctx.lineWidth = 1 + r;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - dir * (10 + r * 18) * (0.6 + 0.6 * strength), y);
-        ctx.stroke();
+        const h2 = Math.sin(i * 17.9 + 5) * 27183.1;
+        const r2 = h2 - Math.floor(h2);
+        const span = right - left + 220;
+        const x = flow(r, span, left - 110, (150 + r2 * 130) * (0.6 + 0.6 * s));
+        const y = lane.y - 46 + r2 * (m.hover + 92);
+        this.wisp(
+          ctx,
+          x,
+          y,
+          dir,
+          (44 + r * 80) * (0.6 + 0.6 * s),
+          (4 + r2 * 8) * (0.5 + 0.5 * s),
+          1.2 + r * 1.6,
+          (0.2 + r2 * 0.32) * (0.5 + 0.5 * s),
+          clock * (3 + r2 * 2) + i * 2.3,
+          accent,
+        );
       }
       ctx.restore();
     }
+  }
+
+  /**
+   * The wind across the whole sky, behind the tower: long slow wisps high and
+   * low, and fine dust riding the air. Faint in a calm, a weather in a gust.
+   */
+  private drawWindFar(ctx: CanvasRenderingContext2D): void {
+    const m = this.mover;
+    if (this.reduceMotion || (m.course !== "gust" && !this.plan.gale)) return;
+    const wind = this.plan.gale ? this.lastWind : null;
+    const s = Math.min(1.3, wind ? wind.strength : 1);
+    const dir = wind && wind.along ? m.dir : m.wind;
+    const gate = m.course === "gust" ? 1 : Math.min(1, m.baseDrift / 40);
+    if (gate <= 0) return;
+    const accent = this.theme.accent;
+    const clock = this.clock;
+    const lane = this.worldToScreen(m.center, m.y);
+    const breath = 0.12 + 0.88 * Math.min(1, s);
+    const flow = (r: number, span: number, from: number, speed: number) =>
+      from + ((((r * span + clock * dir * speed) % span) + span) % span);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 12; i++) {
+      const h = Math.sin(i * 37.1 + 1) * 43758.5453;
+      const r = h - Math.floor(h);
+      const h2 = Math.sin(i * 91.7 + 2) * 27183.1;
+      const r2 = h2 - Math.floor(h2);
+      const span = this.vw + 360;
+      const x = flow(r, span, -180, (40 + r2 * 50) * (0.5 + 0.8 * s));
+      const y = lane.y - 360 + r2 * 720 + Math.sin(clock * 0.4 + i * 1.3) * 28;
+      this.wisp(
+        ctx,
+        x,
+        y,
+        dir,
+        (120 + r * 150) * (0.7 + 0.5 * s),
+        (12 + r2 * 18) * (0.6 + 0.4 * s),
+        1 + r * 1.2,
+        (0.08 + r2 * 0.12) * breath * gate,
+        clock * (0.8 + r * 0.6) + i,
+        accent,
+      );
+    }
+    const motes = Math.round((10 + 26 * s) * gate);
+    ctx.fillStyle = rgbCss(accent, 0.24 * breath);
+    for (let i = 0; i < motes; i++) {
+      const h = Math.sin(i * 23.3 + 7) * 43758.5453;
+      const r = h - Math.floor(h);
+      const h2 = Math.sin(i * 61.1 + 9) * 27183.1;
+      const r2 = h2 - Math.floor(h2);
+      const span = this.vw + 120;
+      const x = flow(r, span, -60, (70 + r2 * 110) * (0.5 + 0.7 * s));
+      const y = lane.y - 240 + r2 * 480 + Math.sin(clock * 2 + i) * 5;
+      ctx.beginPath();
+      ctx.arc(x, y, 0.7 + r * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * One wisp of wind: a ribbon that bulges and curls along its length and
+   * fades at both ends, drawn from (x, y) back against the way it blows.
+   */
+  private wisp(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    dir: number,
+    len: number,
+    amp: number,
+    width: number,
+    alpha: number,
+    phase: number,
+    rgb: RGB,
+  ): void {
+    const g = ctx.createLinearGradient(x, 0, x - dir * len, 0);
+    g.addColorStop(0, rgbCss(rgb, 0));
+    g.addColorStop(0.3, rgbCss(rgb, alpha));
+    g.addColorStop(0.75, rgbCss(rgb, alpha * 0.7));
+    g.addColorStop(1, rgbCss(rgb, 0));
+    ctx.strokeStyle = g;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    // A smooth ribbon: a low-frequency wave along the length, drawn as a run
+    // of quadratic curves through the midpoints so no joint shows.
+    const n = 10;
+    const pts: [number, number][] = [];
+    for (let k = 0; k <= n; k++) {
+      const u = k / n;
+      pts.push([x - dir * len * u, y + Math.sin(phase + u * 2.6) * amp * Math.sin(u * Math.PI)]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0]![0], pts[0]![1]);
+    for (let k = 1; k < n; k++) {
+      const [ax, ay] = pts[k]!;
+      const [bx, by] = pts[k + 1]!;
+      ctx.quadraticCurveTo(ax, ay, (ax + bx) / 2, (ay + by) / 2);
+    }
+    ctx.lineTo(pts[n]![0], pts[n]![1]);
+    ctx.stroke();
   }
 
   private drawBomb(ctx: CanvasRenderingContext2D): void {

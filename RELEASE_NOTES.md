@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 104 — Wind that looks like wind (internal)
+
+- **The wind is drawn as wind now, not lines**: wisps of air — curving, tapered ribbons at three depths (long slow ones far across the sky behind the tower, quicker ones in the slab's lane, fine dust between), all flowing the wind's way and swelling with it; a calm empties the sky. The gust front is built from the same wisps.
+- **The wind bed is quieter again and follows the wind's square**: near-silent in a calm, a presence only when it blows.
+
 ## Build 103 — The music follows the climb (internal)
 
 - **Height lifts the music out of the fog.** A sky starts with the piece distant — muffled and quieter, as if from below — and it opens fully by the summit (sooner if things get tense).
