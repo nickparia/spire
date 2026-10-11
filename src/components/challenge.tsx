@@ -79,6 +79,8 @@ export function SettingsSheet({
   onName,
   onChallenges,
   onTester,
+  onRelight,
+  trace,
   onWeapon,
   onReset,
   onEnded,
@@ -91,6 +93,10 @@ export function SettingsSheet({
   onName: (name: string) => void;
   onChallenges: (on: boolean) => void;
   onTester: (patch: { tester?: boolean; practice?: boolean }) => void;
+  /** Tester tool: relight every Hearth sky with three stars. */
+  onRelight: () => void;
+  /** What the game just did, and any error, for testers. */
+  trace?: string[];
   onWeapon: (id: WeaponId) => void;
   onReset: () => void;
   /** How the music is doing, for testers. */
@@ -242,7 +248,26 @@ export function SettingsSheet({
             onChange={(e) => onTester({ practice: e.target.checked })}
           />
         </label>
+        {save.tester ? (
+          <div className="switch-row">
+            <span>
+              <b>Relight Hearth</b>
+              <small>
+                Three stars on every Hearth sky, so the worlds beyond it open and the title runs
+                one.
+              </small>
+            </span>
+            <button type="button" className="btn" onClick={onRelight}>
+              Relight
+            </button>
+          </div>
+        ) : null}
         {music ? <p className="panel-meta mt-2">Music: {music}</p> : null}
+        {trace && trace.length ? (
+          <pre className="panel-meta mt-2 whitespace-pre-wrap text-left text-[11px] leading-snug">
+            {trace.join("\n")}
+          </pre>
+        ) : null}
 
         <div className="mt-3">
           <button type="button" className="btn btn-primary" onClick={onClose}>

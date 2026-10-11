@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 99 — The title can't be stranded, and testers get a trace (internal)
+
+- **The title.** The way into the worlds is now booked before anything else the tap does (waking audio, the score), so nothing that fails on a phone can keep the title on screen; and if the worlds haven't opened well after they should have, a second tap opens them.
+- **Tester tools** (Options): **Relight Hearth** — three stars on every Hearth sky in one tap, so the Gale opens and the title runs a Gale sky; and a **trace** of what the game just did (title tap, menu, play, start, any error). If the title ever sticks again: open Options, screenshot the trace, send it.
+
 ## Build 98 — Sounds worth hearing (internal)
 
 - **The Dark is quieter.** Its swallow is low, a third of the volume, and never twice in a breath; fallen rubble is a soft thud; the long sting is kept for the big beats — a topple, the Hollow waking, a surge — and cut short. "It sees you" is a low pulse, not a sting.

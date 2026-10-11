@@ -9,6 +9,7 @@ import {
 } from "react";
 import { LEVELS } from "@/game/levels";
 import { nextSkyIn, worldOpen } from "@/game/progress";
+import { trace } from "@/game/trace";
 import { levelStars, type Save } from "@/game/save";
 import { rgbCss, THEMES } from "@/game/themes";
 import { levelsOf, WORLDS, WORLDS_TO_COME } from "@/game/worlds";
@@ -42,12 +43,30 @@ export function TitleSplash({ onEnter, onAwaken }: { onEnter: () => void; onAwak
   const [leaving, setLeaving] = useState(false);
   // A ref, not the state: a lift and a click arrive together, and only one may go in.
   const gone = useRef(false);
+  const left = useRef(0);
   const enter = () => {
-    if (gone.current) return;
+    const now = performance.now();
+    trace(gone.current ? "title tap (again)" : "title tap");
+    if (gone.current) {
+      // Already leaving: if the worlds haven't opened well after they should have, a
+      // second tap opens them now. Nothing may strand the title.
+      if (now - left.current > (TITLE_LEAVE + 0.8) * 1000) onEnter();
+      return;
+    }
     gone.current = true;
+    left.current = now;
     setLeaving(true);
-    onAwaken?.();
-    window.setTimeout(onEnter, TITLE_LEAVE * 1000);
+    // The way in is booked before anything that could fail (audio, the score):
+    // a thrown error here must never keep the title on screen.
+    window.setTimeout(() => {
+      trace("title → worlds");
+      onEnter();
+    }, TITLE_LEAVE * 1000);
+    try {
+      onAwaken?.();
+    } catch (err) {
+      trace(`awaken failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
   return (
     <div

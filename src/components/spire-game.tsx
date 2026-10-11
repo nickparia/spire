@@ -11,6 +11,7 @@ import { EscapeBrief } from "./escape-brief";
 import { ChapterList, ChapterPlayer } from "./story";
 import { CHAPTERS, chapterFor, type Chapter } from "@/game/story";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
+import { trace, traceLines, watchErrors } from "@/game/trace";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect } from "./screens";
 import { TitleSplash, WorldSelect } from "./home";
@@ -126,6 +127,7 @@ export function SpireGame() {
   const [storyThen, setStoryThen] = useState<number | null>(null);
   const play = useCallback((index: number) => {
     const engine = engineRef.current;
+    trace(`play ${index}${engine && isUnlocked(state.current.save, index) ? "" : " (locked)"}`);
     if (!engine || !isUnlocked(state.current.save, index)) return;
     engine.click();
     setSelected(index);
@@ -283,9 +285,13 @@ export function SpireGame() {
         engine.setSfx(on);
       }
     };
+    watchErrors();
     // A phone keeps a second copy of the save; take it if it is the newer one.
     restoreNativeSave(state.current.save).then((restored) => {
-      if (restored) engineRef.current?.adoptSave(restored);
+      if (restored) {
+        trace("native save adopted");
+        engineRef.current?.adoptSave(restored);
+      }
     });
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -576,6 +582,12 @@ export function SpireGame() {
           onName={(name) => engineRef.current?.updateSave({ name })}
           onChallenges={(on) => engineRef.current?.updateSave({ challengesOn: on })}
           onTester={(patch) => engineRef.current?.updateSave(patch)}
+          trace={save.tester ? traceLines() : undefined}
+          onRelight={() => {
+            engineRef.current?.relightHearth();
+            setOptions(false);
+            openTitle();
+          }}
           onWeapon={(id) => engineRef.current?.setWeapon(id)}
           onReset={() => {
             engineRef.current?.resetProgress();

@@ -77,6 +77,7 @@ import { Music } from "./music";
 import { earn, featsFor, type FeatId } from "./feats";
 import { CRADLE_STOP, LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
+import { trace } from "./trace";
 import { finishWorn, trailWorn, type FinishId, type TrailId } from "./finishes";
 import {
   isLanding,
@@ -1078,6 +1079,7 @@ export class SpireEngine {
 
   /** Back to the menus, with the given level's sky behind them. */
   showMenu(levelIndex: number): void {
+    trace(`menu ${LEVELS[levelIndex]?.id ?? levelIndex}`);
     this.escapeTower = null;
     this.mode = "level";
     this.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, levelIndex));
@@ -1121,6 +1123,7 @@ export class SpireEngine {
   }
 
   startLevel(levelIndex: number): void {
+    trace(`start ${LEVELS[levelIndex]?.id ?? levelIndex}`);
     this.mode = "level";
     this.ascent = false;
     this.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, levelIndex));
@@ -1295,6 +1298,32 @@ export class SpireEngine {
 
   /** Buys the next tier of a workshop device. Returns false if it can't be afforded. */
   /** Wipes progress and starts again. Sound settings survive. */
+  /** Tester tool: every Hearth sky relit with three stars, so the worlds beyond it open. */
+  relightHearth(): void {
+    for (const id of WORLDS[0]!.levelIds) {
+      const rec = this.save.levels[id] ?? {
+        clear: false,
+        precise: false,
+        swift: false,
+        bestTime: null,
+        bestAccuracy: null,
+        runs: 0,
+      };
+      this.save.levels[id] = {
+        ...rec,
+        clear: true,
+        precise: true,
+        swift: true,
+        bestTime: rec.bestTime ?? 60,
+        bestAccuracy: rec.bestAccuracy ?? 0.9,
+        runs: Math.max(1, rec.runs),
+      };
+    }
+    this.save.progress[WORLDS[0]!.id] = WORLDS[0]!.levelIds.length;
+    this.commit();
+    if (this.phase === "menu") this.showMenu(nextLevelIndex(this.save));
+  }
+
   resetProgress(): void {
     this.wake();
     const { music, sfx } = this.save;
