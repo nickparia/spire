@@ -493,16 +493,51 @@ export class Sfx {
   }
 
   /** The title wakes: a sub boom, a rush rising out of it, and a high chord over the top. */
-  /** The title answered: the light released. A warm chord rising through the octave, a breath of air, a soft ground. */
+  /**
+   * A voice that swells in over `rise` seconds and fades over the rest: a pad,
+   * not a strike. Everything the title says is said this way.
+   */
+  private pad(
+    freq: number,
+    type: OscillatorType,
+    peak: number,
+    rise: number,
+    dur: number,
+    delay = 0,
+  ): void {
+    const { ctx, sfxBus } = this.rig;
+    if (!ctx || !sfxBus || !this.rig.sfxEnabled) return;
+    const t = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + rise);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain);
+    gain.connect(sfxBus);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
+  }
+
+  /**
+   * The title answered. Not a fanfare: a low minor pad swelling in out of the
+   * dark, a deep floor under it, and one lone bell far above, late — the
+   * Spire waking, and something beneath it noticing.
+   */
   awaken(): void {
-    [261.63, 329.63, 392, 523.25, 659.25].forEach((f, i) => {
-      this.tone(f, 1.7 - i * 0.1, "sine", 0.09, undefined, i * 0.09);
-      this.tone(f, 1.2, "triangle", 0.022, undefined, i * 0.09);
-    });
-    this.tone(1046.5, 1.9, "sine", 0.045, undefined, 0.5);
-    this.tone(1568, 1.6, "sine", 0.02, undefined, 0.62);
-    this.noise(1.3, 0.03, 7000, 0.3);
-    this.tone(65, 0.5, "sine", 0.1, 50);
+    this.pad(73.42, "sine", 0.07, 1.2, 3.2);
+    this.pad(146.83, "triangle", 0.03, 1.0, 2.8, 0.1);
+    this.pad(174.61, "sine", 0.035, 1.1, 2.6, 0.2);
+    this.pad(220, "sine", 0.03, 1.2, 2.4, 0.3);
+    this.pad(329.63, "sine", 0.018, 1.4, 2.2, 0.5);
+    this.pad(880, "sine", 0.022, 0.08, 1.8, 1.3);
+    this.noise(2.2, 0.012, 5000, 0.4);
   }
 
   ui(): void {

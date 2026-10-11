@@ -50,6 +50,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 102 Title sound again (Nick: "no mood to it… a bit loud"): `Sfx.pad()` (exponential swell over `rise`, then fade) and `awaken()` = D2 sine 0.07 / D3 tri 0.03 / F3 0.035 / A3 0.03 / E4 0.018 pads rising ~1 s, A5 bell 0.022 at 1.3 s, 5 kHz air 0.012. Peak sum ≈ 0.2 (was ≈ 0.55).
+
 - 101 Title sound (Nick: "a bit harsh and not that rewarding"): `Sfx.awaken()` = C4–E4–G4–C5–E5 sine+triangle staggered 90 ms (0.09/0.022), C6 and G6 shimmer, 7 kHz air at 0.03, a 0.5 s 65→50 Hz ground at 0.1; the old 72→34 Hz 2.8 s drone at 0.4 and 600 Hz rumble are gone.
 
 - 100 The freeze (Nick: "game froze, sound still playing, after about 2 mins" on the Gale) and the wind too loud: `Sfx.play()` with `cut` called `src.stop()` before `src.start()` → `InvalidStateError` (Chrome and WebKit) thrown inside `step()` → the rAF loop died; the wind loop kept playing because it's an audio-graph node. Reproduced on the web only with sound on (`pace.mjs … sound` — new flag: music/sfx on in the save, `e.wake()` first, `--autoplay-policy=no-user-gesture-required`; the status line now shows `audio: state/sfx/samples`): old sfx on Gusts froze at floor 5. Fix: start before stop; `frame()` try/catches each `step()` and `render()` and traces the error. Wind bed 0.13 → 0.055, moan 0.07 → 0.04. Rule: any bot run that checks a build must include one sound-on run.

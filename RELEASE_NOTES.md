@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 102 — The title's voice (internal)
+
+- **The title's sound has a mood now, and half the volume.** A low minor pad swells in out of the dark instead of striking, with a deep floor under it and one lone bell far above, late — the Spire waking, and something beneath it noticing.
+
 ## Build 101 — A kinder way in (internal)
 
 - **The title's sound is now a reward, not a warning**: a warm chord rising through the octave as the light is released, a breath of air over it, a soft ground under it — in place of the three-second sub drone and rumble.
