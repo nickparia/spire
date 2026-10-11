@@ -70,6 +70,8 @@ const LEAD_16: readonly (readonly [number, number])[] = [
 ];
 
 const STEPS_PER_BAR = 16;
+/** The shimmer's notes over the root, two octaves up: a pentatonic that never clashes with the piece. */
+const SHIMMER = [0, 2, 4, 7, 9, 12, 14, 16];
 
 /**
  * The arrangement, in bars: A, B, A, then a short breakdown. The last bar of
@@ -237,6 +239,8 @@ export class Music {
   private mood: Mood = "menu";
   private target = 0;
   private tension = 0;
+  /** When the next heartbeat is due, in context time; 0 while the heart is quiet. */
+  private nextBeat = 0;
   private step = 0;
   private nextTime = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -496,6 +500,9 @@ export class Music {
     const time = rec.ctx.currentTime;
     const stripped =
       this.mood === "play" && Math.floor(this.step / STEPS_PER_BAR) < this.stripUntil;
+    // The climb lifts the piece out of the fog: muffled and distant at the
+    // foot of the tower, fully open by the summit (or sooner, if it gets tense).
+    const open = Math.max(Math.pow(clamp01(this.climb.progress), 0.7), t);
     const cutoff =
       this.boss || this.mood === "summit" || this.mood === "menu"
         ? 20000
@@ -503,9 +510,12 @@ export class Music {
           ? 650
           : stripped
             ? 900
-            : Math.min(20000, 2200 * Math.pow(9, t));
+            : Math.min(20000, 650 * Math.pow(30, open));
     rec.tone.frequency.setTargetAtTime(cutoff, time, 0.25);
-    const level = this.mood === "fallen" ? 0.5 : this.mood === "menu" ? 0.85 : 1;
+    // Quieter low down; ducked a little while the heart is beating, so it's felt.
+    const heart = this.mood === "play" && !this.boss && this.climb.danger > 0.72 ? 0.86 : 1;
+    const level =
+      this.mood === "fallen" ? 0.5 : this.mood === "menu" ? 0.85 : (0.72 + 0.28 * open) * heart;
     rec.level.gain.setTargetAtTime(
       level,
       time,
@@ -619,13 +629,23 @@ export class Music {
     const level = this.mood === "fallen" ? 0.35 : this.mood === "menu" ? 0.7 : 0.95;
     graph.level.gain.setTargetAtTime(level, time, 0.25);
     graph.echo.delayTime.setTargetAtTime(Math.min(1.4, stepDur * 3), time, 0.05);
+    // The held dissonance creeps in with the Dark's nearness (and, on the synth, with strain).
     const strain =
-      this.mood === "play" && !recorded ? Math.pow(Math.max(0, (t - 0.5) / 0.5), 2) * 0.04 : 0;
+      this.mood === "play"
+        ? Math.max(
+            recorded ? 0 : Math.pow(Math.max(0, (t - 0.5) / 0.5), 2) * 0.04,
+            this.boss ? 0 : Math.pow(clamp01(this.climb.danger), 2) * 0.028,
+          )
+        : 0;
     graph.strain.gain.setTargetAtTime(strain, time, 0.2);
     graph.strainOscs[0]!.frequency.setTargetAtTime(hz(track.root + 25), time, 0.05);
     graph.strainOscs[1]!.frequency.setTargetAtTime(hz(track.root + 30), time, 0.05);
 
     if (bar === this.swellBar && s === 0) this.swell(graph, time, stepDur * STEPS_PER_BAR);
+    if (playing && !this.boss) {
+      this.heartbeat(graph, time, stepDur);
+      this.shimmer(graph, time, s, bar, stepDur);
+    }
     // While the recorded score loads, nothing: better a beat of quiet than a lurch.
     const waiting =
       this.rec !== null && this.recState === "loading" && performance.now() - this.recSince < 8000;
@@ -642,6 +662,68 @@ export class Music {
       }
     }
     return stepDur;
+  }
+
+  /**
+   * The Dark's nearness as a heartbeat: nothing while it's far, a slow thud as
+   * it comes within reach, racing as it closes. Lub-dub, under everything.
+   */
+  private heartbeat(graph: Graph, time: number, stepDur: number): void {
+    // Within about four floors (danger 0.75) the heart starts, slow; at two it races.
+    const near = clamp01((this.climb.danger - 0.72) / 0.28);
+    if (near <= 0) {
+      this.nextBeat = 0;
+      return;
+    }
+    const period = 1.15 - 0.7 * near;
+    if (this.nextBeat < time) this.nextBeat = time;
+    while (this.nextBeat < time + stepDur) {
+      const at = this.nextBeat;
+      const peak = 0.2 + 0.22 * near;
+      this.thud(graph, at, peak);
+      this.thud(graph, at + 0.15, peak * 0.55);
+      this.nextBeat += period;
+    }
+  }
+
+  private thud(graph: Graph, at: number, peak: number): void {
+    const { ctx } = graph;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.setValueAtTime(96, at);
+    osc.frequency.exponentialRampToValueAtTime(38, at + 0.12);
+    gain.gain.setValueAtTime(peak, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.24);
+    osc.connect(gain);
+    gain.connect(graph.drums);
+    osc.start(at);
+    osc.stop(at + 0.26);
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
+  }
+
+  /**
+   * A streak's shimmer: from three perfects a soft high arpeggio in the piece's
+   * own key rides over it, brightening a step per perfect; a miss drops it.
+   */
+  private shimmer(graph: Graph, time: number, s: number, bar: number, stepDur: number): void {
+    const streak = this.climb.streak;
+    if (streak < 3 || s % 2 !== 0) return;
+    const idx = (bar * 8 + s / 2 + streak) % SHIMMER.length;
+    const note = this.track.root + 24 + SHIMMER[idx]!;
+    const peak = 0.014 + 0.0035 * Math.min(10, streak);
+    const release = Math.max(0.35, stepDur * 3);
+    const osc = this.voice(graph, graph.level, time, hz(note), "sine", peak, 0.01, 0, release);
+    if (streak >= 6)
+      this.voice(graph, graph.level, time, hz(note + 12), "sine", peak * 0.4, 0.01, 0, release);
+    const send = graph.ctx.createGain();
+    send.gain.setValueAtTime(peak * 0.8, time);
+    send.gain.exponentialRampToValueAtTime(0.0001, time + release);
+    osc.connect(send);
+    send.connect(graph.echo);
+    osc.addEventListener("ended", () => send.disconnect());
   }
 
   private voice(

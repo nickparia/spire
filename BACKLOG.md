@@ -50,6 +50,8 @@ The one list. Ordered within each section; move items as they go. Keep it curren
 
 ## Done (most recent first)
 
+- 103 Music follows the climb (Nick: "I don't really see a change in the music as you get higher or get more under pressure" — the recorded pieces only had a 2.2→20 kHz low-pass, inaudible on a phone): in `tendRecorded`, `open = max(progress^0.7, tension)` → cutoff `650·30^open` (650 Hz → 19.5 kHz), level `(0.72 + 0.28·open) × 0.86 while the heart beats`; `heartbeat()` on the synth graph's drums bus — `near = (danger − 0.72)/0.28`, period 1.15 → 0.45 s, lub-dub (`thud` 96→38 Hz, second at +0.15 s at 55 %), `nextBeat` scheduled inside `scheduleStep`; strain dissonance also `danger² × 0.028` in recorded mode; `shimmer()` from streak ≥ 3 on every 8th: `SHIMMER` pentatonic two octaves over `track.root`, peak 0.014 + 0.0035·min(10, streak), octave at ≥ 6, echo send; none of it in the boss. `pace.mjs` status now prints `music: piece|danger|heart|streak`.
+
 - 102 Title sound again (Nick: "no mood to it… a bit loud"): `Sfx.pad()` (exponential swell over `rise`, then fade) and `awaken()` = D2 sine 0.07 / D3 tri 0.03 / F3 0.035 / A3 0.03 / E4 0.018 pads rising ~1 s, A5 bell 0.022 at 1.3 s, 5 kHz air 0.012. Peak sum ≈ 0.2 (was ≈ 0.55).
 
 - 101 Title sound (Nick: "a bit harsh and not that rewarding"): `Sfx.awaken()` = C4–E4–G4–C5–E5 sine+triangle staggered 90 ms (0.09/0.022), C6 and G6 shimmer, 7 kHz air at 0.03, a 0.5 s 65→50 Hz ground at 0.1; the old 72→34 Hz 2.8 s drone at 0.4 and 600 Hz rumble are gone.

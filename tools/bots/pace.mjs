@@ -81,6 +81,7 @@ for (let t = 0; t < Number(max); t += 5) {
       t: p.time.toFixed(1),
       gap: e.darkGap().toFixed(1),
       audio: `${e.rig?.ctx?.state ?? "none"}/${e.rig?.sfxEnabled ? "sfx" : "nosfx"}/${e.sfx?.samples?.size ?? 0}`,
+      music: `${e.music?.status?.()}|danger ${(e.music?.climb?.danger ?? 0).toFixed(2)}|heart ${e.music?.nextBeat > 0 ? "on" : "off"}|streak ${e.music?.climb?.streak ?? 0}`,
     };
   });
   last = JSON.stringify(s);

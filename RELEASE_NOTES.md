@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 103 — The music follows the climb (internal)
+
+- **Height lifts the music out of the fog.** A sky starts with the piece distant — muffled and quieter, as if from below — and it opens fully by the summit (sooner if things get tense).
+- **The Dark brings a heartbeat.** Within about four floors a low lub-dub starts under the music, slow; at two floors it races. The piece ducks a touch so it's felt, and a held dissonance creeps in with it. It stops the moment you drive the Dark back.
+- **A streak brings a shimmer.** From three perfects a soft high arpeggio in the piece's own key rides over it, brightening a step per perfect (an octave joins at six); a miss drops it.
+
 ## Build 102 — The title's voice (internal)
 
 - **The title's sound has a mood now, and half the volume.** A low minor pad swells in out of the dark instead of striking, with a deep floor under it and one lone bell far above, late — the Spire waking, and something beneath it noticing.
