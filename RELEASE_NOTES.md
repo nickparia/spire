@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 98 — Sounds worth hearing (internal)
+
+- **The Dark is quieter.** Its swallow is low, a third of the volume, and never twice in a breath; fallen rubble is a soft thud; the long sting is kept for the big beats — a topple, the Hollow waking, a surge — and cut short. "It sees you" is a low pulse, not a sting.
+- **A perfect is the biggest sound in the game.** The chime, a bright note that climbs a pentatonic scale with the streak (back to the root on a miss), its octave, and a thump underneath. Plain drops are half as loud, so the difference is the point.
+- Wind-true, keystone and second-wind resolve on two notes; a forge shimmers.
+
 ## Build 97 — A kinder Gale (internal)
 
 - **The Updraft is on your side.** Sky 1's air draws every drop a third of the way back toward the groove and holds it up a little longer; Gusts keeps half that help. You learn the lead while the sky helps.

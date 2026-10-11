@@ -27,6 +27,9 @@ const SAMPLES = [
 ] as const;
 type Sample = (typeof SAMPLES)[number];
 
+/** Semitones above C5 a perfect's note climbs with the streak: the major pentatonic, two octaves. */
+const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+
 /**
  * The game's one-shot sounds: recorded effects once they have loaded, with
  * the old synth tones standing in until then (or if one can't be had).
@@ -35,6 +38,7 @@ export class Sfx {
   private rig: AudioRig;
   private samples = new Map<Sample, AudioBuffer>();
   private loading = false;
+  private lastAt = new Map<string, number>();
   /** The Gale's wind loop, built once per audio context. */
   private air: {
     ctx: AudioContext;
@@ -71,7 +75,7 @@ export class Sfx {
   }
 
   /** Plays a recorded effect; false if it isn't loaded (the caller falls back to a tone). */
-  private play(name: Sample, gain = 1, rate = 1, delay = 0): boolean {
+  private play(name: Sample, gain = 1, rate = 1, delay = 0, cut = 0): boolean {
     const { ctx, sfxBus } = this.rig;
     const buffer = this.samples.get(name);
     if (!ctx || !sfxBus || !buffer) return false;
@@ -81,13 +85,29 @@ export class Sfx {
     src.playbackRate.value = rate;
     const g = ctx.createGain();
     g.gain.value = gain;
+    const t = ctx.currentTime + delay;
+    if (cut > 0) {
+      // A long sample cut short: faded out over its last third of a second.
+      g.gain.setValueAtTime(gain, t + cut - 0.3);
+      g.gain.linearRampToValueAtTime(0, t + cut);
+      src.stop(t + cut + 0.02);
+    }
     src.connect(g);
     g.connect(sfxBus);
-    src.start(ctx.currentTime + delay);
+    src.start(t);
     src.onended = () => {
       src.disconnect();
       g.disconnect();
     };
+    return true;
+  }
+
+  /** Whether `key` may sound again: the Dark's noises are spaced so they never stack. */
+  private spaced(key: string, every: number): boolean {
+    const now = performance.now() / 1000;
+    const last = this.lastAt.get(key) ?? -1e9;
+    if (now - last < every) return false;
+    this.lastAt.set(key, now);
     return true;
   }
 
@@ -169,7 +189,7 @@ export class Sfx {
   }
 
   drop(): void {
-    if (this.play("drop", 0.8, this.vary())) return;
+    if (this.play("drop", 0.42, this.vary())) return;
     const wobble = 0.94 + Math.random() * 0.12;
     this.tone(170 * wobble, 0.09, "sine", 0.2, 64);
     this.noise(0.05, 0.1, 700);
@@ -181,18 +201,29 @@ export class Sfx {
     this.tone(380, 0.05, "triangle", 0.05, 140);
   }
 
+  /**
+   * A perfect is the biggest sound in the game: the recorded chime, a bright
+   * note that climbs a pentatonic scale with the streak (back to the root on
+   * a miss), its octave above, and a thump underneath for the weight.
+   */
   perfect(streak: number): void {
-    // The chime climbs as the streak builds.
-    if (this.play("perfect", 0.75, 1 + Math.min(streak, 10) * 0.035)) return;
-    const base = 494 + Math.min(streak, 8) * 28;
-    this.tone(base, 0.12, "sine", 0.13);
-    this.tone(base * 1.26, 0.16, "sine", 0.07);
+    const degree = PENTATONIC[Math.min(streak, PENTATONIC.length - 1)]!;
+    const note = 523.25 * Math.pow(2, degree / 12);
+    this.play("perfect", 0.95, 1 + Math.min(streak, 10) * 0.02);
+    this.tone(note, 0.34, "triangle", 0.16);
+    this.tone(note, 0.5, "sine", 0.12);
+    this.tone(note * 2, 0.42, "sine", 0.05, undefined, 0.01);
+    this.tone(62, 0.16, "sine", 0.3, 44);
+    if (streak >= 3) this.tone(note * 1.5, 0.3, "sine", 0.04, undefined, 0.06);
   }
 
   forge(): void {
-    this.tone(523, 0.18, "triangle", 0.14);
-    this.tone(659, 0.22, "sine", 0.09);
-    this.tone(784, 0.26, "sine", 0.07);
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+      this.tone(f, 0.3, "triangle", 0.13, undefined, i * 0.05);
+      this.tone(f * 2, 0.36, "sine", 0.04, undefined, i * 0.05);
+    });
+    this.noise(0.35, 0.05, 9000, 0.1);
+    this.tone(62, 0.2, "sine", 0.3, 44);
   }
 
   tick(): void {
@@ -209,15 +240,25 @@ export class Sfx {
     this.tone(120, 0.05, "square", 0.04);
   }
 
+  /** The Dark swallowing something: low, quiet, and never twice in a breath. */
   hiss(): void {
-    if (this.play("quench", 0.6, this.vary())) return;
-    this.noise(0.14, 0.05, 420);
+    if (!this.spaced("hiss", 1.2)) return;
+    if (this.play("quench", 0.22, 0.8 * this.vary())) return;
+    this.noise(0.14, 0.03, 300);
   }
 
+  /** The Dark noticing you: a low pulse, not a sting. */
+  glance(): void {
+    this.tone(82, 0.5, "sine", 0.22, 55);
+    this.noise(0.3, 0.05, 240);
+  }
+
+  /** Something read right (a wind-true, a keystone, a second wind): a two-note resolve. */
   chime(): void {
-    if (this.play("landing", 0.7)) return;
-    this.tone(698, 0.09, "sine", 0.11);
-    this.tone(988, 0.14, "sine", 0.06);
+    this.play("landing", 0.5, 1, 0, 1.3);
+    this.tone(783.99, 0.18, "triangle", 0.12);
+    this.tone(1046.5, 0.5, "triangle", 0.14, undefined, 0.14);
+    this.tone(2093, 0.5, "sine", 0.04, undefined, 0.14);
   }
 
   best(): void {
@@ -225,8 +266,10 @@ export class Sfx {
     this.tone(1174, 0.18, "sine", 0.06);
   }
 
+  /** The big bad beats only: a topple, the Hollow waking, a surge. */
   fail(): void {
-    if (this.play("taken", 0.85)) return;
+    if (!this.spaced("fail", 2)) return;
+    if (this.play("taken", 0.6, 1, 0, 1.4)) return;
     this.tone(196, 0.38, "sawtooth", 0.05, 48);
     this.noise(0.28, 0.12, 500);
   }
@@ -406,7 +449,8 @@ export class Sfx {
 
   /** Something plunging into the Dark. */
   splash(): void {
-    if (!this.play("splash", 0.7, this.vary(0.12))) this.hiss();
+    if (!this.spaced("splash", 1)) return;
+    if (!this.play("splash", 0.4, this.vary(0.12))) this.hiss();
   }
 
   /** Something tumbling away down the shaft. */
@@ -416,7 +460,8 @@ export class Sfx {
 
   /** A slab crumbling to rubble on the ground. */
   rubble(): void {
-    if (!this.play("rubble", 0.7, this.vary(0.12))) this.drop();
+    if (!this.spaced("rubble", 0.5)) return;
+    if (!this.play("rubble", 0.32, this.vary(0.12))) this.drop();
   }
 
   /** The tower going over. */
@@ -426,7 +471,7 @@ export class Sfx {
 
   /** Something living taken by the dark: the presence, close and low. */
   taken(): void {
-    if (!this.play("taken", 0.6, 0.85)) this.fail();
+    if (!this.play("taken", 0.35, 0.85, 0, 1.4)) this.fail();
   }
 
   /** The Descent's door bursting open. */

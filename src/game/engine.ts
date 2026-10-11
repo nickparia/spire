@@ -2484,7 +2484,7 @@ export class SpireEngine {
       this.float("IT SEES YOU", top.x + top.w / 2, top.y + 110, false, 26);
       this.trauma = Math.min(1, this.trauma + 0.6);
       this.flash = Math.max(this.flash, 0.3);
-      this.sfx.fail();
+      this.sfx.glance();
       haptics.heavy();
       this.emit();
       return;
