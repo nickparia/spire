@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 101 — A kinder way in (internal)
+
+- **The title's sound is now a reward, not a warning**: a warm chord rising through the octave as the light is released, a breath of air over it, a soft ground under it — in place of the three-second sub drone and rumble.
+
 ## Build 100 — The freeze, and a quieter wind (internal)
 
 - **The freeze is fixed.** Build 98's faded-out sounds (a topple's sting, a wind-true's chime) scheduled their stop before their start, which the audio engine rejects — and on a phone that error landed inside the game loop and stopped it, with the wind still blowing. Found by running the bots with sound on, which they now can; the game loop also survives any single bad frame from here on.

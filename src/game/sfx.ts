@@ -493,17 +493,16 @@ export class Sfx {
   }
 
   /** The title wakes: a sub boom, a rush rising out of it, and a high chord over the top. */
+  /** The title answered: the light released. A warm chord rising through the octave, a breath of air, a soft ground. */
   awaken(): void {
-    this.tone(72, 2.8, "sine", 0.4, 34);
-    this.tone(144, 1.6, "triangle", 0.08, 70);
-    this.noise(1.8, 0.12, 600);
-    for (const [f, d] of [
-      [1318.5, 0.18],
-      [1760, 0.3],
-      [2637, 0.42],
-    ] as const) {
-      this.tone(f, 2.4, "sine", 0.035, undefined, d);
-    }
+    [261.63, 329.63, 392, 523.25, 659.25].forEach((f, i) => {
+      this.tone(f, 1.7 - i * 0.1, "sine", 0.09, undefined, i * 0.09);
+      this.tone(f, 1.2, "triangle", 0.022, undefined, i * 0.09);
+    });
+    this.tone(1046.5, 1.9, "sine", 0.045, undefined, 0.5);
+    this.tone(1568, 1.6, "sine", 0.02, undefined, 0.62);
+    this.noise(1.3, 0.03, 7000, 0.3);
+    this.tone(65, 0.5, "sine", 0.1, 50);
   }
 
   ui(): void {
