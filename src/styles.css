@@ -4785,3 +4785,23 @@
   color: var(--school, #ddd);
   text-shadow: 0 1px 2px #000;
 }
+
+.hand-power {
+  width: 30px;
+  height: 40px;
+  margin-left: 4px;
+  animation: hand-power 2.4s ease-in-out infinite;
+}
+@keyframes hand-power {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1.5px var(--c),
+      0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px var(--c),
+      0 0 22px var(--c);
+  }
+}

@@ -182,11 +182,15 @@ function HandRow({ hud }: { hud: Hud }) {
       {hud.combos.map((c) => (
         <span
           key={c}
-          className="hand-combo"
-          style={{ "--c": `rgb(${COMBO_BY_ID[c].rgb.join(",")})` } as CSSProperties}
-        >
-          {COMBO_BY_ID[c].name}
-        </span>
+          className="hand-stone hand-full hand-power"
+          style={
+            {
+              "--c": `rgb(${COMBO_BY_ID[c].rgb.join(",")})`,
+              backgroundImage: `url(art/cards/${c}.jpg)`,
+            } as CSSProperties
+          }
+          title={COMBO_BY_ID[c].name}
+        />
       ))}
     </div>
   );

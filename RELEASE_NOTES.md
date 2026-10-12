@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 109 — Every card has its painting (internal)
+
+- The four newer cards — Keystone, Second Sight, Ember Trail, The Open Hand — and the three powers — Firestorm, The Long Winter, Held Breath — have their own paintings now. A power you hold shows as its own stone in the hand, pulsing.
+
 ## Build 108 — Things you climb past (internal)
 
 - **The sky has company now.** At set heights on every sky you climb past something that belongs there: a flock of crows crossing low, a cloud you climb through, a sheet of rain, a pale sun or a crescent moon breaking through high up; on the ridge, torn prayer-flag scraps tumbling and a kite torn loose. They drift behind the tower at their own depth, never in the slab's lane, and never touch play — the higher ones are the rarer.
