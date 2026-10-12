@@ -3,7 +3,7 @@
  * for testers to read in Options when a phone misbehaves. Nothing leaves
  * the device.
  */
-const KEEP = 24;
+const KEEP = 40;
 const lines: string[] = [];
 
 export function trace(msg: string): void {

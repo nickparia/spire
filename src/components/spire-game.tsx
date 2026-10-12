@@ -88,6 +88,9 @@ export function SpireGame() {
   const rootRef = useRef<HTMLDivElement>(null);
   /** When the last touch was handed to the engine directly, so the two routes never double-tap. */
   const lastDirect = useRef(0);
+  /** A button touched whose click has not arrived yet; pressed for it if the click never comes. */
+  const pending = useRef<{ button: HTMLButtonElement; id: number } | null>(null);
+  const pressSeq = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<SpireEngine | null>(null);
   const [hud, setHud] = useState<Hud>(INITIAL);
@@ -323,12 +326,26 @@ export function SpireGame() {
       if (!engine) return;
       const target = ev.target as HTMLElement | null;
       const phase = state.current.hud.phase;
-      if (phase === "menu") return;
       const ui = target?.closest?.("button, [data-ui], input, a, select, textarea");
       const where = target
         ? `${target.tagName.toLowerCase()}.${String(target.className).slice(0, 24)}`
         : "?";
-      if (phase === "ready") trace(`touch ${ev.type} on ${where}${ui ? " (ui)" : ""}`);
+      if (phase === "ready" || phase === "menu")
+        trace(`touch ${ev.type} on ${where}${ui ? " (ui)" : ""}`);
+      // A button touched: if its click never comes (it has died on a phone,
+      // more than once), the button is pressed for it after a beat.
+      const button = target?.closest?.("button") as HTMLButtonElement | null;
+      if (button && ev.type === "pointerdown" && !button.disabled) {
+        const id = ++pressSeq.current;
+        pending.current = { button, id };
+        window.setTimeout(() => {
+          if (pending.current?.id !== id) return;
+          pending.current = null;
+          trace(`click lost on ${where}: pressed for it`);
+          button.click();
+        }, 320);
+      }
+      if (phase === "menu") return;
       if (ui) return;
       const now = performance.now();
       if (now - lastDirect.current < 80) return;
@@ -337,6 +354,15 @@ export function SpireGame() {
     };
     window.addEventListener("touchstart", direct, { capture: true, passive: true });
     window.addEventListener("pointerdown", direct, { capture: true });
+    // A click that does arrive cancels the press for it.
+    const arrived = (ev: Event) => {
+      const target = ev.target as HTMLElement | null;
+      const button = target?.closest?.("button");
+      if (button && pending.current?.button === button) pending.current = null;
+      if (button && state.current.hud.phase === "menu")
+        trace(`click ${button.textContent?.trim().slice(0, 16) ?? ""}`);
+    };
+    window.addEventListener("click", arrived, { capture: true });
     // A phone keeps a second copy of the save; take it if it is the newer one.
     restoreNativeSave(state.current.save).then((restored) => {
       if (restored) {
@@ -349,6 +375,7 @@ export function SpireGame() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", direct, { capture: true });
       window.removeEventListener("pointerdown", direct, { capture: true });
+      window.removeEventListener("click", arrived, { capture: true });
     };
   }, [next, openTitle, openWorlds, play, quit, retry, skyFor, worldFocus]);
 

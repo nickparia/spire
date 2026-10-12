@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 113 — Every button answers, and the new cards ignite (internal)
+
+- **A button you touch is pressed even if the phone drops the tap.** The window itself now watches every touch on a button; if the click doesn't follow within a third of a second, the button is pressed for you. Covers Nice, Begin, New, Try again — all of them. The tester trace records touches and clicks in menus too.
+- **The seven newer cards ignite** when taken, like the first five: Keystone, Second Sight, Ember Trail, The Open Hand, Firestorm, The Long Winter, Held Breath.
+
 ## Build 112 — Events (internal)
 
 - **Every climb now has two moments that belong to its sky, at floors that differ every run**, each announced by the world a beat before, each asking something of the drop. Never on a landing, never the same two.
