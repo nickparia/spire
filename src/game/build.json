@@ -1,9 +1,7 @@
 {
-  "build": 110,
-  "title": "The first screen always goes",
+  "build": 111,
+  "title": "The cards stand tall again",
   "notes": [
-    "A touch at a sky's start always drops the first slab: touches reach the game by a second, direct route, and the first drop can't be held by a demo, a freeze or a sting.",
-    "The wind's sound, the passers-by and the wheel run fenced: one that fails on a phone is switched off and the climb goes on.",
-    "If a sky's start ever holds again: Options → Tester tools → screenshot the trace. It now records every touch and what it landed on."
+    "The three cards are dealt as a triangle, one up and two below, so each is full size again."
   ]
 }

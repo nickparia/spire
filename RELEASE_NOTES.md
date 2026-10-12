@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 111 — The cards stand tall again (internal)
+
+- **The three cards are dealt as a triangle** — one up, two below — so each is full size again. The top card's words sit beside it.
+
 ## Build 110 — The first screen always goes (internal)
 
 - **A touch at a sky's start always drops the first slab.** Touches now reach the game by a second, direct route from the window itself — before anything on the page can swallow them — and the first drop of a climb can no longer be held by a demo, a freeze or a sting. Whatever sat over the canvas on the phone, the ready card goes on the first tap.
