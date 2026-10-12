@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 105 — Lighter wind, kinder Gale, and a stall trace (internal)
+
+- **The wind bed is at less than half again** (and the howl's moan with it).
+- **The Gale is kinder**: the Updraft draws a miss nearly half-way home (Gusts a third, Crosswinds a little), the carry is lower on the first three skies, and the Gale's Dark climbs at three-quarters speed.
+- **The wind is cheaper to draw**: the ribbons are pre-rendered and stamped, not drawn with a gradient each, so a phone paints a hundred a frame without dropping frames.
+- **For the hold at a sky's start**: the tester trace now records any stall of the game loop (how long, in which phase), the reason for every tap the game ignored, how long each music piece took to decode, and any video that failed. If the hold happens again: Options → Tester tools → screenshot → send.
+
 ## Build 104 — Wind that looks like wind (internal)
 
 - **The wind is drawn as wind now, not lines**: wisps of air — curving, tapered ribbons at three depths (long slow ones far across the sky behind the tower, quicker ones in the slab's lane, fine dust between), all flowing the wind's way and swelling with it; a calm empties the sky. The gust front is built from the same wisps.

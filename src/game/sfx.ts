@@ -404,9 +404,9 @@ export class Sfx {
     const s = Math.min(1.3, Math.max(0, strength));
     const t = ctx.currentTime;
     // Faint in a calm, a presence only when it blows: the level follows the square of the strength.
-    this.air.gain.gain.setTargetAtTime(on * 0.028 * s * s, t, 0.12);
+    this.air.gain.gain.setTargetAtTime(on * 0.012 * s * s, t, 0.12);
     this.air.filter.frequency.setTargetAtTime(200 + 520 * s, t, 0.15);
-    this.air.moan.gain.setTargetAtTime(on * 0.022 * howl, t, 0.3);
+    this.air.moan.gain.setTargetAtTime(on * 0.01 * howl, t, 0.3);
     this.air.osc.frequency.setTargetAtTime(88 + 44 * howl, t, 0.3);
   }
 

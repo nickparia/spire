@@ -1,6 +1,7 @@
 import type { AudioRig } from "./audio";
 import { clamp01 } from "./logic";
 import type { Track } from "./themes";
+import { trace } from "./trace";
 
 export type Mood = "menu" | "play" | "fallen" | "summit";
 
@@ -362,13 +363,19 @@ export class Music {
       this.buffers.set(name, have);
       return have;
     }
+    const since = performance.now();
     const made = fetch(`music/${name}.m4a`)
       .then((r) => (okResponse(r) ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
       // Kept as decoded, full stereo: shrinking it (an offline render at a lower
       // rate) failed on iPhone and left the synth playing instead.
       .then((data) => decode(ctx, data))
+      .then((buffer) => {
+        trace(`music ${name} ready in ${Math.round(performance.now() - since)} ms`);
+        return buffer;
+      })
       .catch((err: unknown) => {
         this.lastError = `${name}: ${err instanceof Error ? err.message : String(err)}`;
+        trace(`music ${name} failed: ${this.lastError}`);
         return null;
       });
     this.buffers.set(name, made);

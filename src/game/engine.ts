@@ -259,6 +259,11 @@ const SPOKEN =
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
 const DEMO_TIME = 0.5;
+/** The wind's pre-rendered ribbons: phases kept, and the unscaled sprite's size and wave. */
+const WISP_PHASES = 12;
+const WISP_W = 200;
+const WISP_H = 56;
+const WISP_AMP = 16;
 /** The longest a demo may hold your taps before it steps aside, in seconds. */
 const DEMO_MAX = 4;
 const SLAB_MID = 0.07;
@@ -767,6 +772,10 @@ export class SpireEngine {
   private wasInZone = false;
   /** The last frame was in a gust: its rush plays once as it arrives. */
   private wasGusting = false;
+  /** Pre-rendered wind ribbons by sky colour (see wispSprites). */
+  private wispCache = new Map<string, HTMLCanvasElement[]>();
+  /** Why the last tap was ignored, so the trace says it once, not every tap. */
+  private lastIgnored: string | null = null;
   /** The floor count after a wind-true: the drop made at it is judged more kindly. */
   private boonFloor = -1;
   /** The wind this frame, read once in the update for everything drawn. */
@@ -1066,9 +1075,22 @@ export class SpireEngine {
       this.breakTop();
       return;
     }
-    if (this.freeze > 0 || this.mover.fallT >= 0) return;
-    if (this.demo && !this.demoing) return;
-    if (this.ascentSting > 0) return;
+    const why =
+      this.freeze > 0
+        ? "freeze"
+        : this.mover.fallT >= 0
+          ? "falling"
+          : this.demo && !this.demoing
+            ? "demo"
+            : this.ascentSting > 0
+              ? "sting"
+              : null;
+    if (why) {
+      if (why !== this.lastIgnored) trace(`tap ignored: ${why} (${this.phase})`);
+      this.lastIgnored = why;
+      return;
+    }
+    this.lastIgnored = null;
     if (this.bomb && this.bomb.fuse > 0) {
       this.detonate();
       return;
@@ -2996,6 +3018,7 @@ export class SpireEngine {
     v.addEventListener("timeupdate", ready);
     v.addEventListener("error", () => {
       this.darkArtReady = false;
+      trace(`video error: dark (${v.error?.code ?? "?"})`);
     });
     document.body.appendChild(v);
     this.darkArt = v;
@@ -3092,6 +3115,7 @@ export class SpireEngine {
     v.addEventListener("timeupdate", ready);
     v.addEventListener("error", () => {
       this.sourceArtReady = false;
+      trace(`video error: source (${v.error?.code ?? "?"})`);
     });
     document.body.appendChild(v);
     this.sourceArt = v;
@@ -4772,6 +4796,12 @@ export class SpireEngine {
 
   private frame = (now: number): void => {
     if (!this.running) return;
+    // A frame that arrives late by most of a second is a stall worth knowing about.
+    if (now - this.last > 700 && this.last > 0) {
+      trace(
+        `stall ${Math.round(now - this.last)} ms in ${this.phase}${this.paused ? " (paused)" : ""}`,
+      );
+    }
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (!this.paused) {
@@ -6791,31 +6821,64 @@ export class SpireEngine {
     phase: number,
     rgb: RGB,
   ): void {
-    const g = ctx.createLinearGradient(x, 0, x - dir * len, 0);
-    g.addColorStop(0, rgbCss(rgb, 0));
-    g.addColorStop(0.3, rgbCss(rgb, alpha));
-    g.addColorStop(0.75, rgbCss(rgb, alpha * 0.7));
-    g.addColorStop(1, rgbCss(rgb, 0));
-    ctx.strokeStyle = g;
-    ctx.lineWidth = width;
-    ctx.lineCap = "round";
-    // A smooth ribbon: a low-frequency wave along the length, drawn as a run
-    // of quadratic curves through the midpoints so no joint shows.
-    const n = 10;
-    const pts: [number, number][] = [];
-    for (let k = 0; k <= n; k++) {
-      const u = k / n;
-      pts.push([x - dir * len * u, y + Math.sin(phase + u * 2.6) * amp * Math.sin(u * Math.PI)]);
+    // Drawn from a small set of pre-rendered ribbons (one per phase), scaled to
+    // length and wave: a drawImage each, not a gradient each — a phone can
+    // paint a hundred a frame.
+    const sprites = this.wispSprites(rgb);
+    const k =
+      ((Math.round((phase / (Math.PI * 2)) * WISP_PHASES) % WISP_PHASES) + WISP_PHASES) %
+      WISP_PHASES;
+    const sprite = sprites[k]!;
+    ctx.save();
+    ctx.globalAlpha *= Math.min(1, alpha * (0.7 + width * 0.3));
+    ctx.translate(x, y);
+    ctx.scale((-dir * len) / WISP_W, Math.max(0.25, amp / WISP_AMP));
+    ctx.drawImage(sprite, 0, -WISP_H / 2);
+    ctx.restore();
+  }
+
+  /** The ribbons, rendered once per sky colour: a tapered wave at each phase. */
+  private wispSprites(rgb: RGB): HTMLCanvasElement[] {
+    const key = rgb.join(",");
+    const have = this.wispCache.get(key);
+    if (have) return have;
+    const out: HTMLCanvasElement[] = [];
+    for (let p = 0; p < WISP_PHASES; p++) {
+      const c = document.createElement("canvas");
+      c.width = WISP_W;
+      c.height = WISP_H;
+      const g = c.getContext("2d")!;
+      const grad = g.createLinearGradient(0, 0, WISP_W, 0);
+      grad.addColorStop(0, rgbCss(rgb, 0));
+      grad.addColorStop(0.3, rgbCss(rgb, 1));
+      grad.addColorStop(0.75, rgbCss(rgb, 0.7));
+      grad.addColorStop(1, rgbCss(rgb, 0));
+      g.strokeStyle = grad;
+      g.lineWidth = 2.4;
+      g.lineCap = "round";
+      const phase = (p / WISP_PHASES) * Math.PI * 2;
+      const n = 12;
+      const pts: [number, number][] = [];
+      for (let k = 0; k <= n; k++) {
+        const u = k / n;
+        pts.push([
+          u * WISP_W,
+          WISP_H / 2 + Math.sin(phase + u * 2.6) * WISP_AMP * Math.sin(u * Math.PI),
+        ]);
+      }
+      g.beginPath();
+      g.moveTo(pts[0]![0], pts[0]![1]);
+      for (let k = 1; k < n; k++) {
+        const [ax, ay] = pts[k]!;
+        const [bx, by] = pts[k + 1]!;
+        g.quadraticCurveTo(ax, ay, (ax + bx) / 2, (ay + by) / 2);
+      }
+      g.lineTo(pts[n]![0], pts[n]![1]);
+      g.stroke();
+      out.push(c);
     }
-    ctx.beginPath();
-    ctx.moveTo(pts[0]![0], pts[0]![1]);
-    for (let k = 1; k < n; k++) {
-      const [ax, ay] = pts[k]!;
-      const [bx, by] = pts[k + 1]!;
-      ctx.quadraticCurveTo(ax, ay, (ax + bx) / 2, (ay + by) / 2);
-    }
-    ctx.lineTo(pts[n]![0], pts[n]![1]);
-    ctx.stroke();
+    this.wispCache.set(key, out);
+    return out;
   }
 
   private drawBomb(ctx: CanvasRenderingContext2D): void {
