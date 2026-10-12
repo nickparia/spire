@@ -5,7 +5,15 @@
  */
 
 export type LandingId =
-  "fire" | "frost" | "storm" | "stone" | "shadow" | "keystone" | "sight" | "ember";
+  "fire" | "frost" | "storm" | "stone" | "shadow" | "keystone" | "sight" | "ember" | "open";
+
+/** The three schools: strike the Dark, hold the tower, see and breathe. A landing deals one of each. */
+export type School = "fire" | "stone" | "air";
+export const SCHOOLS: { id: School; name: string; rgb: [number, number, number] }[] = [
+  { id: "fire", name: "Fire", rgb: [255, 150, 60] },
+  { id: "stone", name: "Stone", rgb: [190, 210, 230] },
+  { id: "air", name: "Air", rgb: [190, 170, 255] },
+];
 
 /** A card builds: taken again it is kindled to II, then III. */
 export const TIERS = 3;
@@ -13,6 +21,7 @@ export const TIER_NAMES = ["I", "II", "III"] as const;
 
 export type LandingDef = {
   id: LandingId;
+  school: School;
   name: string;
   blurb: string;
   /** What it does kindled to II and to III. */
@@ -26,6 +35,7 @@ export type LandingDef = {
 export const LANDINGS: LandingDef[] = [
   {
     id: "fire",
+    school: "fire",
     name: "Forge-fire",
     blurb: "Your next six slabs blaze. Each one that lands burns the Dark back a floor.",
     kindled: [
@@ -37,6 +47,7 @@ export const LANDINGS: LandingDef[] = [
   },
   {
     id: "frost",
+    school: "stone",
     name: "Rime",
     blurb:
       "The Dark freezes for ten seconds. Your next five slabs freeze to whatever they land on.",
@@ -49,6 +60,7 @@ export const LANDINGS: LandingDef[] = [
   },
   {
     id: "storm",
+    school: "fire",
     name: "Starfall",
     blurb: "Your next three perfects call down lightning that blasts the Dark three floors down.",
     kindled: [
@@ -60,6 +72,7 @@ export const LANDINGS: LandingDef[] = [
   },
   {
     id: "stone",
+    school: "stone",
     name: "Bedrock",
     blurb:
       "Buttresses rise to brace the tower. The sway is halved, and your next four slabs are broad.",
@@ -72,6 +85,7 @@ export const LANDINGS: LandingDef[] = [
   },
   {
     id: "shadow",
+    school: "air",
     name: "Stillness",
     blurb: "Time thickens. The world slows for your next six slabs.",
     kindled: ["The world slows for twelve slabs.", "The world slows all the way to the summit."],
@@ -80,6 +94,7 @@ export const LANDINGS: LandingDef[] = [
   },
   {
     id: "keystone",
+    school: "stone",
     name: "Keystone",
     blurb:
       "Your next three slabs are keystones: narrow to land, and each perfect pushes the Dark twice.",
@@ -92,6 +107,7 @@ export const LANDINGS: LandingDef[] = [
   },
   {
     id: "sight",
+    school: "air",
     name: "Second Sight",
     blurb: "The perfect moment shows itself: the cue stays lit for your next six slabs.",
     kindled: ["The cue stays lit for twelve slabs.", "The cue stays lit to the summit."],
@@ -100,6 +116,7 @@ export const LANDINGS: LandingDef[] = [
   },
   {
     id: "ember",
+    school: "fire",
     name: "Ember Trail",
     blurb:
       "A streak burns: from the second perfect in a row, each pushes the Dark half a floor more.",
@@ -109,6 +126,18 @@ export const LANDINGS: LandingDef[] = [
     ],
     rgb: [255, 110, 70],
     needsDark: true,
+  },
+  {
+    id: "open",
+    school: "air",
+    name: "The Open Hand",
+    blurb: "The groove forgives: your next six drops are judged half again as wide.",
+    kindled: [
+      "Twelve drops judged half again as wide.",
+      "Every drop to the summit judged half again as wide.",
+    ],
+    rgb: [220, 200, 255],
+    needsDark: false,
   },
 ];
 
@@ -318,36 +347,37 @@ export function landingOffer(
   hand: Hand = {},
 ): LandingId[] {
   const usable = LANDINGS.filter((l) => darkOn || !l.needsDark).map((l) => l.id);
-  const pick = (from: LandingId[]): LandingId | undefined => {
-    const fresh = from.filter((id) => !taken.includes(id));
-    const pool = fresh.length > 0 ? fresh : from;
-    return pool[Math.floor(rand() * pool.length)];
-  };
-  // The offer leans towards building: a card held but not yet at III, or one
-  // that would make a power with a card held. Building is a choice, not luck.
-  const kindle = usable.filter((id) => (hand[id] ?? 0) > 0 && (hand[id] ?? 0) < TIERS);
-  const makes = usable.filter((id) => comboWith(hand, id) !== null);
-  const lean = (): LandingId | undefined => {
-    if (makes.length > 0 && rand() < 0.6) return makes[Math.floor(rand() * makes.length)];
-    if (kindle.length > 0 && rand() < 0.75) return kindle[Math.floor(rand() * kindle.length)];
-    return undefined;
-  };
-  if (trial) {
-    const counters = TRIALS[trial].counters.filter((id) => usable.includes(id));
-    const a = pick(counters);
-    const leaned = lean();
-    const b =
-      leaned && leaned !== a
-        ? leaned
-        : pick(usable.filter((id) => id !== a && !counters.includes(id)));
-    if (a && b) return [a, b];
+  const counters = trial ? TRIALS[trial].counters.filter((id) => usable.includes(id)) : [];
+  const out: LandingId[] = [];
+  // One card from each school. Within a school the deal leans towards
+  // building: a card that would make a power with one held, then a card held
+  // but not yet at III, then the trial's counter, then anything fresh.
+  for (const school of SCHOOLS) {
+    const pool = usable.filter((id) => LANDING_BY_ID[id].school === school.id && !out.includes(id));
+    if (pool.length === 0) continue;
+    const makes = pool.filter((id) => comboWith(hand, id) !== null);
+    const kindle = pool.filter((id) => (hand[id] ?? 0) > 0 && (hand[id] ?? 0) < TIERS);
+    const counter = pool.filter((id) => counters.includes(id));
+    const fresh = pool.filter((id) => !taken.includes(id));
+    const from =
+      makes.length > 0 && rand() < 0.6
+        ? makes
+        : kindle.length > 0 && rand() < 0.75
+          ? kindle
+          : counter.length > 0 && rand() < 0.7
+            ? counter
+            : fresh.length > 0
+              ? fresh
+              : pool;
+    out.push(from[Math.floor(rand() * from.length)]!);
   }
-  const leaned = lean();
-  const fresh = usable.filter((id) => !taken.includes(id) && id !== leaned);
-  const pool = fresh.length >= 2 ? fresh : usable.filter((id) => id !== leaned);
-  const a = leaned ?? pool.splice(Math.floor(rand() * pool.length), 1)[0]!;
-  const b = pool.splice(Math.floor(rand() * pool.length), 1)[0]!;
-  return [a, b];
+  // A school with nothing usable (the Dark off): fill the deal from the rest.
+  while (out.length < 3) {
+    const rest = usable.filter((id) => !out.includes(id));
+    if (rest.length === 0) break;
+    out.push(rest[Math.floor(rand() * rest.length)]!);
+  }
+  return out;
 }
 
 /** A sky this many floors tall or more has two landings; shorter ones have one, halfway. */

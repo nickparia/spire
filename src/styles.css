@@ -4747,3 +4747,41 @@
 .ecard-combo b {
   color: #ffd98a;
 }
+
+/* ---- Three schools dealt: three cards must fit a phone. */
+.gifts-three .gifts-row {
+  gap: 8px;
+}
+.gifts-three .ecard {
+  width: 112px;
+  --tilt: calc((var(--i) - 1) * 4deg);
+}
+.gifts-three .ecard-face {
+  width: 112px;
+}
+.gifts-three .ecard-name {
+  font-size: 12px;
+}
+.gifts-three .ecard-blurb {
+  font-size: 11px;
+  line-height: 1.25;
+}
+.ecard-face {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--school, #888) 35%, #1a1410),
+    #0b0806
+  );
+  outline: 1.5px solid color-mix(in srgb, var(--school, #888) 55%, transparent);
+  outline-offset: -1.5px;
+}
+.ecard-school {
+  position: absolute;
+  top: 7px;
+  left: 9px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--school, #ddd);
+  text-shadow: 0 1px 2px #000;
+}

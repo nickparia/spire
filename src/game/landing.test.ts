@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COMBOS,
   LANDINGS,
+  LANDING_BY_ID,
   TIERS,
   combosOf,
   comboWith,
@@ -40,11 +41,19 @@ describe("the offer", () => {
     return () => values[i++ % values.length]!;
   };
 
-  it("offers two different cards", () => {
+  it("deals three different cards, one from each school", () => {
     for (let n = 0; n < 50; n++) {
-      const [a, b] = landingOffer(Math.random, true);
-      expect(a).not.toBe(b);
+      const offer = landingOffer(Math.random, true);
+      expect(offer).toHaveLength(3);
+      expect(new Set(offer).size).toBe(3);
+      expect(new Set(offer.map((id) => LANDING_BY_ID[id].school)).size).toBe(3);
     }
+  });
+
+  it("still deals three with the Dark off, when a school has nothing usable", () => {
+    const offer = landingOffer(Math.random, false);
+    expect(offer).toHaveLength(3);
+    expect(new Set(offer).size).toBe(3);
   });
 
   it("leans towards a card that would make a power", () => {

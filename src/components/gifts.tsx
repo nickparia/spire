@@ -2,12 +2,18 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import {
   COMBO_BY_ID,
   LANDING_BY_ID,
+  SCHOOLS,
   TIER_NAMES,
   comboWith,
   landingBlurb,
   type Hand,
   type LandingId,
 } from "@/game/landing";
+
+const SCHOOL_BY_ID = Object.fromEntries(SCHOOLS.map((s) => [s.id, s])) as Record<
+  (typeof SCHOOLS)[number]["id"],
+  (typeof SCHOOLS)[number]
+>;
 
 /** Seconds the chosen card burns in its element before it flies into the tower. */
 const IGNITE = 2.3;
@@ -42,7 +48,11 @@ export function GiftCards({
   };
   return (
     <section
-      className={"gifts" + (taken !== null ? " gifts-taken" : "")}
+      className={
+        "gifts" +
+        (taken !== null ? " gifts-taken" : "") +
+        (offers.length >= 3 ? " gifts-three" : "")
+      }
       style={{ "--ignite": `${IGNITE}s`, "--fly": `${FLY}s` } as CSSProperties}
       aria-label="A landing"
       data-ui
@@ -68,12 +78,25 @@ export function GiftCards({
             <button
               key={id}
               type="button"
-              className={`ecard ecard-${id}${state}${held > 0 ? " ecard-kindle" : ""}`}
-              style={{ "--i": i } as CSSProperties}
+              className={`ecard ecard-${id} ecard-school-${def.school}${state}${held > 0 ? " ecard-kindle" : ""}`}
+              style={
+                {
+                  "--i": i,
+                  "--school": `rgb(${SCHOOL_BY_ID[def.school].rgb.join(",")})`,
+                } as CSSProperties
+              }
               onClick={() => take(i)}
             >
               <span className="ecard-face">
-                <img className="ecard-art" src={`art/cards/${id}.jpg`} alt="" />
+                <img
+                  className="ecard-art"
+                  src={`art/cards/${id}.jpg`}
+                  alt=""
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+                <span className="ecard-school">{SCHOOL_BY_ID[def.school].name}</span>
                 {taken === i ? <Ignite id={id} /> : null}
                 {tier > 1 ? <span className="ecard-tier">{TIER_NAMES[tier - 1]}</span> : null}
                 <span className="ecard-name">

@@ -259,7 +259,7 @@ const SKY_STONES: readonly string[] = [
 const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
-  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|THE DARK HEAVES|THE GROOVE WALKS|THE BEAT QUICKENS|THE RUSH|THE BREATH SHORTENS|THE GALE RISES|THE SKY DARKENS|THE COLUMN SPLITS|THE STONE BURNS|THE DARK FREEZES|THE STARS FALL|THE ROCK BRACES|THE WORLD STILLS|WIND-TRUE|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|THE DARK HEAVES|THE GROOVE WALKS|THE BEAT QUICKENS|THE RUSH|THE BREATH SHORTENS|THE GALE RISES|THE SKY DARKENS|THE COLUMN SPLITS|THE STONE BURNS|THE DARK FREEZES|THE STARS FALL|THE ROCK BRACES|THE WORLD STILLS|WIND-TRUE|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|IT QUICKENS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
 /** A streak is only called out at these milestones. */
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
@@ -961,7 +961,10 @@ export class SpireEngine {
     keystone: 0,
     sight: 0,
     ember: 0,
+    open: 0,
   };
+  /** The Dark's pace set by the last drop: a perfect slows it, a wide miss spurs it. */
+  private aimPace = 1;
   /** The cards held this climb and their tiers; the powers two of them make. */
   private hand: Hand = {};
   private combos: ComboId[] = [];
@@ -1629,7 +1632,9 @@ export class SpireEngine {
       keystone: 0,
       sight: 0,
       ember: 0,
+      open: 0,
     };
+    this.aimPace = 1;
     this.giftsTaken = [];
     this.hand = {};
     this.combos = [];
@@ -2488,6 +2493,13 @@ export class SpireEngine {
         this.emberPush = 0.5 * tier;
         this.sfx.fire();
         said = "THE EMBER TRAIL";
+        break;
+      case "open":
+        // The groove forgives: drops judged wider.
+        this.gift.open = lasts(6, 12);
+        this.tol = this.toleranceNow();
+        this.sfx.chime();
+        said = "THE OPEN HAND";
         break;
     }
     if (favour) said = `FAVOUR · ${LANDING_BY_ID[id].name.toUpperCase()}`;
@@ -3595,7 +3607,8 @@ export class SpireEngine {
         this.mover.turns < (this.plan.look ?? 0);
       // The Long Winter: while the buttresses stand, the Dark stays frozen.
       const winter = !this.boss && this.combos.includes("winter") && this.bedrock >= 0;
-      const rate = looking || winter ? 0 : base * (this.boss ? 1 : this.quickening());
+      const rate =
+        looking || winter ? 0 : base * (this.boss ? 1 : this.quickening() * this.aimPace);
       this.dark += rate * dt;
       const top = this.peak()!;
       if (this.boss) this.bossTurn(dt, top);
@@ -3822,8 +3835,8 @@ export class SpireEngine {
     const peak = m.course === "beat" ? base * 1.9 : m.course === "breath" ? base * 1.3 : 0;
     const px = Math.max(1, peak > 0 ? m.halfSpan * peak : m.pxSpeed);
     const tol = tolerance(px, this.plan.difficulty + this.floors, m.w);
-    // A wind-true read the wind: the next drop is judged half again as kindly.
-    const boon = this.boonFloor === this.floors ? 1.5 : 1;
+    // A wind-true read the wind, or the Open Hand is held: the drop is judged half again as kindly.
+    const boon = this.boonFloor === this.floors || this.gift.open > 0 ? 1.5 : 1;
     return (m.keystone ? tol * 0.68 : tol) * windowFor(this.tune, this.streak) * boon;
   }
 
@@ -4234,6 +4247,20 @@ export class SpireEngine {
     }
     if (this.gift.keystone > 0) this.gift.keystone -= 1;
     if (this.gift.sight > 0) this.gift.sight -= 1;
+    if (this.gift.open > 0) this.gift.open -= 1;
+    // The Dark follows your aim: a perfect slows it for the next floor, a wide
+    // miss spurs it and it surges; a clean drop leaves it be.
+    if (!this.boss) {
+      const wide = !result.perfect && Math.abs(dx) > this.tol * 2;
+      this.aimPace = result.perfect ? 0.8 : wide ? 1.4 : 1;
+      if (wide && this.plan.darkRate > 0) {
+        this.trauma = Math.min(1, this.trauma + 0.25);
+        this.rockShake = Math.max(this.rockShake, 0.4);
+        this.fx.blood(cx, this.dark, INK_RGB, 14, 160, false);
+        this.float("IT QUICKENS", cx, this.dark + 60, false, 18);
+        this.sfx.hiss();
+      }
+    }
     if (this.gift.ember > 0 && result.perfect && result.streak >= 2) {
       // The ember trail: a streak's heat pushes the Dark further with every perfect.
       this.gift.ember -= 1;
