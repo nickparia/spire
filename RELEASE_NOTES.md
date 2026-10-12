@@ -3,6 +3,12 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 110 — The first screen always goes (internal)
+
+- **A touch at a sky's start always drops the first slab.** Touches now reach the game by a second, direct route from the window itself — before anything on the page can swallow them — and the first drop of a climb can no longer be held by a demo, a freeze or a sting. Whatever sat over the canvas on the phone, the ready card goes on the first tap.
+- Every side system — the wind's sound, the passers-by, the wheel — now runs fenced: one that fails on a phone is switched off and noted in the trace, and the climb goes on.
+- The tester trace records every touch at a sky's start: what element it landed on, and whether it reached the game. If it ever holds again, Options → Tester tools → screenshot.
+
 ## Build 109 — Every card has its painting (internal)
 
 - The four newer cards — Keystone, Second Sight, Ember Trail, The Open Hand — and the three powers — Firestorm, The Long Winter, Held Breath — have their own paintings now. A power you hold shows as its own stone in the hand, pulsing.

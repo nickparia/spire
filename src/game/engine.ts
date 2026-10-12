@@ -805,6 +805,22 @@ export class SpireEngine {
   private wispCache = new Map<string, HTMLCanvasElement[]>();
   /** Why the last tap was ignored, so the trace says it once, not every tap. */
   private lastIgnored: string | null = null;
+  /** Taps this run, for the trace of a sky's first moments. */
+  private tapCount = 0;
+  /** Side systems that threw and were switched off for this session. */
+  private fencedOff = new Set<string>();
+
+  /** Runs a side system; if it throws it is switched off and the trace says so. The climb never stops for it. */
+  private fenced(name: string, run: () => void): void {
+    if (this.fencedOff.has(name)) return;
+    try {
+      run();
+    } catch (err) {
+      this.fencedOff.add(name);
+      trace(`${name} failed, off: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(err);
+    }
+  }
   /** The floor count after a wind-true: the drop made at it is judged more kindly. */
   private boonFloor = -1;
   /** The wind this frame, read once in the update for everything drawn. */
@@ -1112,8 +1128,17 @@ export class SpireEngine {
 
   tap(): void {
     this.wake();
+    this.tapCount += 1;
+    if (this.phase === "ready" && this.tapCount <= 3) trace(`tap ${this.tapCount} in ready`);
     if (this.paused || this.phase === "menu" || this.phase === "won" || this.phase === "pick") {
       return;
+    }
+    // The first drop of a climb is never held: no demo, no freeze, no sting
+    // may keep the ready card on screen. Whatever else is going on, it drops.
+    if (this.phase === "ready" && this.mover.fallT < 0) {
+      this.demo = false;
+      this.freeze = 0;
+      this.ascentSting = 0;
     }
     if (this.phase === "fall") {
       // While a rebuild is on offer, a stray tap must not throw it away.
@@ -1651,6 +1676,7 @@ export class SpireEngine {
       open: 0,
     };
     this.aimPace = 1;
+    this.tapCount = 0;
     this.passers = [];
     this.passersDue = [...(this.plan.passers ?? [])].sort((a, b) => a.at - b.at);
     this.giftsTaken = [];
@@ -5042,9 +5068,13 @@ export class SpireEngine {
         this.emit();
       }
     }
-    if (this.cut && this.phase === "play" && !this.ascent) this.stepCut(dt);
-    this.windSound();
-    this.stepPassers(dt);
+    // The side systems — the wheel, the wind's sound, the passers-by — each run
+    // fenced: one that throws (a phone's audio engine refusing a call, say) is
+    // switched off and said in the trace, and the climb itself goes on.
+    if (this.cut && this.phase === "play" && !this.ascent)
+      this.fenced("cut", () => this.stepCut(dt));
+    this.fenced("wind", () => this.windSound());
+    this.fenced("passers", () => this.stepPassers(dt));
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
     const prev = this.peak();
@@ -5053,7 +5083,7 @@ export class SpireEngine {
       if (this.mover.fallT >= 0) this.advanceFall(dt);
       else {
         this.advanceMover(dt);
-        this.liveWind();
+        this.fenced("liveWind", () => this.liveWind());
       }
       inZone = this.cued() && this.lined(this.peak());
       if (this.phase !== "menu") {

@@ -39,7 +39,8 @@ export class Sfx {
   private samples = new Map<Sample, AudioBuffer>();
   private loading = false;
   private lastAt = new Map<string, number>();
-  /** The Gale's wind loop, built once per audio context. */
+  /** The Gale's wind loop, built once per audio context; once it has thrown it is never built again. */
+  private airBroken = false;
   private air: {
     ctx: AudioContext;
     gain: GainNode;
@@ -362,7 +363,18 @@ export class Sfx {
    */
   wind(strength: number, howl: number): void {
     const { ctx, sfxBus } = this.rig;
-    if (!ctx || !sfxBus) return;
+    if (!ctx || !sfxBus || this.airBroken) return;
+    try {
+      this.windNodes(ctx, sfxBus, strength, howl);
+    } catch (err) {
+      // An audio engine that refuses the bed is a phone without a wind bed, not a phone without a game.
+      this.airBroken = true;
+      this.air = null;
+      throw err;
+    }
+  }
+
+  private windNodes(ctx: AudioContext, sfxBus: GainNode, strength: number, howl: number): void {
     if (this.air && this.air.ctx !== ctx) this.air = null;
     if (!this.air) {
       if (strength <= 0) return;

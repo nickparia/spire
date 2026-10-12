@@ -1,7 +1,9 @@
 {
-  "build": 109,
-  "title": "Every card has its painting",
+  "build": 110,
+  "title": "The first screen always goes",
   "notes": [
-    "Keystone, Second Sight, Ember Trail, The Open Hand, and the three powers — Firestorm, The Long Winter, Held Breath — have their own paintings now. A power you hold shows as its own stone in the hand."
+    "A touch at a sky's start always drops the first slab: touches reach the game by a second, direct route, and the first drop can't be held by a demo, a freeze or a sting.",
+    "The wind's sound, the passers-by and the wheel run fenced: one that fails on a phone is switched off and the climb goes on.",
+    "If a sky's start ever holds again: Options → Tester tools → screenshot the trace. It now records every touch and what it landed on."
   ]
 }

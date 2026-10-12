@@ -12,6 +12,8 @@ import { ChapterList, ChapterPlayer } from "./story";
 import { CHAPTERS, chapterFor, type Chapter } from "@/game/story";
 import { type Save, emptySave, isUnlocked, nextLevelIndex, restoreNativeSave } from "@/game/save";
 import { trace, traceLines, watchErrors } from "@/game/trace";
+import { Capacitor } from "@capacitor/core";
+import { Preferences } from "@capacitor/preferences";
 import { OverPanel, PauseSheet, PickPanel, ResultsPanel, RunHud } from "./panels";
 import { BoardScreen, LevelSelect } from "./screens";
 import { TitleSplash, WorldSelect } from "./home";
@@ -83,6 +85,8 @@ function onAccent(css: string): string {
 
 export function SpireGame() {
   const rootRef = useRef<HTMLDivElement>(null);
+  /** When the last touch was handed to the engine directly, so the two routes never double-tap. */
+  const lastDirect = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<SpireEngine | null>(null);
   const [hud, setHud] = useState<Hud>(INITIAL);
@@ -289,6 +293,43 @@ export function SpireGame() {
       }
     };
     watchErrors();
+    // Tester harness for the phone: a sky id left in the native store starts
+    // that sky on launch, once. Lets the simulator be driven to any sky.
+    if (Capacitor.isNativePlatform()) {
+      Preferences.get({ key: "spire-debug-start" })
+        .then(({ value }) => {
+          if (!value || !state.current.save.tester) return;
+          void Preferences.remove({ key: "spire-debug-start" });
+          const index = LEVELS.findIndex((l) => l.id === value);
+          trace(`debug start ${value} → ${index}`);
+          if (index >= 0) window.setTimeout(() => play(index), 1500);
+        })
+        .catch(() => undefined);
+    }
+    // Belt and braces for the phone: a touch anywhere that is not on a button
+    // or a panel reaches the engine straight from the window, before anything
+    // else can swallow it — React's handler on the root is the second route.
+    // Each incident of "the first screen won't go" has been input never
+    // arriving; this makes arrival not depend on what sits over the canvas.
+    const direct = (ev: Event) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      const target = ev.target as HTMLElement | null;
+      const phase = state.current.hud.phase;
+      if (phase === "menu") return;
+      const ui = target?.closest?.("button, [data-ui], input, a, select, textarea");
+      const where = target
+        ? `${target.tagName.toLowerCase()}.${String(target.className).slice(0, 24)}`
+        : "?";
+      if (phase === "ready") trace(`touch ${ev.type} on ${where}${ui ? " (ui)" : ""}`);
+      if (ui) return;
+      const now = performance.now();
+      if (now - lastDirect.current < 80) return;
+      lastDirect.current = now;
+      engine.tap();
+    };
+    window.addEventListener("touchstart", direct, { capture: true, passive: true });
+    window.addEventListener("pointerdown", direct, { capture: true });
     // A phone keeps a second copy of the save; take it if it is the newer one.
     restoreNativeSave(state.current.save).then((restored) => {
       if (restored) {
@@ -297,7 +338,11 @@ export function SpireGame() {
       }
     });
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("touchstart", direct, { capture: true });
+      window.removeEventListener("pointerdown", direct, { capture: true });
+    };
   }, [next, openTitle, openWorlds, play, quit, retry, skyFor, worldFocus]);
 
   const running = hud.phase === "ready" || hud.phase === "play";
@@ -317,6 +362,9 @@ export function SpireGame() {
           return;
         }
         event.preventDefault();
+        // The window listener above has normally already tapped for this touch.
+        if (performance.now() - lastDirect.current < 80) return;
+        lastDirect.current = performance.now();
         engineRef.current?.tap();
       }}
       onContextMenu={(event) => event.preventDefault()}

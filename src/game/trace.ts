@@ -10,6 +10,7 @@ export function trace(msg: string): void {
   const t = (performance.now() / 1000).toFixed(1);
   lines.push(`${t}s ${msg}`);
   if (lines.length > KEEP) lines.shift();
+  console.log(`[spire] ${t}s ${msg}`);
 }
 
 export function traceLines(): string[] {
