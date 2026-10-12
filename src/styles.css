@@ -4820,3 +4820,19 @@
       0 0 22px var(--c);
   }
 }
+
+/* The Dark quickening: the count pulses violet. No words. */
+.dark-quick {
+  animation: dark-quick 0.9s ease-in-out infinite;
+}
+@keyframes dark-quick {
+  0%,
+  100% {
+    color: #c9a2ff;
+    text-shadow: 0 0 6px rgba(160, 80, 230, 0.4);
+  }
+  50% {
+    color: #ffd1ff;
+    text-shadow: 0 0 16px rgba(190, 110, 255, 0.95);
+  }
+}

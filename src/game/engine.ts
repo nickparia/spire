@@ -79,6 +79,7 @@ import { CRADLE_STOP, LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
 import { trace } from "./trace";
 import { PASSER_LOOKS, type Passer, type PasserKind } from "./passers";
+import { EVENT_BY_ID, pickEvents, type EventDef, type Scheduled } from "./events";
 import { finishWorn, trailWorn, type FinishId, type TrailId } from "./finishes";
 import {
   isLanding,
@@ -260,7 +261,7 @@ const SKY_STONES: readonly string[] = [
 const STONE_PAD = 0.12 / 1.24;
 /** Call-outs the game still speaks: the story's moments, not the play-by-play. */
 const SPOKEN =
-  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|THE DARK QUICKENS|THE SHAFT GROANS|BROKEN THROUGH|IT SEEPS IN|THE DARK HEAVES|THE GROOVE WALKS|THE BEAT QUICKENS|THE RUSH|THE BREATH SHORTENS|THE GALE RISES|THE SKY DARKENS|THE COLUMN SPLITS|THE STONE BURNS|THE DARK FREEZES|THE STARS FALL|THE ROCK BRACES|THE WORLD STILLS|WIND-TRUE|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|IT QUICKENS|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
+  /^(THE SKY IS LIT|IT SEES YOU|THE LIGHT IS TAKEN|THE LIGHT ESCAPES|TAKEN BY THE DARK|THE LIGHT IS BURIED|IT HAS YOU|THE DOOR OPENS|BROKEN THROUGH|IT SEEPS IN|THE DARK HEAVES|THE GROOVE WALKS|THE BEAT QUICKENS|THE RUSH|THE BREATH SHORTENS|THE GALE RISES|THE SKY DARKENS|THE COLUMN SPLITS|THE STONE BURNS|THE DARK FREEZES|THE STARS FALL|THE ROCK BRACES|THE WORLD STILLS|WIND-TRUE|SECOND WIND|NEW BEST|SUMMIT|LANDING|IT FEEDS|THE FORGE BREATHES|THE CRANE SWINGS|THE SWELL|SEA MIST|SMOKE|THE GROUND GIVES|ROCKFALL|DUST STORM|HOARFROST|WHITEOUT|AVALANCHE|NIGHTFALL|ASH FALLS|TREMOR|LANTERNS|THE DARK SLEEPS|LIGHTNING|ROGUE GUST|THE LULL|WIND SHEAR|THE KITE|SURGE|CHAIN ×\d+|THE HOLLOW .*|PERFECT ×\d+)$/;
 /** A streak is only called out at these milestones. */
 const STREAK_SPOKEN = 10;
 /** How fast time runs while a new course shows itself. */
@@ -476,6 +477,8 @@ export type Hud = {
   combos: ComboId[];
   /** The last card to fire, and when (clock seconds), for the hand's flare. */
   handFired: { id: LandingId; at: number } | null;
+  /** The Dark is quickening (past par, or spurred by a wide miss). */
+  quick: boolean;
 };
 
 export type EngineEvents = {
@@ -614,6 +617,8 @@ type Mover = {
   gusted: boolean;
   /** Times the hanging slab has turned at a lane's end since it was spawned. */
   turns: number;
+  /** The forge's breath: red-hot, and shrinking while it hangs. */
+  hot: boolean;
   guide: boolean;
   /** Seconds into the fall, or -1 while it is still hanging. */
   fallT: number;
@@ -708,6 +713,7 @@ export class SpireEngine {
     baseDrift: 0,
     gusted: false,
     turns: 0,
+    hot: false,
     guide: false,
     fallT: -1,
     fallTime: 0,
@@ -801,8 +807,37 @@ export class SpireEngine {
   /** The sky's passers not yet met, in floor order. */
   private passersDue: Passer[] = [];
   private passerArt = new Map<PasserKind, HTMLImageElement>();
+  /** This climb's events, in floor order, and the one in force. */
+  private eventsDue: Scheduled[] = [];
+  private event: { def: EventDef; left: number; t: number; x: number; done: boolean } | null = null;
+  /** The swell: the sway multiplied while it lasts. */
+  private swellUntil = 0;
+  /** The ash-kind event's painting, kept while the lane stays dimmed. */
+  private ashArt = "ash";
+  private eventArt = new Map<string, HTMLImageElement>();
+  /** The forge's breath: slabs still to come red-hot. */
+  private hotSlabs = 0;
+  /** Ash: floors the lane stays dimmed and the cue is gone. */
+  private ashFloors = 0;
+  /** A tremor: the next drop must be a perfect. */
+  private tremorArmed = false;
+  /** The Gale's event winds: a rogue gust or a lull, until this run time. */
+  private eventWind: { kind: "rogue" | "lull"; until: number; from: number } | null = null;
   /** Pre-rendered wind ribbons by sky colour (see wispSprites). */
   private wispCache = new Map<string, HTMLCanvasElement[]>();
+  /** The Dark quickening, seen: its edge flares and it throws ink while this decays. */
+  private darkSurge = 0;
+
+  /** The Dark quickens — past par, or after a wide miss. The world shows it; nothing says it. */
+  private surgeDark(): void {
+    this.darkSurge = 1;
+    this.rockShake = Math.max(this.rockShake, 0.5);
+    this.pulse = Math.max(this.pulse, 0.6);
+    this.fx.blood(this.camX, this.dark, INK_RGB, 26, 220, false);
+    this.sfx.quicken();
+    haptics.medium();
+  }
+
   /** Why the last tap was ignored, so the trace says it once, not every tap. */
   private lastIgnored: string | null = null;
   /** Taps this run, for the trace of a sky's first moments. */
@@ -1657,6 +1692,7 @@ export class SpireEngine {
     this.slowmo = 0;
     this.summitHold = 0;
     this.quickStep = -1;
+    this.darkSurge = 0;
     this.unranked = phase === "ready" && this.save.practice;
     this.breather = 0;
     this.boss = null;
@@ -1679,6 +1715,19 @@ export class SpireEngine {
     this.tapCount = 0;
     this.passers = [];
     this.passersDue = [...(this.plan.passers ?? [])].sort((a, b) => a.at - b.at);
+    this.event = null;
+    this.hotSlabs = 0;
+    this.ashFloors = 0;
+    this.tremorArmed = false;
+    this.eventWind = null;
+    this.swellUntil = 0;
+    {
+      const level = LEVELS[this.levelIndex]!;
+      this.eventsDue =
+        phase === "ready" && this.mode === "level" && !this.ascent
+          ? pickEvents(Math.random, worldOf(level.id).id, level.theme, this.plan.goal)
+          : [];
+    }
     this.giftsTaken = [];
     this.hand = {};
     this.combos = [];
@@ -1874,6 +1923,7 @@ export class SpireEngine {
       baseDrift: 0,
       gusted: false,
       turns: 0,
+      hot: false,
       guide: fall?.guide ?? false,
       fallT: -1,
       // The Updraft holds a drop up a little longer.
@@ -1888,6 +1938,11 @@ export class SpireEngine {
       dir2: -dir,
       x2: 0,
     };
+    // The forge's breath: this slab comes red-hot.
+    if (this.hotSlabs > 0) {
+      this.hotSlabs -= 1;
+      this.mover.hot = true;
+    }
     // The hand at work on the slab itself: keystones, and the cue kept lit.
     if (this.gift.keystone > 0) this.mover.keystone = true;
     if (this.gift.sight > 0) this.mover.guide = true;
@@ -1899,7 +1954,7 @@ export class SpireEngine {
     this.syncMoverX();
     this.tol = this.toleranceNow();
     this.wasInZone = false;
-    this.mote = null;
+    if (this.event?.def.kind !== "lanterns") this.mote = null;
     this.moteArmed = false;
     this.tip = "";
     if (fall) {
@@ -2208,6 +2263,9 @@ export class SpireEngine {
       const w = this.windNow();
       const lean = Math.max(0, (w.strength - 0.75) / 0.5);
       stage.sway = this.swayBase * (1 + 3 * lean);
+    } else if (this.phase === "play") {
+      // The swell: the sea rolls the tower while it lasts.
+      stage.sway = this.swayBase * (this.swellUntil > this.runTime ? 2.2 : 1);
     }
     stage.step(this.slowmo > 0 ? dt * 0.3 : dt);
     if (stage.takeTopple() && this.phase === "play") {
@@ -3544,17 +3602,9 @@ export class SpireEngine {
     if (over <= 0) return 1;
     const step = Math.floor(over / QUICKEN_EVERY);
     if (step > this.quickStep) {
+      // No words for it: the Dark itself flares and throws ink, and the count pulses.
       this.quickStep = step;
-      const top = this.peak();
-      this.float(
-        this.plan.descent ? "THE SHAFT GROANS" : "THE DARK QUICKENS",
-        top.x + top.w / 2,
-        this.dark + 70,
-        false,
-        22,
-      );
-      this.sfx.quicken();
-      this.pulse = Math.max(this.pulse, 0.5);
+      this.surgeDark();
     }
     return 1 + QUICKEN_RATE * over;
   }
@@ -3730,6 +3780,8 @@ export class SpireEngine {
    * is gone, it does not: reading the streamer is the skill.
    */
   private cued(): boolean {
+    // Under ash the perfect moment is not shown — unless the Second Sight is held.
+    if (this.ashFloors > 0 && this.gift.sight <= 0 && !this.mover.guide) return false;
     return this.mover.drift <= 0 || this.mover.guide;
   }
 
@@ -3739,6 +3791,20 @@ export class SpireEngine {
    * blows along the slide (a tailwind) rather than across it.
    */
   windNow(): Wind {
+    // An event's wind overrides the sky's, on any windy sky: a rogue gust, or a lull.
+    const ev = this.eventWind;
+    if (ev && this.runTime < ev.until) {
+      if (ev.kind === "lull")
+        return { strength: 0.04, gusting: false, along: false, front: null, howl: 0 };
+      const since = this.runTime - ev.from;
+      return {
+        strength: 2,
+        gusting: since > 1,
+        along: false,
+        front: since < 1 ? since : null,
+        howl: 0,
+      };
+    }
     const gale = this.galeNow();
     if (!gale) return { strength: 1, gusting: false, along: false, front: null, howl: 0 };
     const t = this.runTime;
@@ -3800,7 +3866,7 @@ export class SpireEngine {
    * the flag and the drop all agree. In a tailwind it blows the slide's way.
    */
   private liveWind(): void {
-    if (!this.plan.gale) return;
+    if (!this.plan.gale && !(this.eventWind && this.runTime < this.eventWind.until)) return;
     const m = this.mover;
     const w = this.windNow();
     m.drift = m.baseDrift * w.strength;
@@ -4292,6 +4358,19 @@ export class SpireEngine {
     if (this.gift.keystone > 0) this.gift.keystone -= 1;
     if (this.gift.sight > 0) this.gift.sight -= 1;
     if (this.gift.open > 0) this.gift.open -= 1;
+    if (this.ashFloors > 0) this.ashFloors -= 1;
+    if (this.tremorArmed) {
+      // The tremor asked for a perfect. Anything less and the Dark climbs two floors.
+      this.tremorArmed = false;
+      if (!result.perfect && this.plan.darkRate > 0) {
+        this.dark += SLAB_H * 2;
+        this.trauma = Math.min(1, this.trauma + 0.5);
+        this.rockShake = Math.max(this.rockShake, 0.8);
+        this.fx.blood(cx, this.dark, INK_RGB, 30, 220, false);
+        this.float("IT FEEDS", cx, this.dark + 60, false, 20);
+        this.sfx.hiss();
+      }
+    }
     // The Dark follows your aim: a perfect slows it for the next floor, a wide
     // miss spurs it and it surges; a clean drop leaves it be.
     if (!this.boss) {
@@ -4299,10 +4378,7 @@ export class SpireEngine {
       this.aimPace = result.perfect ? 0.8 : wide ? 1.4 : 1;
       if (wide && this.plan.darkRate > 0) {
         this.trauma = Math.min(1, this.trauma + 0.25);
-        this.rockShake = Math.max(this.rockShake, 0.4);
-        this.fx.blood(cx, this.dark, INK_RGB, 14, 160, false);
-        this.float("IT QUICKENS", cx, this.dark + 60, false, 18);
-        this.sfx.hiss();
+        this.surgeDark();
       }
     }
     if (this.gift.ember > 0 && result.perfect && result.streak >= 2) {
@@ -5007,6 +5083,7 @@ export class SpireEngine {
       hand: (Object.keys(this.hand) as LandingId[]).map((id) => ({ id, tier: this.hand[id]! })),
       combos: this.combos,
       handFired: this.handFired,
+      quick: this.darkSurge > 0 || this.aimPace > 1 || this.quickStep >= 0,
     });
   }
 
@@ -5057,6 +5134,18 @@ export class SpireEngine {
       if (this.fade >= 1) this.fading = null;
     }
     this.curtain = Math.max(0, this.curtain - dt / 0.32);
+    if (this.darkSurge > 0) {
+      this.darkSurge = Math.max(0, this.darkSurge - dt / 1.6);
+      if (!this.reduceMotion && Math.random() < 0.5 + this.darkSurge) {
+        this.fx.sparkle(
+          this.camX + (Math.random() - 0.5) * this.vw,
+          this.dark + 10,
+          40,
+          [150, 80, 220],
+          1,
+        );
+      }
+    }
     this.pulse = Math.max(0, this.pulse - dt * 2.2);
     if (this.phase === "pick" && this.landing?.omen && !this.paused) {
       // The omen plays out on the world, then the cards are dealt.
@@ -5075,6 +5164,7 @@ export class SpireEngine {
       this.fenced("cut", () => this.stepCut(dt));
     this.fenced("wind", () => this.windSound());
     this.fenced("passers", () => this.stepPassers(dt));
+    this.fenced("events", () => this.stepEvents(dt));
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
     const prev = this.peak();
@@ -5084,6 +5174,7 @@ export class SpireEngine {
       else {
         this.advanceMover(dt);
         this.fenced("liveWind", () => this.liveWind());
+        if (this.mover.hot && this.phase === "play") this.burnHanging(dt);
       }
       inZone = this.cued() && this.lined(this.peak());
       if (this.phase !== "menu") {
@@ -5754,6 +5845,7 @@ export class SpireEngine {
 
     if (aiming && !this.escape && this.phase !== "menu") {
       this.drawPassers(ctx);
+      this.fenced("eventsDraw", () => this.drawEvents(ctx));
       this.drawWindFar(ctx);
     }
     const burning = this.burning();
@@ -5923,6 +6015,19 @@ export class SpireEngine {
     haze.addColorStop(1, "rgba(20,12,16,0)");
     ctx.fillStyle = haze;
     ctx.fillRect(-120, surface - 46, this.vw + 240, 54);
+    if (this.darkSurge > 0) {
+      // Quickening: a violet flare along the edge, brightest as it surges.
+      const a = this.darkSurge * (0.35 + 0.15 * Math.sin(clock * 12));
+      const flare = ctx.createLinearGradient(0, surface - 70, 0, surface + 14);
+      flare.addColorStop(0, "rgba(160,80,230,0)");
+      flare.addColorStop(0.8, `rgba(160,80,230,${a})`);
+      flare.addColorStop(1, "rgba(160,80,230,0)");
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = flare;
+      ctx.fillRect(-120, surface - 70, this.vw + 240, 84);
+      ctx.restore();
+    }
     if (this.boss) this.drawEyes(ctx, surface);
     if (this.rime > 0) this.drawRime(ctx, surface);
     // Motes drifting up off it when it is close to the top.
@@ -7016,6 +7121,265 @@ export class SpireEngine {
     );
   }
 
+  /** Events: the next one starts at its floor (never over a landing); the one in force ticks and ends. */
+  private stepEvents(dt: number): void {
+    if (this.mode !== "level" || this.boss || this.ascent) return;
+    if (this.phase === "play" && !this.event && this.landingDue === null && !this.landing) {
+      const next = this.eventsDue[0];
+      if (next && next.at <= this.floors) {
+        this.eventsDue.shift();
+        const def = EVENT_BY_ID[next.id];
+        if (def) this.startEvent(def);
+      }
+    }
+    const ev = this.event;
+    if (!ev) return;
+    if (this.phase !== "play" && this.phase !== "ready") return;
+    ev.t += dt;
+    ev.left -= dt;
+    const m = this.mover;
+    switch (ev.def.kind) {
+      case "lanterns":
+        // Across the sky at the lane's height: drop under one to take it.
+        if (this.mote) {
+          this.mote.x += 62 * dt;
+          if (this.mote.x > this.camX + this.vw / 2 + 60) this.mote = null;
+        }
+        if (!this.mote) ev.left = 0;
+        break;
+      case "drag": {
+        // Something crosses the lane; as it passes the hanging slab it drags it a step.
+        ev.x += 150 * dt;
+        const sx = this.camX - this.vw / 2 - 90 + ev.x;
+        const mid = m.x + m.w / 2;
+        if (!ev.done && m.fallT < 0 && sx >= mid) {
+          ev.done = true;
+          m.u = Math.max(-1, Math.min(1, m.u + 0.35));
+          this.syncMoverX();
+          this.sfx.swish();
+          this.trauma = Math.min(1, this.trauma + 0.2);
+        }
+        if (ev.x > this.vw + 200) ev.left = 0;
+        break;
+      }
+      default:
+        break;
+    }
+    if (ev.left <= 0) this.event = null;
+  }
+
+  private startEvent(def: EventDef): void {
+    const top = this.peak();
+    if (!top) return;
+    const cx = top.x + top.w / 2;
+    this.event = { def, left: def.dur > 0 ? def.dur : 0.6, t: 0, x: 0, done: false };
+    this.float(def.omen, cx, top.y + 150, false, 22);
+    trace(`event ${def.id} at ${this.floors}`);
+    this.pulse = 1;
+    switch (def.kind) {
+      case "forge":
+        this.hotSlabs = 2;
+        this.mover.hot = true;
+        this.sfx.fire();
+        this.fx.sparkle(cx, top.y + SLAB_H, this.vw * 0.7, [255, 160, 60], 40);
+        this.flash = Math.max(this.flash, 0.3);
+        break;
+      case "ash":
+        this.ashFloors = 4;
+        this.ashArt = def.art ?? "ash";
+        this.sfx.hiss();
+        break;
+      case "tremor":
+        this.tremorArmed = true;
+        this.rockShake = 1;
+        this.trauma = Math.min(1, this.trauma + 0.6);
+        this.sfx.quicken();
+        for (let i = 0; i < this.stack.length; i++) this.stack[i]!.ripple = i * 0.02;
+        break;
+      case "lanterns":
+        this.mote = {
+          x: this.camX - this.vw / 2 - 40,
+          y: top.y + SLAB_H + VISUAL_H + 34,
+          kind: "ember",
+        };
+        this.sfx.chime();
+        break;
+      case "sleep":
+        // It heaves a floor, then lies still: time, if you use it.
+        this.dark = Math.min(this.dark + SLAB_H, this.crownY() - SLAB_H * 3);
+        this.breather = Math.max(this.breather, def.dur);
+        this.rockShake = 0.6;
+        this.fx.blood(cx, this.dark, INK_RGB, 30, 220, false);
+        this.sfx.quicken();
+        break;
+      case "lightning":
+        this.flash = Math.max(this.flash, 0.9);
+        this.mover.guide = true;
+        this.sfx.thunder();
+        this.bolts.push({ x: cx, life: BOLT_LIFE, seed: Math.random() * 1000 });
+        break;
+      case "rogue":
+        this.eventWind = { kind: "rogue", until: this.runTime + def.dur, from: this.runTime };
+        break;
+      case "lull":
+        this.eventWind = { kind: "lull", until: this.runTime + def.dur, from: this.runTime };
+        this.sfx.slow();
+        break;
+      case "shear":
+        this.mover.wind = (this.mover.wind > 0 ? -1 : 1) as 1 | -1;
+        this.liveWind();
+        this.sfx.gust();
+        break;
+      case "drag":
+        this.sfx.swish();
+        break;
+      case "swell":
+        // The sea lifts under the tower: the sway doubles while it lasts.
+        this.swellUntil = this.runTime + def.dur;
+        this.sfx.splash();
+        this.trauma = Math.min(1, this.trauma + 0.3);
+        break;
+      case "frost":
+        // Hoarfrost: the next three slabs freeze to whatever they land on. A help.
+        this.gift.frost = Math.max(this.gift.frost, 3);
+        this.gift.set = Math.max(this.gift.set, 3);
+        this.sfx.frost();
+        this.fx.sparkle(cx, top.y + SLAB_H, this.vw * 0.6, [170, 230, 255], 30);
+        break;
+    }
+    haptics.medium();
+    this.emit();
+  }
+
+  /** A red-hot slab shrinks while it hangs: land it fast. */
+  private burnHanging(dt: number): void {
+    const m = this.mover;
+    const min = m.w0 * 0.6;
+    if (m.w > min) {
+      const before = m.w;
+      m.w = Math.max(min, m.w - m.w0 * 0.08 * dt);
+      m.x += (before - m.w) / 2;
+      this.syncMoverX();
+    }
+    if (!this.reduceMotion && Math.random() < 0.5) {
+      this.fx.sparkle(m.x + Math.random() * m.w, m.y + VISUAL_H, 8, [255, 170, 70], 1);
+    }
+  }
+
+  private eventImage(name: string): HTMLImageElement | null {
+    let img = this.eventArt.get(name);
+    if (!img) {
+      img = Object.assign(new Image(), { src: `art/events/${name}.png` });
+      this.eventArt.set(name, img);
+    }
+    return img.complete && img.naturalWidth > 0 ? img : null;
+  }
+
+  /** What an event looks like in the world: ash over the lane, lanterns, a crane or kite, a bolt, the swell. */
+  private drawEvents(ctx: CanvasRenderingContext2D): void {
+    const top = this.peak();
+    if (!top) return;
+    const laneY = this.worldToScreen(0, top.y + SLAB_H).y;
+    const clock = this.reduceMotion ? 0 : this.clock;
+    if (this.ashFloors > 0) {
+      const img = this.eventImage(this.ashArt);
+      if (img) {
+        // A veil over the lane, drawn twice so light-on-black reads as weather, not haze.
+        const w = this.vw * 1.5;
+        const h = (w * img.naturalHeight) / img.naturalWidth;
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.8;
+        const drift = ((clock * 22) % w) - w / 2;
+        for (let pass = 0; pass < 2; pass++) {
+          ctx.drawImage(img, drift - w * 0.25, laneY - h * 0.6, w, h);
+          ctx.drawImage(img, drift - w * 0.25 - w, laneY - h * 0.6, w, h);
+        }
+        ctx.restore();
+      }
+    }
+    if (this.swellUntil > this.runTime) {
+      const img = this.eventImage("swell");
+      if (img) {
+        const w = this.vw * 1.4;
+        const h = (w * img.naturalHeight) / img.naturalWidth;
+        const base = this.worldToScreen(0, 0).y;
+        const left = this.swellUntil - this.runTime;
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.6 * Math.min(1, left / 1.5);
+        ctx.drawImage(
+          img,
+          -w * 0.2 + Math.sin(clock * 1.3) * 30,
+          base - h * 0.55 + Math.sin(clock * 2) * 12,
+          w,
+          h,
+        );
+        ctx.restore();
+      }
+    }
+    const ev = this.event;
+    if (!ev) return;
+    const { def } = ev;
+    const art = def.art;
+    if (def.kind === "lanterns" && this.mote && art) {
+      const img = this.eventImage(art);
+      if (img) {
+        const s = this.worldToScreen(this.mote.x, this.mote.y);
+        const w = 150;
+        const h = (w * img.naturalHeight) / img.naturalWidth;
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.translate(s.x, s.y + Math.sin(clock * 2) * 4);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
+    } else if (def.kind === "drag" && art) {
+      const img = this.eventImage(art);
+      if (img) {
+        const crane = art === "crane";
+        const w = crane ? 110 : 90;
+        const h = (w * img.naturalHeight) / img.naturalWidth;
+        ctx.save();
+        ctx.translate(ev.x - 90, laneY - 40 + Math.sin(clock * 3) * 10);
+        ctx.rotate(Math.sin(clock * 2.2) * (crane ? 0.12 : 0.3));
+        ctx.drawImage(img, -w / 2, crane ? -h : -h / 2, w, h);
+        ctx.restore();
+      }
+    } else if (def.kind === "lightning" && ev.t < 0.5 && art) {
+      const img = this.eventImage(art);
+      if (img) {
+        const h = this.vh * 0.8;
+        const w = (h * img.naturalWidth) / img.naturalHeight;
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 1 - ev.t / 0.5;
+        ctx.drawImage(img, this.vw / 2 - w / 2, laneY - h, w, h);
+        ctx.restore();
+      }
+    } else if ((def.kind === "forge" || def.kind === "frost") && ev.t < 0.6 && art) {
+      const img = this.eventImage(art);
+      if (img) {
+        const w = 260;
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 1 - ev.t / 0.6;
+        ctx.drawImage(img, this.vw / 2 - w / 2, laneY - w * (0.3 + ev.t), w, w);
+        ctx.restore();
+      }
+    } else if (def.kind === "tremor" && ev.t < 0.6 && art) {
+      const img = this.eventImage(art);
+      if (img) {
+        const w = 200;
+        const h = (w * img.naturalHeight) / img.naturalWidth;
+        ctx.save();
+        ctx.globalAlpha = 1 - ev.t / 0.6;
+        ctx.drawImage(img, this.vw / 2 - w / 2, laneY + 40 - ev.t * 120, w, h);
+        ctx.restore();
+      }
+    }
+  }
+
   private drawPassers(ctx: CanvasRenderingContext2D): void {
     if (this.passers.length === 0) return;
     for (const q of this.passers) {
@@ -7255,6 +7619,21 @@ export class SpireEngine {
     const mote = this.mote;
     const top = this.peak();
     if (!mote || !top) return;
+    // The lanterns are their own picture (drawEvents): no pickup glyph, no words.
+    if (this.event?.def.kind === "lanterns") {
+      const s = this.worldToScreen(mote.x, mote.y);
+      const floorY = this.worldToScreen(0, top.y + VISUAL_H).y;
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,190,110,${this.moteArmed ? 0.9 : 0.35})`;
+      ctx.lineWidth = this.moteArmed ? 2 : 1.2;
+      if (!this.moteArmed) ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y + 18);
+      ctx.lineTo(s.x, floorY - 30);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     const s = this.worldToScreen(mote.x, mote.y);
     drawPickup(ctx, {
       kind: mote.kind,

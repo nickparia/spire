@@ -3,6 +3,14 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 112 — Events (internal)
+
+- **Every climb now has two moments that belong to its sky, at floors that differ every run**, each announced by the world a beat before, each asking something of the drop. Never on a landing, never the same two.
+- *Hearth, sky by sky* — **The Foundry**: the forge breathes (two slabs come red-hot and shrink while they hang — land them fast); the crane swings through the lane and drags the hanging slab a step. **Tidewater**: the swell (the sea rolls the tower for seven seconds); sea mist (the lane dims for four floors and the perfect moment goes — Second Sight sees through it). **The City**: smoke; the ground gives (the next drop must be a perfect or the Dark climbs two floors). **Red Canyon**: rockfall; a dust storm. **Gale Ridge**: a rogue gust, wind shear, a kite torn loose. **The Glacier**: hoarfrost (a help — the next three slabs freeze where they land); whiteout; avalanche. **The Eclipse**: lightning (one flash shows the groove for a single drop); nightfall. **The Apex** draws from all of them.
+- *Every sky*: lanterns drift across at the lane's height — drop under one to take a card; the Dark heaves a floor, then sleeps for eight seconds — time, if you use it.
+- *The Gale*: the rogue gust, the lull (ten seconds of dead air: build), wind shear, the kite — and the lanterns and the sleeping Dark.
+- **The Dark quickens without words now.** "The Dark quickens" is gone; when it speeds up — past par, or after a wide miss — its edge flares violet and it throws ink, and the floors-below count pulses.
+
 ## Build 111 — The cards stand tall again (internal)
 
 - **The three cards are dealt as a triangle** — one up, two below — so each is full size again. The top card's words sit beside it.

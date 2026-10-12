@@ -68,6 +68,7 @@ const INITIAL: Hud = {
   hand: [],
   combos: [],
   handFired: null,
+  quick: false,
   accent: "rgb(255,77,26)",
   result: null,
 };
@@ -293,6 +294,8 @@ export function SpireGame() {
       }
     };
     watchErrors();
+    // The trace, readable by the bots.
+    (window as unknown as { __spireTrace?: () => string[] }).__spireTrace = traceLines;
     // Tester harness for the phone: a sky id left in the native store starts
     // that sky on launch, once. Lets the simulator be driven to any sky.
     if (Capacitor.isNativePlatform()) {
