@@ -78,6 +78,7 @@ import { earn, featsFor, type FeatId } from "./feats";
 import { CRADLE_STOP, LEVEL_TILT, Stage } from "./physics";
 import { isBoss, worldOf, WORLDS } from "./worlds";
 import { trace } from "./trace";
+import { PASSER_LOOKS, type Passer, type PasserKind } from "./passers";
 import { finishWorn, trailWorn, type FinishId, type TrailId } from "./finishes";
 import {
   isLanding,
@@ -785,6 +786,21 @@ export class SpireEngine {
   private wasInZone = false;
   /** The last frame was in a gust: its rush plays once as it arrives. */
   private wasGusting = false;
+  /** Passers-by in the sky: met at a floor, drifting past behind the tower. */
+  private passers: {
+    kind: PasserKind;
+    /** Screen x from the centre, and the screen y it appeared at with the camera then. */
+    x: number;
+    sy0: number;
+    camAt: number;
+    vx: number;
+    depth: number;
+    age: number;
+    seed: number;
+  }[] = [];
+  /** The sky's passers not yet met, in floor order. */
+  private passersDue: Passer[] = [];
+  private passerArt = new Map<PasserKind, HTMLImageElement>();
   /** Pre-rendered wind ribbons by sky colour (see wispSprites). */
   private wispCache = new Map<string, HTMLCanvasElement[]>();
   /** Why the last tap was ignored, so the trace says it once, not every tap. */
@@ -1635,6 +1651,8 @@ export class SpireEngine {
       open: 0,
     };
     this.aimPace = 1;
+    this.passers = [];
+    this.passersDue = [...(this.plan.passers ?? [])].sort((a, b) => a.at - b.at);
     this.giftsTaken = [];
     this.hand = {};
     this.combos = [];
@@ -5026,6 +5044,7 @@ export class SpireEngine {
     }
     if (this.cut && this.phase === "play" && !this.ascent) this.stepCut(dt);
     this.windSound();
+    this.stepPassers(dt);
 
     const aiming = this.phase === "menu" || this.phase === "ready" || this.phase === "play";
     const prev = this.peak();
@@ -5703,7 +5722,10 @@ export class SpireEngine {
     const prev = this.peak();
     const inZone = aiming && this.phase !== "menu" && this.cued() && this.lined(prev);
 
-    if (aiming && !this.escape && this.phase !== "menu") this.drawWindFar(ctx);
+    if (aiming && !this.escape && this.phase !== "menu") {
+      this.drawPassers(ctx);
+      this.drawWindFar(ctx);
+    }
     const burning = this.burning();
     for (let i = 0; i < this.stack.length; i++) {
       const slab = this.stack[i]!;
@@ -6916,6 +6938,93 @@ export class SpireEngine {
           clock * (3 + r2 * 2) + i * 2.3,
           accent,
         );
+      }
+      ctx.restore();
+    }
+  }
+
+  /** Passers-by: met at their floor, then drifting across and climbed past. */
+  private stepPassers(dt: number): void {
+    if (this.mode !== "level" || this.phase === "menu" || this.escape) return;
+    const top = this.peak();
+    while (this.passersDue.length > 0 && this.passersDue[0]!.at <= this.floors && top) {
+      const p = this.passersDue.shift()!;
+      const look = PASSER_LOOKS[p.kind];
+      const depth = p.depth ?? look.depth;
+      const side = p.side ?? (p.kind === "sun" || p.kind === "moon" ? 1 : -1);
+      const w = look.w * depth;
+      // Where it appears: a flock or scraps come in from off the side; a cloud
+      // from the edge, already half in view; a sun or moon hangs high beside
+      // the tower. All of them `above` floors over the tower's top, on screen.
+      const x =
+        look.speed >= 40
+          ? -side * (this.vw / 2 + w / 2)
+          : look.speed >= 10
+            ? -side * (this.vw / 2 + w * 0.15)
+            : side * this.vw * 0.3;
+      const ty = this.worldToScreen(0, top.y + SLAB_H).y;
+      this.passers.push({
+        kind: p.kind,
+        x,
+        sy0: ty - SLAB_H * look.above * (0.6 + 0.4 * depth),
+        camAt: this.camY,
+        vx: side * look.speed * depth,
+        depth,
+        age: 0,
+        seed: Math.random() * 100,
+      });
+    }
+    for (const q of this.passers) {
+      q.age += dt;
+      q.x += q.vx * dt;
+    }
+    // Gone once well off the side, or climbed past and below the view.
+    this.passers = this.passers.filter(
+      (q) =>
+        Math.abs(q.x) < this.vw / 2 + PASSER_LOOKS[q.kind].w + 80 &&
+        q.sy0 + (this.camY - q.camAt) * q.depth < this.vh + 400,
+    );
+  }
+
+  private drawPassers(ctx: CanvasRenderingContext2D): void {
+    if (this.passers.length === 0) return;
+    for (const q of this.passers) {
+      let img = this.passerArt.get(q.kind);
+      if (!img) {
+        img = Object.assign(new Image(), { src: `art/passers/${q.kind}.png` });
+        this.passerArt.set(q.kind, img);
+      }
+      if (!img.complete || img.naturalWidth === 0) continue;
+      const look = PASSER_LOOKS[q.kind];
+      const d = q.depth;
+      const w = look.w * d;
+      const h = (w * img.naturalHeight) / img.naturalWidth;
+      // Parallax: as the camera climbs it sinks on screen, the farther back the less.
+      const sy = q.sy0 + (this.camY - q.camAt) * d;
+      const clock = this.reduceMotion ? 0 : this.clock;
+      const bob = Math.sin((clock / look.bobPeriod) * Math.PI * 2 + q.seed) * look.bob * d;
+      const roll = Math.sin((clock / (look.bobPeriod * 1.7)) * Math.PI * 2 + q.seed) * look.roll;
+      // Fading in as it arrives, so it never pops.
+      const fade = Math.min(1, q.age / 1.2);
+      ctx.save();
+      ctx.globalAlpha = look.alpha * fade;
+      // Light painted on black is laid over the sky as light: no cut-out edge.
+      if (look.light) ctx.globalCompositeOperation = "screen";
+      if (look.sheet) {
+        // Rain: a band tiled across the width, streaking down.
+        const scroll = (clock * 260) % h;
+        const bandTop = sy - h * 1.5;
+        ctx.beginPath();
+        ctx.rect(0, bandTop, this.vw, h * 3);
+        ctx.clip();
+        for (let x = -w; x < this.vw + w; x += w) {
+          for (let k = -1; k < 4; k++) ctx.drawImage(img, x, bandTop + k * h + scroll - h, w, h);
+        }
+      } else {
+        ctx.translate(this.vw / 2 + q.x, sy + bob);
+        if (roll) ctx.rotate(roll);
+        if (q.vx > 0) ctx.scale(-1, 1);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
       }
       ctx.restore();
     }

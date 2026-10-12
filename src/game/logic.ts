@@ -1,3 +1,4 @@
+import type { Passer } from "./passers";
 import type { ThemeId } from "./themes";
 
 export type RGB = [number, number, number];
@@ -163,6 +164,8 @@ export type Plan = {
   look?: number;
   /** The cutting wheel: the goal is metres cut, not floors; the Dark follows from above. */
   cut?: boolean;
+  /** Things the climb goes past at a height (see passers.ts). */
+  passers?: Passer[];
   /**
    * The Ring: the rim the tower stands on tilts, swinging to this many radians
    * either way over `tiltPeriod` seconds. Gravity tilts with it, so an

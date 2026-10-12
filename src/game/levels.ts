@@ -1,3 +1,4 @@
+import type { Passer } from "./passers";
 import {
   clamp01,
   COURSE_CYCLE,
@@ -47,6 +48,8 @@ export type LevelDef = {
   descent?: boolean;
   /** Its own painting and stone (art/sky/<paint>.mp4, art/slabs/<paint>.webp); defaults to the theme's. */
   paint?: string;
+  /** Things the climb goes past at a height: a flock, a cloud, rain, a sun (see passers.ts). */
+  passers?: Passer[];
   /** Floors between the wind turning; 6 unless a sky says otherwise. */
   windTurn?: number;
   /** The Gale: what the wind does on this sky (see Plan.gale). */
@@ -69,6 +72,11 @@ export const WARMUP_FLOORS = 3;
 export const LEVELS: LevelDef[] = [
   {
     id: "foundry",
+    passers: [
+      { at: 6, kind: "birds" },
+      { at: 12, kind: "cloud" },
+      { at: 17, kind: "sun" },
+    ],
     name: "The Foundry",
     blurb: "Even pace. Learn the groove.",
     line: "This is where the stone was cut. It still knows the shape.",
@@ -84,6 +92,12 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "tide",
+    passers: [
+      { at: 5, kind: "birds", side: 1 },
+      { at: 11, kind: "rain" },
+      { at: 17, kind: "cloud" },
+      { at: 22, kind: "moon" },
+    ],
     name: "Tidewater",
     blurb: "The groove walks. Follow it.",
     line: "The sea remembers the Spire's shadow. It walks when you walk.",
@@ -100,6 +114,11 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "city",
+    passers: [
+      { at: 7, kind: "cloud" },
+      { at: 13, kind: "birds" },
+      { at: 19, kind: "moon" },
+    ],
     name: "Pulse City",
     blurb: "It rests, then it jumps. Count it in.",
     line: "They built clocks here, to keep time with the tower. The clocks are all that is left.",
@@ -116,6 +135,11 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "canyon",
+    passers: [
+      { at: 6, kind: "birds", side: 1 },
+      { at: 14, kind: "cloud" },
+      { at: 20, kind: "sun" },
+    ],
     name: "Red Canyon",
     blurb: "It bursts through the centre. A bomb means wait.",
     line: "Something burst through here on its way down. Mind the fuses.",
@@ -132,6 +156,12 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "ridge",
+    passers: [
+      { at: 5, kind: "scraps" },
+      { at: 12, kind: "kite" },
+      { at: 19, kind: "cloud" },
+      { at: 26, kind: "birds" },
+    ],
     name: "Gale Ridge",
     blurb: "The slab falls now, and the wind carries it.",
     line: "Up here the wind has nothing to hold on to but you.",
@@ -149,6 +179,11 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "glacier",
+    passers: [
+      { at: 7, kind: "cloud" },
+      { at: 15, kind: "birds", side: 1 },
+      { at: 22, kind: "moon" },
+    ],
     name: "The Glacier",
     blurb: "It holds at the walls. Breathe with it.",
     line: "Slow. The cold is honest; it only takes what you give it time to take.",
@@ -165,6 +200,11 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "eclipse",
+    passers: [
+      { at: 8, kind: "moon" },
+      { at: 16, kind: "birds" },
+      { at: 24, kind: "cloud" },
+    ],
     name: "Eclipse",
     blurb: "The slab goes dark. Tap the flare.",
     line: "The last sky they lit was the first to go dark. Watch for the flare.",
@@ -181,6 +221,13 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "apex",
+    passers: [
+      { at: 8, kind: "birds" },
+      { at: 16, kind: "cloud" },
+      { at: 24, kind: "rain" },
+      { at: 32, kind: "sun" },
+      { at: 40, kind: "moon" },
+    ],
     name: "Apex",
     blurb: "Every sky, one after another.",
     line: "The top. It has been waiting, and so has what lives beneath it.",
@@ -402,6 +449,11 @@ export const LEVELS: LevelDef[] = [
   // and half of them are things it does for you if you read it.
   {
     id: "gale1",
+    passers: [
+      { at: 5, kind: "scraps" },
+      { at: 11, kind: "cloud" },
+      { at: 17, kind: "kite" },
+    ],
     name: "The Updraft",
     blurb: "A steady wind, and an updraft that draws every drop toward the groove. Lead it.",
     line: "The first climbers thought the wind was the mountain breathing.",
@@ -424,6 +476,11 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "gale2",
+    passers: [
+      { at: 6, kind: "kite" },
+      { at: 13, kind: "birds", side: 1 },
+      { at: 20, kind: "cloud" },
+    ],
     name: "Gusts",
     blurb: "Calm, then a gust you can see coming. Drop in the gust and land true: a wind-true.",
     line: "Wait for it. Or don't.",
@@ -446,6 +503,12 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "gale3",
+    passers: [
+      { at: 5, kind: "scraps", side: 1 },
+      { at: 12, kind: "scraps" },
+      { at: 19, kind: "cloud" },
+      { at: 25, kind: "sun" },
+    ],
     name: "Crosswinds",
     blurb: "It turns every floor. Watch the cloth.",
     line: "What the wind carries up, it carries for a reason.",
@@ -469,6 +532,12 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "gale4",
+    passers: [
+      { at: 6, kind: "birds" },
+      { at: 14, kind: "kite", side: 1 },
+      { at: 22, kind: "cloud" },
+      { at: 27, kind: "moon" },
+    ],
     name: "Tailwind",
     blurb: "It blows along the slide. Drop short and it carries the slab home.",
     line: "For once the ridge is on your side. Trust it, a little.",
@@ -490,6 +559,12 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "gale5",
+    passers: [
+      { at: 6, kind: "scraps" },
+      { at: 13, kind: "cloud" },
+      { at: 20, kind: "kite" },
+      { at: 27, kind: "birds" },
+    ],
     name: "The Howl",
     blurb: "It rises and falls in a long wave. Build in the lulls; they shorten.",
     line: "It does not blow. It decides.",
@@ -511,6 +586,13 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: "gale6",
+    passers: [
+      { at: 6, kind: "kite" },
+      { at: 13, kind: "scraps", side: 1 },
+      { at: 20, kind: "rain" },
+      { at: 27, kind: "cloud" },
+      { at: 33, kind: "sun" },
+    ],
     name: "The Eye",
     blurb: "Everything the wind knows, in turn. Then it stops.",
     line: "At the top of the ridge the wind stops. That is not a mercy.",
@@ -587,6 +669,7 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
     gale: level.gale,
     lift: level.lift,
     look: level.look,
+    passers: level.passers,
     tilt: level.tilt?.[0] ?? 0,
     tiltPeriod: level.tilt?.[1] ?? 10,
     turn: level.turn ?? 0,

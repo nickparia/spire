@@ -3,6 +3,10 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 108 — Things you climb past (internal)
+
+- **The sky has company now.** At set heights on every sky you climb past something that belongs there: a flock of crows crossing low, a cloud you climb through, a sheet of rain, a pale sun or a crescent moon breaking through high up; on the ridge, torn prayer-flag scraps tumbling and a kite torn loose. They drift behind the tower at their own depth, never in the slab's lane, and never touch play — the higher ones are the rarer.
+
 ## Build 107 — Three schools, and the Dark follows your aim (internal)
 
 - **Three cards a landing, one from each school**: *Fire* strikes the Dark (Forge-fire, Starfall, Ember Trail), *Stone* holds the tower (Bedrock, Rime, Keystone), *Air* sees and breathes (Stillness, Second Sight, and the new *Open Hand* — your next drops judged half again as wide). The choice is always strike, hold, or see; kindling and the powers still lean the deal.
