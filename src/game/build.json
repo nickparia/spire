@@ -1,9 +1,9 @@
 {
-  "build": 105,
-  "title": "Lighter wind, kinder Gale",
+  "build": 106,
+  "title": "A free look, and cards that build",
   "notes": [
-    "The wind bed is at less than half again. The Updraft draws a miss nearly half-way home, the carry is lower on the first three skies, and the Gale's Dark climbs at three-quarters speed.",
-    "The wind's ribbons are pre-rendered now, so a phone paints them without dropping frames.",
-    "If a sky's start ever holds again: Options, Tester tools, screenshot the trace, send it — it now records stalls, ignored taps, music decode times and video errors."
+    "The Gale: on every floor the Dark holds still until the slab has made a pass. Reading the wind costs nothing.",
+    "Take a card you already hold and it is kindled: II, then III, which lasts the whole climb. Two cards make a power: Firestorm, The Long Winter, Held Breath.",
+    "Three new cards: Keystone, Second Sight, Ember Trail. Your hand shows under the score. Three stars on a sky and you start the next one holding a card."
   ]
 }

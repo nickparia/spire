@@ -69,6 +69,8 @@ export type Save = {
   /** The stone finish worn and the trail left: see finishes.ts. */
   finish: string;
   trail: string;
+  /** A favour earned by three stars: the card to start the next sky holding ("" for none). */
+  favour: string;
   /** When this save was last written, ms since the epoch. */
   savedAt: number;
 };
@@ -102,6 +104,7 @@ export function emptySave(): Save {
     progress: {},
     finish: "sky",
     trail: "none",
+    favour: "",
     savedAt: 0,
   };
 }
@@ -165,6 +168,7 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
       }
       save.practice = data.practice === true;
       if (typeof data.finish === "string") save.finish = data.finish;
+      if (typeof data.favour === "string") save.favour = data.favour;
       if (typeof data.trail === "string") save.trail = data.trail;
       save.savedAt = Math.max(0, num(data.savedAt, 0));
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));

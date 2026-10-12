@@ -1,3 +1,4 @@
+import { type CSSProperties } from "react";
 import {
   ChevronRight,
   Crosshair,
@@ -42,6 +43,7 @@ import { ThrowShade } from "./shade";
 import type { FeatId } from "@/game/feats";
 import { skyNumber, skyWord, worldOf } from "@/game/worlds";
 import { GiftCards } from "./gifts";
+import { COMBO_BY_ID, LANDING_BY_ID, TIER_NAMES } from "@/game/landing";
 import type { Hud, LevelResult, SpireEngine } from "@/game/engine";
 import { LEVELS } from "@/game/levels";
 import { formatPercent, formatTime, starCount } from "@/game/logic";
@@ -108,7 +110,14 @@ function Build({
 export function PickPanel({ hud, onChoose }: { hud: Hud; onChoose: (index: number) => void }) {
   if (hud.landing) {
     if (hud.landing.omen) return null;
-    return <GiftCards floor={hud.landing.floor} offers={hud.landing.offers} onChoose={onChoose} />;
+    return (
+      <GiftCards
+        floor={hud.landing.floor}
+        offers={hud.landing.offers}
+        hand={Object.fromEntries(hud.hand.map((h) => [h.id, h.tier]))}
+        onChoose={onChoose}
+      />
+    );
   }
   return (
     <section className="panel panel-in" aria-label="Choose an upgrade" data-ui>
@@ -146,6 +155,43 @@ export function PickPanel({ hud, onChoose }: { hud: Hud; onChoose: (index: numbe
 }
 
 /** The strip across the top during a run: progress, the clock, and how clean you are. */
+/** The cards held, as small stones under the score: their tier, and a flare when one fires. */
+function HandRow({ hud }: { hud: Hud }) {
+  return (
+    <div className="hand" aria-label="Cards held">
+      {hud.hand.map((h) => {
+        const def = LANDING_BY_ID[h.id];
+        const fired = hud.handFired && hud.handFired.id === h.id ? hud.handFired.at : 0;
+        return (
+          <span
+            key={h.id}
+            className={"hand-stone" + (h.tier >= 3 ? " hand-full" : "")}
+            style={
+              {
+                "--c": `rgb(${def.rgb.join(",")})`,
+                backgroundImage: `url(art/cards/${h.id}.jpg)`,
+              } as CSSProperties
+            }
+            title={def.name}
+          >
+            {fired ? <i key={fired} className="hand-flare" /> : null}
+            <b className="hand-tier">{TIER_NAMES[h.tier - 1]}</b>
+          </span>
+        );
+      })}
+      {hud.combos.map((c) => (
+        <span
+          key={c}
+          className="hand-combo"
+          style={{ "--c": `rgb(${COMBO_BY_ID[c].rgb.join(",")})` } as CSSProperties}
+        >
+          {COMBO_BY_ID[c].name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function RunHud({
   hud,
   engineRef,
@@ -214,6 +260,7 @@ export function RunHud({
 
         {started || hud.heat > 0 ? <Heat hud={hud} /> : null}
         <Build ranks={hud.ranks} families={hud.families} />
+        {hud.hand.length > 0 ? <HandRow hud={hud} /> : null}
       </div>
 
       <div className="text-right">

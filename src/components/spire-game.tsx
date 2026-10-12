@@ -63,6 +63,9 @@ const INITIAL: Hud = {
   boss: null,
   escape: null,
   landing: null,
+  hand: [],
+  combos: [],
+  handFired: null,
   accent: "rgb(255,77,26)",
   result: null,
 };

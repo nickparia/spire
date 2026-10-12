@@ -83,6 +83,11 @@ import {
   isLanding,
   LANDING_BY_ID,
   landingOffer,
+  combosOf,
+  COMBO_BY_ID,
+  TIERS,
+  type ComboId,
+  type Hand,
   type LandingId,
   TRIALS,
   trialFor,
@@ -465,6 +470,11 @@ export type Hud = {
   /** A landing to choose from. */
   /** A landing: the omen plays first (the cards wait), then the gifts are offered. */
   landing: { floor: number; offers: LandingId[]; omen: boolean } | null;
+  /** The cards held this climb, each with its tier, and the powers they make. */
+  hand: { id: LandingId; tier: number }[];
+  combos: ComboId[];
+  /** The last card to fire, and when (clock seconds), for the hand's flare. */
+  handFired: { id: LandingId; at: number } | null;
 };
 
 export type EngineEvents = {
@@ -601,6 +611,8 @@ type Mover = {
   baseDrift: number;
   /** Let go in a gust: a true landing is a wind-true. */
   gusted: boolean;
+  /** Times the hanging slab has turned at a lane's end since it was spawned. */
+  turns: number;
   guide: boolean;
   /** Seconds into the fall, or -1 while it is still hanging. */
   fallT: number;
@@ -694,6 +706,7 @@ export class SpireEngine {
     drift: 0,
     baseDrift: 0,
     gusted: false,
+    turns: 0,
     guide: false,
     fallT: -1,
     fallTime: 0,
@@ -938,7 +951,26 @@ export class SpireEngine {
   /** Landings already taken this run, by floor. */
   private landed = new Set<number>();
   /** Gifts in effect: slabs left that set wherever they land, wide, or slow. */
-  private gift = { set: 0, broad: 0, slow: 0, fire: 0, frost: 0, storm: 0 };
+  private gift = {
+    set: 0,
+    broad: 0,
+    slow: 0,
+    fire: 0,
+    frost: 0,
+    storm: 0,
+    keystone: 0,
+    sight: 0,
+    ember: 0,
+  };
+  /** The cards held this climb and their tiers; the powers two of them make. */
+  private hand: Hand = {};
+  private combos: ComboId[] = [];
+  private handFired: { id: LandingId; at: number } | null = null;
+  /** What the held tiers make of the elements: floors a burning slab takes, a bolt's depth, the braced sway, an ember's push. */
+  private fireBurn = FIRE_BURN;
+  private stormPush = STORM_PUSH;
+  private swayGift = 0.5;
+  private emberPush = 0.5;
   /** Gifts taken this run, so the next landing offers new ones first. */
   private giftsTaken: LandingId[] = [];
   /** Bedrock's buttresses: how far grown (0..1), or -1 when there are none. */
@@ -1587,8 +1619,25 @@ export class SpireEngine {
     this.escape = null;
     this.landing = null;
     this.landed.clear();
-    this.gift = { set: 0, broad: 0, slow: 0, fire: 0, frost: 0, storm: 0 };
+    this.gift = {
+      set: 0,
+      broad: 0,
+      slow: 0,
+      fire: 0,
+      frost: 0,
+      storm: 0,
+      keystone: 0,
+      sight: 0,
+      ember: 0,
+    };
     this.giftsTaken = [];
+    this.hand = {};
+    this.combos = [];
+    this.handFired = null;
+    this.fireBurn = FIRE_BURN;
+    this.stormPush = STORM_PUSH;
+    this.swayGift = 0.5;
+    this.emberPush = 0.5;
     this.bedrock = -1;
     this.bedrockGone = -1;
     this.trial = null;
@@ -1615,6 +1664,15 @@ export class SpireEngine {
     this.demoNext = 0.8;
     this.demoLit = false;
     this.spawnMover();
+    // A favour earned by three stars: the next sky begins with that card in hand.
+    if (phase === "ready" && this.mode === "level" && !this.save.practice) {
+      const favour = this.save.favour as LandingId;
+      if (favour && favour in LANDING_BY_ID) {
+        this.save.favour = "";
+        storeSave(this.save);
+        this.applyGift(favour, true);
+      }
+    }
     this.emit();
   }
 
@@ -1766,6 +1824,7 @@ export class SpireEngine {
         (slipping && this.kit.slipCalm ? 0 : slowed ? 0.5 : 1),
       baseDrift: 0,
       gusted: false,
+      turns: 0,
       guide: fall?.guide ?? false,
       fallT: -1,
       // The Updraft holds a drop up a little longer.
@@ -1780,6 +1839,9 @@ export class SpireEngine {
       dir2: -dir,
       x2: 0,
     };
+    // The hand at work on the slab itself: keystones, and the cue kept lit.
+    if (this.gift.keystone > 0) this.mover.keystone = true;
+    if (this.gift.sight > 0) this.mover.guide = true;
     // The Gale: the sky's full carry is kept; the hanging slab carries what the wind is doing now.
     this.mover.baseDrift = this.mover.drift;
     this.liveWind();
@@ -2234,7 +2296,7 @@ export class SpireEngine {
     this.applySway();
     this.landing = {
       floor,
-      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken, trial),
+      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken, trial, this.hand),
       omen: true,
     };
     this.omen = OMEN_SECONDS;
@@ -2317,7 +2379,8 @@ export class SpireEngine {
   private applySway(): void {
     if (!this.stage) return;
     const trial = this.trial ? TRIALS[this.trial].sway : 1;
-    this.swayBase = this.plan.sway * this.kit.sway * trial * (this.gift.broad > 0 ? 0.5 : 1);
+    this.swayBase =
+      this.plan.sway * this.kit.sway * trial * (this.gift.broad > 0 ? this.swayGift : 1);
     this.stage.sway = this.swayBase;
   }
 
@@ -2336,16 +2399,25 @@ export class SpireEngine {
     this.emit();
   }
 
-  /** A gift takes effect at once, and says so. */
-  private applyGift(id: LandingId): void {
+  /**
+   * A gift takes effect at once, and says so. Taken again it is kindled: the
+   * same element, a tier stronger and longer. A `favour` is a card a sky
+   * starts with, earned by three stars on the one before.
+   */
+  private applyGift(id: LandingId, favour = false): void {
     const cx = this.seat.x;
     const y = this.seat.y + 60;
     this.giftsTaken.push(id);
+    const tier = Math.min(TIERS, (this.hand[id] ?? 0) + 1);
+    this.hand[id] = tier;
+    // Slabs a card lasts at each tier; the third is the whole climb.
+    const lasts = (one: number, two: number) => (tier >= 3 ? 999 : tier === 2 ? two : one);
     let said = LANDING_BY_ID[id].name.toUpperCase();
     switch (id) {
       case "fire":
         // The stone above ignites and the Dark recoils a floor at once.
-        this.gift.fire = 6;
+        this.gift.fire = lasts(6, 12);
+        this.fireBurn = FIRE_BURN * (tier >= 2 ? 2 : 1);
         this.sfx.fire();
         this.fx.sparkle(
           cx,
@@ -2360,17 +2432,18 @@ export class SpireEngine {
       case "frost":
         // The Dark crusts over with ice and stops.
         this.sfx.frost();
-        this.gift.frost = 5;
-        this.gift.set = Math.max(this.gift.set, 5);
-        this.rime = RIME_SECONDS;
-        this.breather = Math.max(this.breather, RIME_SECONDS);
+        this.gift.frost = lasts(5, 10);
+        this.gift.set = Math.max(this.gift.set, lasts(5, 10));
+        this.rime = RIME_SECONDS * (tier >= 3 ? 2.4 : tier === 2 ? 1.6 : 1);
+        this.breather = Math.max(this.breather, this.rime);
         this.fx.sparkle(cx, this.dark, this.vw, LANDING_BY_ID.frost.rgb, 40);
         this.fx.ring(cx, this.dark, LANDING_BY_ID.frost.rgb, 300, 4);
         said = "THE DARK FREEZES";
         break;
       case "storm":
         // The first star falls now: lightning on the Dark.
-        this.gift.storm = 3;
+        this.gift.storm = lasts(3, 6);
+        this.stormPush = STORM_PUSH + (tier - 1);
         this.sfx.thunder();
         this.fx.rayBurst(cx, this.dark, [255, 240, 200], 260, 10);
         this.flash = Math.max(this.flash, 0.7);
@@ -2378,7 +2451,8 @@ export class SpireEngine {
         break;
       case "stone":
         // Buttresses heave up out of the rock and grip the base.
-        this.gift.broad = Math.max(this.gift.broad, 4);
+        this.gift.broad = Math.max(this.gift.broad, lasts(4, 8));
+        this.swayGift = tier >= 3 ? 0.25 : tier === 2 ? 0.33 : 0.5;
         this.bedrock = 0;
         this.bedrockGone = -1;
         this.applySway();
@@ -2392,10 +2466,44 @@ export class SpireEngine {
         break;
       case "shadow":
         // The air thickens: a violet hush over everything.
-        this.gift.slow = 6;
+        this.gift.slow = lasts(6, 12);
         this.sfx.slow();
         said = "THE WORLD STILLS";
         break;
+      case "keystone":
+        // The next slabs come as keystones: narrow, and twice the push for a perfect.
+        this.gift.keystone = lasts(3, 6);
+        this.sfx.forge();
+        said = "THE KEYSTONES";
+        break;
+      case "sight":
+        // The perfect moment shows itself.
+        this.gift.sight = lasts(6, 12);
+        this.sfx.chime();
+        said = "SECOND SIGHT";
+        break;
+      case "ember":
+        // A streak burns: each perfect past the first pushes the Dark further.
+        this.gift.ember = lasts(6, 12);
+        this.emberPush = 0.5 * tier;
+        this.sfx.fire();
+        said = "THE EMBER TRAIL";
+        break;
+    }
+    if (favour) said = `FAVOUR · ${LANDING_BY_ID[id].name.toUpperCase()}`;
+    else if (tier > 1)
+      said = `${LANDING_BY_ID[id].name.toUpperCase()} ${tier === 2 ? "II" : "III"}`;
+    // Two cards held make a power of their own; a new one is announced.
+    const before = this.combos;
+    this.combos = combosOf(this.hand);
+    const made = this.combos.find((c) => !before.includes(c));
+    if (made) {
+      const combo = COMBO_BY_ID[made];
+      this.float(combo.name.toUpperCase(), cx, y - 60, true, 30);
+      this.fx.rayBurst(cx, this.seat.y, combo.rgb, 360, 28);
+      this.fx.ring(cx, this.seat.y, combo.rgb, 420, 6);
+      this.sfx.forge();
+      this.flash = Math.max(this.flash, 0.7);
     }
     this.float(said, cx, y, true, 24);
     const rgb: RGB = LANDING_BY_ID[id].rgb;
@@ -3478,7 +3586,16 @@ export class SpireEngine {
           : this.plan.darkRate * (this.trial ? TRIALS[this.trial].dark : 1);
       // Linger past par and the Dark quickens: about 40% faster ten seconds
       // over, more than twice as fast by thirty. Not in the boss fight.
-      const rate = base * (this.boss ? 1 : this.quickening());
+      // The Gale gives you a look: on each floor the Dark holds still until the
+      // hanging slab has turned `look` times, so reading the wind costs nothing.
+      const looking =
+        !this.boss &&
+        (this.plan.look ?? 0) > 0 &&
+        this.mover.fallT < 0 &&
+        this.mover.turns < (this.plan.look ?? 0);
+      // The Long Winter: while the buttresses stand, the Dark stays frozen.
+      const winter = !this.boss && this.combos.includes("winter") && this.bedrock >= 0;
+      const rate = looking || winter ? 0 : base * (this.boss ? 1 : this.quickening());
       this.dark += rate * dt;
       const top = this.peak()!;
       if (this.boss) this.bossTurn(dt, top);
@@ -3760,10 +3877,12 @@ export class SpireEngine {
       if (m.u >= 1) {
         m.u = 1;
         m.dir = -1;
+        m.turns += 1;
         if (this.phase === "play") this.sfx.swish();
       } else if (m.u <= -1) {
         m.u = -1;
         m.dir = 1;
+        m.turns += 1;
         if (this.phase === "play") this.sfx.swish();
       }
       this.syncMoverX();
@@ -4090,23 +4209,37 @@ export class SpireEngine {
       this.gift.fire -= 1;
       slab.element = "fire";
       // It burns the Dark back: flames lick down its edge.
-      this.pushDark(SLAB_H * FIRE_BURN);
+      this.pushDark(SLAB_H * this.fireBurn);
+      this.handFired = { id: "fire", at: this.clock };
       this.fx.burst(cx, this.dark, LANDING_BY_ID.fire.rgb, 26, 260);
       this.fx.sparkle(cx, this.dark, this.vw * 0.8, [255, 200, 120], 22);
     } else if (this.gift.frost > 0) {
       this.gift.frost -= 1;
       slab.element = "ice";
+      this.handFired = { id: "frost", at: this.clock };
     }
-    if (this.gift.storm > 0 && result.perfect) {
+    const firestorm = this.combos.includes("firestorm") && this.gift.fire > 0;
+    if (this.gift.storm > 0 && (result.perfect || firestorm)) {
       this.gift.storm -= 1;
       slab.element = "charge";
-      this.pushDark(SLAB_H * STORM_PUSH);
+      const breath = this.combos.includes("breath") && this.gift.slow > 0 ? 2 : 1;
+      this.pushDark(SLAB_H * this.stormPush * breath);
+      this.handFired = { id: "storm", at: this.clock };
       this.bolts.push({ x: cx, life: BOLT_LIFE, seed: Math.random() * 1000 });
       this.fx.burst(cx, this.dark, LANDING_BY_ID.storm.rgb, 40, 380);
       this.flash = Math.max(this.flash, 0.85);
       this.trauma = Math.min(1, this.trauma + 0.5);
       this.sfx.thunder();
       haptics.heavy();
+    }
+    if (this.gift.keystone > 0) this.gift.keystone -= 1;
+    if (this.gift.sight > 0) this.gift.sight -= 1;
+    if (this.gift.ember > 0 && result.perfect && result.streak >= 2) {
+      // The ember trail: a streak's heat pushes the Dark further with every perfect.
+      this.gift.ember -= 1;
+      this.pushDark(SLAB_H * this.emberPush);
+      this.fx.sparkle(cx, this.dark, this.vw * 0.5, LANDING_BY_ID.ember.rgb, 16);
+      this.handFired = { id: "ember", at: this.clock };
     }
     const heatBefore = this.heat;
     this.heat = clamp01(this.heat + (gain > 0 ? gain * this.kit.charge : gain));
@@ -4206,7 +4339,13 @@ export class SpireEngine {
     storeSave(this.save);
     if (grabbed === "ember") {
       // An ember is a gift taken on the move: one of the landing's, at once.
-      const [id] = landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken);
+      const [id] = landingOffer(
+        Math.random,
+        this.plan.darkRate > 0,
+        this.giftsTaken,
+        null,
+        this.hand,
+      );
       this.applyGift(id!);
     }
     this.spawnMover();
@@ -4555,6 +4694,11 @@ export class SpireEngine {
     // A rebuilt run can still light the sky, but it was not a clean climb.
     if (this.rebuilt) goals.swift = false;
     const outcome = recordRun(this.save, level.id, this.runTime, accuracy, goals);
+    // Three stars earn a favour: the first card taken on this climb starts the next sky.
+    if (goals.clear && goals.precise && goals.swift && this.giftsTaken[0]) {
+      this.save.favour = this.giftsTaken[0];
+      storeSave(this.save);
+    }
     {
       const world = worldOf(level.id);
       const at = world.levelIds.indexOf(level.id) + 1;
@@ -4789,6 +4933,9 @@ export class SpireEngine {
           }
         : null,
       landing: this.landing,
+      hand: (Object.keys(this.hand) as LandingId[]).map((id) => ({ id, tier: this.hand[id]! })),
+      combos: this.combos,
+      handFired: this.handFired,
     });
   }
 

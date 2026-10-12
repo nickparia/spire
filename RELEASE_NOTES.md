@@ -3,6 +3,15 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 106 — The Dark gives you a look, and cards that build (internal)
+
+- **The Gale: a free look.** On every floor the Dark holds still until the hanging slab has made a full pass (the first three skies) or half a pass (the last three). Reading the wind costs nothing; dithering past that does.
+- **Cards build now.** Take a card you already hold and it is *kindled* — the same element a tier stronger and longer: II, then III, which lasts the whole climb. The offer leans towards what you hold, so building a thing is a choice.
+- **Two cards make a power.** Forge-fire + Starfall = *Firestorm* (while the stone burns, every landing calls the lightning). Rime + Bedrock = *The Long Winter* (while the buttresses stand, the Dark stays frozen). Stillness + Starfall = *Held Breath* (in slow time the lightning strikes twice as deep). An offer that would complete one says so on the card.
+- **Three new cards**: *Keystone* (your next slabs are keystones, each perfect pushing twice), *Second Sight* (the perfect moment stays shown), *Ember Trail* (from the second perfect in a row, each pushes the Dark further).
+- **The hand is shown** under the score: each card held as a small stone with its tier, flaring when it fires; a power's name beside them.
+- **A favour**: three stars on a sky and you start the next one already holding the first card you took.
+
 ## Build 105 — Lighter wind, kinder Gale, and a stall trace (internal)
 
 - **The wind bed is at less than half again** (and the howl's moan with it).

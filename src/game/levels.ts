@@ -53,6 +53,8 @@ export type LevelDef = {
   gale?: Gale;
   /** The Gale: the updraft's help, a share (0..1) of each miss drawn back toward the groove. */
   lift?: number;
+  /** The Gale: turns of the hanging slab the Dark waits for on each floor (2 = one full pass free). */
+  look?: number;
   /** Floors the perfect-moment cue stays once the wind starts; 3 unless a sky says otherwise. */
   guideFloors?: number;
   /** The Ring: the rim's tilt, radians either way, and its period in seconds. */
@@ -410,6 +412,7 @@ export const LEVELS: LevelDef[] = [
     wind: [18, 32],
     gale: "steady",
     lift: 0.45,
+    look: 2,
     guideFloors: 99,
     picks: 8,
     keystones: false,
@@ -431,6 +434,7 @@ export const LEVELS: LevelDef[] = [
     wind: [24, 40],
     gale: "gusts",
     lift: 0.3,
+    look: 2,
     guideFloors: 99,
     picks: 8,
     keystones: false,
@@ -453,6 +457,7 @@ export const LEVELS: LevelDef[] = [
     windTurn: 1,
     gale: "cross",
     lift: 0.15,
+    look: 2,
     guideFloors: 99,
     picks: 8,
     keystones: true,
@@ -473,6 +478,7 @@ export const LEVELS: LevelDef[] = [
     period: [0.84, 0.7],
     wind: [34, 58],
     gale: "tail",
+    look: 1,
     guideFloors: 12,
     picks: 9,
     keystones: true,
@@ -493,6 +499,7 @@ export const LEVELS: LevelDef[] = [
     period: [0.82, 0.68],
     wind: [38, 64],
     gale: "howl",
+    look: 1,
     guideFloors: 12,
     picks: 9,
     keystones: true,
@@ -513,6 +520,7 @@ export const LEVELS: LevelDef[] = [
     period: [0.8, 0.64],
     wind: [40, 68],
     gale: "eye",
+    look: 1,
     guideFloors: 12,
     picks: 9,
     keystones: true,
@@ -578,6 +586,7 @@ export function levelPlan(level: LevelDef, listIndex: number): Plan {
     windTurn: level.windTurn ?? 6,
     gale: level.gale,
     lift: level.lift,
+    look: level.look,
     tilt: level.tilt?.[0] ?? 0,
     tiltPeriod: level.tilt?.[1] ?? 10,
     turn: level.turn ?? 0,

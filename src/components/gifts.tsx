@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { LANDING_BY_ID, type LandingId } from "@/game/landing";
+import {
+  COMBO_BY_ID,
+  LANDING_BY_ID,
+  TIER_NAMES,
+  comboWith,
+  landingBlurb,
+  type Hand,
+  type LandingId,
+} from "@/game/landing";
 
 /** Seconds the chosen card burns in its element before it flies into the tower. */
 const IGNITE = 2.3;
@@ -15,10 +23,13 @@ const FLY = 0.55;
 export function GiftCards({
   floor,
   offers,
+  hand,
   onChoose,
 }: {
   floor: number;
   offers: LandingId[];
+  /** The cards already held, with their tiers: an offer of one of them kindles it. */
+  hand: Hand;
   onChoose: (index: number) => void;
 }) {
   const [taken, setTaken] = useState<number | null>(null);
@@ -44,6 +55,9 @@ export function GiftCards({
       <div className="gifts-row">
         {offers.map((id, i) => {
           const def = LANDING_BY_ID[id];
+          const held = hand[id] ?? 0;
+          const tier = Math.min(3, held + 1);
+          const makes = comboWith(hand, id);
           const state =
             taken === null
               ? ""
@@ -54,16 +68,26 @@ export function GiftCards({
             <button
               key={id}
               type="button"
-              className={`ecard ecard-${id}${state}`}
+              className={`ecard ecard-${id}${state}${held > 0 ? " ecard-kindle" : ""}`}
               style={{ "--i": i } as CSSProperties}
               onClick={() => take(i)}
             >
               <span className="ecard-face">
                 <img className="ecard-art" src={`art/cards/${id}.jpg`} alt="" />
                 {taken === i ? <Ignite id={id} /> : null}
-                <span className="ecard-name">{def.name}</span>
+                {tier > 1 ? <span className="ecard-tier">{TIER_NAMES[tier - 1]}</span> : null}
+                <span className="ecard-name">
+                  {def.name}
+                  {tier > 1 ? <small className="ecard-kindled">kindled</small> : null}
+                </span>
               </span>
-              <span className="ecard-blurb">{emphasise(def.blurb)}</span>
+              <span className="ecard-blurb">{emphasise(landingBlurb(id, tier))}</span>
+              {makes ? (
+                <span className="ecard-combo">
+                  with {LANDING_BY_ID[COMBO_BY_ID[makes].of.find((o) => o !== id)!].name}:{" "}
+                  <b>{COMBO_BY_ID[makes].name}</b>
+                </span>
+              ) : null}
             </button>
           );
         })}

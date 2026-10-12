@@ -159,6 +159,8 @@ export type Plan = {
   gale?: Gale;
   /** The Gale: a share of each drop's miss the updraft draws back toward the groove. */
   lift?: number;
+  /** The Gale: turns of the hanging slab the Dark waits for on each floor before it climbs — a free look. */
+  look?: number;
   /** The cutting wheel: the goal is metres cut, not floors; the Dark follows from above. */
   cut?: boolean;
   /**
