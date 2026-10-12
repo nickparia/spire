@@ -298,11 +298,15 @@ export function SpireGame() {
     if (Capacitor.isNativePlatform()) {
       Preferences.get({ key: "spire-debug-start" })
         .then(({ value }) => {
-          if (!value || !state.current.save.tester) return;
+          if (!value) return;
           void Preferences.remove({ key: "spire-debug-start" });
           const index = LEVELS.findIndex((l) => l.id === value);
-          trace(`debug start ${value} → ${index}`);
-          if (index >= 0) window.setTimeout(() => play(index), 1500);
+          // Judged once the save has surely loaded, from the engine's own copy.
+          window.setTimeout(() => {
+            const tester = state.current.save.tester;
+            trace(`debug start ${value} → ${index}${tester ? "" : " (not tester)"}`);
+            if (tester && index >= 0) play(index);
+          }, 1500);
         })
         .catch(() => undefined);
     }
