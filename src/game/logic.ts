@@ -166,6 +166,8 @@ export type Plan = {
   cut?: boolean;
   /** Things the climb goes past at a height (see passers.ts). */
   passers?: Passer[];
+  /** Floors between landings, when a sky sets its own spacing (the Vigil: every 20); else halves and thirds. */
+  landingEvery?: number;
   /**
    * The Ring: the rim the tower stands on tilts, swinging to this many radians
    * either way over `tiltPeriod` seconds. Gravity tilts with it, so an

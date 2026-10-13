@@ -297,6 +297,23 @@ export class Stage {
     return false;
   }
 
+  /**
+   * Sets a slab for good: it becomes ground, and nothing bends or moves it
+   * again. A tall welded column is a chain of joints that flexes under the
+   * sway until a slab crumbles; stone set at a landing takes it out of play.
+   */
+  petrify(id: number): void {
+    const body = this.bodies.get(id);
+    if (!body || !body.isDynamic()) return;
+    body.setLinearVelocity(new Vec2(0, 0));
+    body.setAngularVelocity(0);
+    body.setStatic();
+    this.setting.delete(id);
+    this.crooked.delete(id);
+    this.landed.add(id);
+    this.landedBodies.add(body);
+  }
+
   /** Welds a resting slab to another at once, whatever its tilt: a brace. */
   weld(id: number, onto: number): void {
     const body = this.bodies.get(id);

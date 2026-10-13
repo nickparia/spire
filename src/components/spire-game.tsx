@@ -23,6 +23,7 @@ import { Invite, SettingsSheet } from "./challenge";
 import { adoptRival, partnerOf, useChallenge, type Rival } from "./use-challenge";
 import type { Ghost } from "@/game/logic";
 import { WhatsNew } from "./whats-new";
+import { VigilBoard, VigilEndPanel } from "./vigil";
 
 const INITIAL: Hud = {
   phase: "menu",
@@ -71,9 +72,10 @@ const INITIAL: Hud = {
   quick: false,
   accent: "rgb(255,77,26)",
   result: null,
+  vigil: null,
 };
 
-type Menu = "title" | "worlds" | "levels" | "board" | "map" | "end";
+type Menu = "title" | "worlds" | "levels" | "board" | "map" | "end" | "vigil";
 
 /** Text colour that reads on the sky's accent: dark on a pale accent, white on a deep one. */
 function onAccent(css: string): string {
@@ -182,6 +184,21 @@ export function SpireGame() {
     setMenu("worlds");
     engine.showMenu(skyFor(worldFocus));
   }, [skyFor, worldFocus]);
+
+  /** The Vigil: today's sky, the same for everyone. */
+  const playVigil = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    trace("play vigil");
+    engine.click();
+    engine.startVigil();
+  }, []);
+  const openVigilBoard = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.click();
+    setMenu("vigil");
+  }, []);
 
   const select = useCallback((index: number) => {
     const engine = engineRef.current;
@@ -447,6 +464,8 @@ export function SpireGame() {
               engineRef.current?.click();
               setStory(true);
             }}
+            onVigil={playVigil}
+            onVigilBoard={openVigilBoard}
             notices={
               <>
                 <Invite
@@ -498,6 +517,10 @@ export function SpireGame() {
             onFinish={(id) => engineRef.current?.setFinish(id)}
             onTrail={(id) => engineRef.current?.setTrail(id)}
           />
+        ) : null}
+
+        {hud.phase === "menu" && menu === "vigil" ? (
+          <VigilBoard save={save} me={me} onBack={openWorlds} onPlay={playVigil} />
         ) : null}
 
         {hud.phase === "menu" && menu === "board" ? (
@@ -580,7 +603,23 @@ export function SpireGame() {
           <PickPanel hud={hud} onChoose={(i) => engineRef.current?.choose(i)} />
         ) : null}
 
-        {hud.phase === "over" ? (
+        {(hud.phase === "over" || hud.phase === "won") && hud.mode === "vigil" && hud.vigil ? (
+          <VigilEndPanel
+            hud={hud}
+            save={save}
+            onRetry={retry}
+            onQuit={quit}
+            onBoard={() => {
+              engineRef.current?.click();
+              setMenu("vigil");
+              engineRef.current?.showMenu(state.current.hud.levelIndex);
+            }}
+            onName={(name) => engineRef.current?.updateSave({ name })}
+            onRank={(rank) => engineRef.current?.setVigilRank(rank)}
+          />
+        ) : null}
+
+        {hud.phase === "over" && hud.mode !== "vigil" ? (
           <OverPanel
             hud={hud}
             onRetry={retry}

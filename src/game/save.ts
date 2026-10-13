@@ -71,9 +71,62 @@ export type Save = {
   trail: string;
   /** A favour earned by three stars: the card to start the next sky holding ("" for none). */
   favour: string;
+  /** The Vigil: today's best and attempts, and the last thirty days. */
+  vigil: VigilSave;
   /** When this save was last written, ms since the epoch. */
   savedAt: number;
 };
+
+export type VigilDay = { day: string; floors: number; summit: boolean; rank: number | null };
+
+export type VigilSave = {
+  /** The day these fields describe (YYYY-MM-DD, UTC); "" before the first climb. */
+  day: string;
+  /** Today's best run; floors 0 means none yet. */
+  floors: number;
+  summit: boolean;
+  time: number;
+  accuracy: number;
+  /** Attempts today. */
+  attempts: number;
+  /** Where today's best stood on the board when it was last posted. */
+  rank: number | null;
+  /** The best attempt's trace today, raced on the next. */
+  ghost: Ghost | null;
+  /** Days before today, newest first, at most VIGIL_HISTORY. */
+  history: VigilDay[];
+};
+
+export const VIGIL_HISTORY = 30;
+
+export function emptyVigil(day = ""): VigilSave {
+  return {
+    day,
+    floors: 0,
+    summit: false,
+    time: 0,
+    accuracy: 0,
+    attempts: 0,
+    rank: null,
+    ghost: null,
+    history: [],
+  };
+}
+
+/**
+ * Makes the Vigil fields describe `day`: a day gone by is folded into the
+ * history and the fields cleared. True when something changed.
+ */
+export function rollVigil(save: Save, day: string): boolean {
+  const v = save.vigil;
+  if (v.day === day) return false;
+  const history = v.history.slice();
+  if (v.day && v.attempts > 0) {
+    history.unshift({ day: v.day, floors: v.floors, summit: v.summit, rank: v.rank });
+  }
+  save.vigil = { ...emptyVigil(day), history: history.slice(0, VIGIL_HISTORY) };
+  return true;
+}
 
 export function emptySave(): Save {
   return {
@@ -105,6 +158,7 @@ export function emptySave(): Save {
     finish: "sky",
     trail: "none",
     favour: "",
+    vigil: emptyVigil(),
     savedAt: 0,
   };
 }
@@ -170,6 +224,50 @@ export function parseSave(raw: string | null, legacy: string | null = null): Sav
       if (typeof data.finish === "string") save.finish = data.finish;
       if (typeof data.favour === "string") save.favour = data.favour;
       if (typeof data.trail === "string") save.trail = data.trail;
+      {
+        const v = (data as { vigil?: Partial<VigilSave> }).vigil;
+        if (v && typeof v === "object") {
+          const day = typeof v.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.day) ? v.day : "";
+          const out = emptyVigil(day);
+          out.floors = Math.max(0, Math.floor(num(v.floors, 0)));
+          out.summit = v.summit === true;
+          out.time = Math.max(0, num(v.time, 0));
+          out.accuracy = Math.max(0, Math.min(1, num(v.accuracy, 0)));
+          out.attempts = Math.max(0, Math.floor(num(v.attempts, 0)));
+          out.rank = numOrNull(v.rank);
+          if (Array.isArray(v.ghost) && v.ghost.length >= 2) {
+            const clean: number[] = [];
+            for (const t of v.ghost) {
+              if (
+                typeof t !== "number" ||
+                !Number.isFinite(t) ||
+                t < (clean[clean.length - 1] ?? 0)
+              )
+                break;
+              clean.push(t);
+            }
+            if (clean.length >= 2) out.ghost = clean;
+          }
+          if (Array.isArray(v.history)) {
+            out.history = v.history
+              .filter(
+                (h): h is VigilDay =>
+                  !!h &&
+                  typeof h === "object" &&
+                  typeof h.day === "string" &&
+                  typeof h.floors === "number",
+              )
+              .map((h) => ({
+                day: h.day,
+                floors: Math.max(0, Math.floor(h.floors)),
+                summit: h.summit === true,
+                rank: numOrNull(h.rank),
+              }))
+              .slice(0, VIGIL_HISTORY);
+          }
+          save.vigil = out;
+        }
+      }
       save.savedAt = Math.max(0, num(data.savedAt, 0));
       save.whatsNewSeen = Math.max(0, Math.floor(num(data.whatsNewSeen, 0)));
       save.storySeen = data.storySeen === true;

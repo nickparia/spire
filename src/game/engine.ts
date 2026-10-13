@@ -33,7 +33,15 @@ import {
   type Payout,
 } from "./gear";
 import { haptics } from "./haptics";
-import { ENDLESS_PLAN, endlessTheme, LEVELS, levelPlan, WARMUP_FLOORS } from "./levels";
+import {
+  ENDLESS_PLAN,
+  endlessTheme,
+  LEVELS,
+  levelPlan,
+  WARMUP_FLOORS,
+  type LevelDef,
+} from "./levels";
+import { vigilBetter, vigilDay, vigilDeal, vigilEvents, vigilLevel, vigilPlan } from "./vigil";
 import {
   type CourseId,
   DARK_PUSH,
@@ -112,6 +120,7 @@ import {
   loadSave,
   nextLevelIndex,
   recordRun,
+  rollVigil,
   skiesLit,
   storeSave,
   totalStars,
@@ -363,7 +372,28 @@ const TIPS = {
 } as const;
 
 export type HudPhase = "menu" | "ready" | "play" | "pick" | "over" | "won";
-export type RunMode = "level" | "endless";
+export type RunMode = "level" | "endless" | "vigil";
+
+/** The Vigil, as the cards need it: the day, the attempt, the best before it, and the run once it has ended. */
+export type VigilHud = {
+  day: string;
+  /** This attempt's number today, from 1. */
+  attempt: number;
+  /** Today's best before this attempt; null on the first. */
+  best: { floors: number; summit: boolean; time: number } | null;
+  /** Once the run has ended: what it did, and whether it is now the day's best. */
+  run: {
+    floors: number;
+    summit: boolean;
+    time: number;
+    accuracy: number;
+    trace: Ghost;
+    kept: boolean;
+  } | null;
+  /** Feats earned by this run, to announce. */
+  feats: FeatId[];
+  unranked: boolean;
+};
 
 export type LevelResult = {
   levelIndex: number;
@@ -479,6 +509,8 @@ export type Hud = {
   handFired: { id: LandingId; at: number } | null;
   /** The Dark is quickening (past par, or spurred by a wide miss). */
   quick: boolean;
+  /** The Vigil, while one is being climbed or has just ended. */
+  vigil: VigilHud | null;
 };
 
 export type EngineEvents = {
@@ -682,6 +714,15 @@ export class SpireEngine {
 
   private mode: RunMode = "level";
   private levelIndex = 0;
+  /** The Vigil being climbed: its day and sky, which attempt this is, and the run once over. */
+  private vigil: {
+    day: string;
+    level: LevelDef;
+    attempt: number;
+    best: VigilHud["best"];
+    run: VigilHud["run"];
+    feats: FeatId[];
+  } | null = null;
   private plan: Plan = levelPlan(LEVELS[0]!, 0);
   private theme: Theme = THEMES.foundry;
   private backdrop: Backdrop;
@@ -1210,13 +1251,24 @@ export class SpireEngine {
     else this.place();
   }
 
+  /** The sky being climbed: the Vigil's for the day, else the level at `levelIndex`. */
+  private level(): LevelDef {
+    return this.mode === "vigil" && this.vigil ? this.vigil.level : LEVELS[this.levelIndex]!;
+  }
+
+  /** A sky with a summit: a level or the Vigil, as against endless. */
+  private sky(): boolean {
+    return this.mode === "level" || this.mode === "vigil";
+  }
+
   /** Back to the menus, with the given level's sky behind them. */
   showMenu(levelIndex: number): void {
     trace(`menu ${LEVELS[levelIndex]?.id ?? levelIndex}`);
     this.escapeTower = null;
+    this.vigil = null;
     this.mode = "level";
     this.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, levelIndex));
-    const level = LEVELS[this.levelIndex]!;
+    const level = this.level();
     this.plan = levelPlan(level, this.levelIndex);
     const cut = this.phase !== "menu";
     this.setTheme(THEMES[level.theme], 0, !cut);
@@ -1260,7 +1312,7 @@ export class SpireEngine {
     this.mode = "level";
     this.ascent = false;
     this.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, levelIndex));
-    const level = LEVELS[this.levelIndex]!;
+    const level = this.level();
     this.plan = levelPlan(level, this.levelIndex);
     this.setTheme(THEMES[level.theme], 0, false);
     this.begin();
@@ -1273,14 +1325,42 @@ export class SpireEngine {
     this.begin();
   }
 
+  /** The Vigil: the day's sky, the same for everyone. Each attempt starts it over. */
+  startVigil(day: string = vigilDay()): void {
+    trace(`start vigil ${day}`);
+    this.escapeTower = null;
+    this.ascent = false;
+    this.mode = "vigil";
+    if (rollVigil(this.save, day)) storeSave(this.save);
+    const level = vigilLevel(day);
+    const s = this.save.vigil;
+    this.vigil = {
+      day,
+      level,
+      attempt: s.attempts + 1,
+      best: s.floors > 0 ? { floors: s.floors, summit: s.summit, time: s.time } : null,
+      run: null,
+      feats: [],
+    };
+    // The Hearth sky painted the same way stands in wherever a level index is wanted.
+    this.levelIndex = Math.max(
+      0,
+      LEVELS.findIndex((l) => l.theme === level.theme),
+    );
+    this.plan = vigilPlan(day);
+    this.setTheme(THEMES[level.theme], 0, false);
+    this.begin();
+  }
+
   retry(): void {
-    if (this.mode === "endless") this.startEndless();
+    if (this.mode === "vigil") this.startVigil(this.vigil?.day);
+    else if (this.mode === "endless") this.startEndless();
     else if (this.ascent) {
       const unranked = this.unranked;
       this.startLevel(this.levelIndex);
       this.unranked = unranked;
       this.beginAscent(false);
-    } else if (this.escapeTower && isBoss(LEVELS[this.levelIndex]!.id)) {
+    } else if (this.escapeTower && isBoss(this.level().id)) {
       // A failed escape is retried from the summit, on the same tower.
       const tower = this.escapeTower;
       const unranked = this.unranked;
@@ -1376,6 +1456,12 @@ export class SpireEngine {
     const fresh = earn(this.save.feats, [id], Date.now()).length > 0;
     if (fresh) this.commit();
     return fresh;
+  }
+
+  /** Where today's Vigil best stands on the board, once posted. */
+  setVigilRank(rank: number | null): void {
+    this.save.vigil.rank = rank;
+    this.commit();
   }
 
   /** The shell's way to change what the leaderboard needs: name and rival. */
@@ -1722,11 +1808,13 @@ export class SpireEngine {
     this.eventWind = null;
     this.swellUntil = 0;
     {
-      const level = LEVELS[this.levelIndex]!;
+      const level = this.level();
       this.eventsDue =
-        phase === "ready" && this.mode === "level" && !this.ascent
-          ? pickEvents(Math.random, worldOf(level.id).id, level.theme, this.plan.goal)
-          : [];
+        phase === "ready" && this.mode === "vigil" && this.vigil
+          ? vigilEvents(this.vigil.day)
+          : phase === "ready" && this.mode === "level" && !this.ascent
+            ? pickEvents(Math.random, worldOf(level.id).id, level.theme, this.plan.goal)
+            : [];
     }
     this.giftsTaken = [];
     this.hand = {};
@@ -1750,12 +1838,15 @@ export class SpireEngine {
     this.ghost = null;
     this.ghostName = "BEST";
     if (phase === "ready" && this.mode === "level") {
-      const id = LEVELS[this.levelIndex]!.id;
+      const id = this.level().id;
       const rival = this.save.rival ? this.save.rivalGhosts[id] : undefined;
       if (rival) {
         this.ghost = rival;
         this.ghostName = this.save.rival!.name;
       } else this.ghost = this.save.ghosts[id] ?? null;
+    } else if (phase === "ready" && this.mode === "vigil") {
+      // Today's best attempt climbs beside you.
+      this.ghost = this.save.vigil.ghost;
     }
     this.taken = false;
     this.demoAge = 0;
@@ -2000,12 +2091,7 @@ export class SpireEngine {
     if (course !== this.courseSeen) {
       this.courseSeen = course;
       const seen = `demo-${course}`;
-      if (
-        course !== "slide" &&
-        this.mode === "level" &&
-        this.phase !== "menu" &&
-        !this.save.tips[seen]
-      ) {
+      if (course !== "slide" && this.sky() && this.phase !== "menu" && !this.save.tips[seen]) {
         this.save.tips[seen] = 1;
         storeSave(this.save);
         this.demo = true;
@@ -2362,7 +2448,7 @@ export class SpireEngine {
           ? this.summitHold + dt
           : 0;
       if (this.plan.goal > 0 && this.summitHold >= SUMMIT_HOLD && !this.boss) {
-        if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.lightTheSky();
+        if (this.mode === "level" && isBoss(this.level().id)) this.lightTheSky();
         else this.win();
       }
     }
@@ -2380,8 +2466,17 @@ export class SpireEngine {
 
   /** Keeps this run's trace as the ghost if it is the better run. */
   private keepGhost(): void {
-    if (this.mode !== "level" || this.unranked) return;
-    const id = LEVELS[this.levelIndex]!.id;
+    if (this.unranked) return;
+    if (this.mode === "vigil") {
+      const v = this.save.vigil;
+      if (ghostBetter(v.ghost ?? undefined, this.trace, this.plan.goal)) {
+        v.ghost = this.trace.slice();
+        storeSave(this.save);
+      }
+      return;
+    }
+    if (this.mode !== "level") return;
+    const id = this.level().id;
     if (ghostBetter(this.save.ghosts[id], this.trace, this.plan.goal)) {
       this.save.ghosts[id] = this.trace.slice();
       storeSave(this.save);
@@ -2403,7 +2498,13 @@ export class SpireEngine {
     this.applySway();
     this.landing = {
       floor,
-      offers: landingOffer(Math.random, this.plan.darkRate > 0, this.giftsTaken, trial, this.hand),
+      offers: landingOffer(
+        this.mode === "vigil" && this.vigil ? vigilDeal(this.vigil.day, floor) : Math.random,
+        this.plan.darkRate > 0,
+        this.giftsTaken,
+        trial,
+        this.hand,
+      ),
       omen: true,
     };
     this.omen = OMEN_SECONDS;
@@ -2431,9 +2532,11 @@ export class SpireEngine {
    * drop or at the landing.
    */
   private noteLanding(prev: number, reached: number): void {
-    if (this.mode !== "level" || this.boss || this.ascent) return;
+    if (!this.sky() || this.boss || this.ascent) return;
     for (let f = prev + 1; f <= reached; f++) {
-      if (isLanding(f, this.plan.goal) && !this.landed.has(f)) this.landingDue = f;
+      if (isLanding(f, this.plan.goal, this.plan.landingEvery) && !this.landed.has(f)) {
+        this.landingDue = f;
+      }
     }
   }
 
@@ -2671,7 +2774,7 @@ export class SpireEngine {
       this.stack.push(slab);
     }
     const top = this.stack[this.stack.length - 1]!;
-    const world = Math.max(0, WORLDS.indexOf(worldOf(LEVELS[this.levelIndex]!.id)));
+    const world = Math.max(0, WORLDS.indexOf(worldOf(this.level().id)));
     this.escape = {
       source: top.y + SLAB_H * ESCAPE_START,
       // Hearth's source is the gentlest; each later world's comes faster.
@@ -3597,8 +3700,8 @@ export class SpireEngine {
    * par time, called out each time it steps up.
    */
   private quickening(): number {
-    if (this.mode !== "level") return 1;
-    const over = this.runTime - LEVELS[this.levelIndex]!.parTime;
+    if (!this.sky()) return 1;
+    const over = this.runTime - this.level().parTime;
     if (over <= 0) return 1;
     const step = Math.floor(over / QUICKEN_EVERY);
     if (step > this.quickStep) {
@@ -3675,8 +3778,7 @@ export class SpireEngine {
       this.bolts[i]!.life -= dt;
       if (this.bolts[i]!.life <= 0) this.bolts.splice(i, 1);
     }
-    const practice =
-      (this.save.practice && this.mode === "level" && !this.boss) || this.escape !== null;
+    const practice = (this.save.practice && this.sky() && !this.boss) || this.escape !== null;
     if (
       !practice &&
       this.plan.darkRate > 0 &&
@@ -4476,7 +4578,7 @@ export class SpireEngine {
     this.music.setTension(tensionFor(slab.w, this.startW));
 
     if (!this.stage && this.plan.goal > 0 && this.floors >= this.plan.goal) {
-      if (this.plan.descent && this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) {
+      if (this.plan.descent && this.mode === "level" && isBoss(this.level().id)) {
         this.beginAscent(true);
         return;
       }
@@ -4553,6 +4655,11 @@ export class SpireEngine {
       s.loose = false;
       s.flash = 1;
       n++;
+    }
+    // A sky with its own landing spacing (the Vigil) sets the stone below for
+    // good: a hundred welded floors flex like a chain, and crumbled near fifty.
+    if (this.plan.landingEvery) {
+      for (const s of this.stack) if (s.body !== null) this.stage.petrify(s.body);
     }
     return n;
   }
@@ -4796,6 +4903,7 @@ export class SpireEngine {
   private die(): void {
     this.phase = "fall";
     this.keepGhost();
+    if (this.mode === "vigil") this.endVigil(false);
     this.fallAge = 0;
     this.hint = false;
     this.bomb = null;
@@ -4833,8 +4941,55 @@ export class SpireEngine {
     this.emit();
   }
 
+  /**
+   * Books a finished Vigil attempt: the day's count, today's best if this
+   * beat it, and the feat on a first summit. Practice is counted for nothing.
+   */
+  private endVigil(summit: boolean): void {
+    const v = this.vigil;
+    if (!v) return;
+    const run = {
+      floors: this.floors,
+      summit,
+      time: this.runTime,
+      accuracy: this.accuracy(),
+      trace: this.trace.slice(),
+      kept: false,
+    };
+    if (!this.unranked) {
+      const s = this.save.vigil;
+      s.attempts += 1;
+      if (vigilBetter(run, s.floors > 0 ? s : null)) {
+        s.floors = run.floors;
+        s.summit = run.summit;
+        s.time = run.time;
+        s.accuracy = run.accuracy;
+        s.rank = null;
+        run.kept = true;
+      }
+      if (summit) v.feats = earn(this.save.feats, ["vigil-summit"], Date.now());
+      storeSave(this.save);
+    }
+    v.run = run;
+  }
+
+  /** The Vigil's summit: no stars, no sky relit; the day's best, and the stone for a first. */
+  private winVigil(): void {
+    this.mark(this.plan.goal);
+    this.trace.length = this.plan.goal + 1;
+    this.trace[this.plan.goal] = this.runTime;
+    this.keepGhost();
+    this.endVigil(true);
+    this.result = null;
+    this.summitScene(1);
+  }
+
   private win(): void {
-    const level = LEVELS[this.levelIndex]!;
+    if (this.mode === "vigil") {
+      this.winVigil();
+      return;
+    }
+    const level = this.level();
     if (this.cut) this.breakThrough();
     const accuracy = this.accuracy();
     const goals = goalsFor(this.runTime, accuracy, level.parTime, level.parAccuracy);
@@ -4893,6 +5048,11 @@ export class SpireEngine {
     this.result.trace = this.trace.slice();
     this.keepGhost();
     this.result.offers = this.offersNow();
+    this.summitScene(Number(goals.clear) + Number(goals.precise) + Number(goals.swift));
+  }
+
+  /** The summit as a scene: the pull-back, the sparkle, the word, the stars' cues, the music. */
+  private summitScene(stars: number): void {
     this.phase = "won";
     this.wonAge = 0;
     this.dark = DARK_START - 400;
@@ -4915,7 +5075,6 @@ export class SpireEngine {
     this.flash = 0.5;
     this.trauma = Math.min(1, this.trauma + 0.5);
     this.nextShell = 0.3;
-    const stars = Number(goals.clear) + Number(goals.precise) + Number(goals.swift);
     this.starCues = [1.05, 1.4, 1.75].slice(0, stars);
     this.sfx.summit();
     this.music.setMood("summit");
@@ -5083,6 +5242,17 @@ export class SpireEngine {
       hand: (Object.keys(this.hand) as LandingId[]).map((id) => ({ id, tier: this.hand[id]! })),
       combos: this.combos,
       handFired: this.handFired,
+      vigil:
+        this.mode === "vigil" && this.vigil
+          ? {
+              day: this.vigil.day,
+              attempt: this.vigil.attempt,
+              best: this.vigil.best,
+              run: this.vigil.run,
+              feats: this.vigil.feats,
+              unranked: this.unranked,
+            }
+          : null,
       quick: this.darkSurge > 0 || this.aimPace > 1 || this.quickStep >= 0,
     });
   }
@@ -5687,13 +5857,13 @@ export class SpireEngine {
 
   /** The art the current sky is painted with: its own, or its theme's. */
   private paintKey(): string {
-    const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
+    const level = this.sky() ? this.level() : undefined;
     return level?.paint ?? this.theme.id;
   }
 
   /** How hard the rock is at this depth, 0 (earth) to 1 (the floor of the world). */
   private hardness(): number {
-    const level = this.mode === "level" ? LEVELS[this.levelIndex] : undefined;
+    const level = this.sky() ? this.level() : undefined;
     return level?.descent ? Math.min(1, (level.tier ?? 0) / 7) : 0;
   }
 
@@ -6264,7 +6434,7 @@ export class SpireEngine {
       return;
     }
     if (c.depth >= this.plan.goal) {
-      if (this.mode === "level" && isBoss(LEVELS[this.levelIndex]!.id)) this.beginAscent(true);
+      if (this.mode === "level" && isBoss(this.level().id)) this.beginAscent(true);
       else this.win();
     }
   }
@@ -7080,7 +7250,7 @@ export class SpireEngine {
 
   /** Passers-by: met at their floor, then drifting across and climbed past. */
   private stepPassers(dt: number): void {
-    if (this.mode !== "level" || this.phase === "menu" || this.escape) return;
+    if (!this.sky() || this.phase === "menu" || this.escape) return;
     const top = this.peak();
     while (this.passersDue.length > 0 && this.passersDue[0]!.at <= this.floors && top) {
       const p = this.passersDue.shift()!;
@@ -7123,7 +7293,7 @@ export class SpireEngine {
 
   /** Events: the next one starts at its floor (never over a landing); the one in force ticks and ends. */
   private stepEvents(dt: number): void {
-    if (this.mode !== "level" || this.boss || this.ascent) return;
+    if (!this.sky() || this.boss || this.ascent) return;
     if (this.phase === "play" && !this.event && this.landingDue === null && !this.landing) {
       const next = this.eventsDue[0];
       if (next && next.at <= this.floors) {

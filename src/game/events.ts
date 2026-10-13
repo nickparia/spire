@@ -257,12 +257,13 @@ export function pickEvents(
   theme: string,
   goal: number,
   count = 2,
+  landingEvery = 0,
 ): Scheduled[] {
   const deck = deckFor(worldId, theme);
   if (deck.length === 0 || goal < 12) return [];
   const taken: Scheduled[] = [];
   const clear = (f: number) => {
-    for (let d = -CLEAR; d <= CLEAR; d++) if (isLanding(f + d, goal)) return false;
+    for (let d = -CLEAR; d <= CLEAR; d++) if (isLanding(f + d, goal, landingEvery)) return false;
     return taken.every((t) => Math.abs(t.at - f) > APART);
   };
   const pool = [...deck];

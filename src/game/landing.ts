@@ -385,9 +385,10 @@ export const LONG_SKY = 30;
 /** Endless has no summit: a landing every this many floors. */
 export const ENDLESS_LANDING = 12;
 
-/** The floor a landing falls on, counted floors; the summit is never one. */
-export function isLanding(floors: number, goal: number): boolean {
+/** The floor a landing falls on, counted floors; the summit is never one. A sky may set its own spacing. */
+export function isLanding(floors: number, goal: number, every = 0): boolean {
   if (floors <= 0) return false;
+  if (every > 0) return floors % every === 0 && floors < goal;
   if (goal <= 0) return floors % ENDLESS_LANDING === 0;
   if (goal < LONG_SKY) return floors === Math.round(goal / 2);
   return floors === Math.round(goal / 3) || floors === Math.round((goal * 2) / 3);

@@ -1,8 +1,9 @@
 {
-  "build": 113,
-  "title": "Every button answers, and the new cards ignite",
+  "build": 114,
+  "title": "The Vigil",
   "notes": [
-    "A button you touch is pressed even if the phone drops the tap: if the click doesn't follow within a third of a second, the button is pressed for you. Nice, Begin, New, Try again — all of them.",
-    "The seven newer cards ignite when taken, like the first five."
+    "One sky a day, a hundred floors, the same for everyone: the Vigil card on the worlds row, after the Gale. The day turns at midnight UTC; climb as often as you like, your best of the day counts.",
+    "The day's board: summits by time, then the highest climbs. A first summit earns Vigil Kept and the Watch stone finish.",
+    "The Vigil opens once the Foundry is lit."
   ]
 }

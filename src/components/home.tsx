@@ -15,6 +15,8 @@ import { rgbCss, THEMES } from "@/game/themes";
 import { levelsOf, WORLDS, WORLDS_TO_COME } from "@/game/worlds";
 import { StarIcon } from "./bits";
 import { ArtImage, ArtLoop } from "./art";
+import { VigilPanel } from "./vigil";
+import { vigilDay, vigilLevel } from "@/game/vigil";
 
 /**
  * The title: the Spire building itself out of the dark behind (the engine's
@@ -127,7 +129,9 @@ export function TitleSplash({ onEnter, onAwaken }: { onEnter: () => void; onAwak
 }
 
 type Panel =
-  { kind: "world"; index: number } | { kind: "soon"; id: string; name: string; blurb: string };
+  | { kind: "world"; index: number }
+  | { kind: "vigil" }
+  | { kind: "soon"; id: string; name: string; blurb: string };
 
 /**
  * Choose your world: slanted panels to swipe through, the sky behind
@@ -145,6 +149,8 @@ export function WorldSelect({
   onBoard,
   onAchievements,
   onStory,
+  onVigil,
+  onVigilBoard,
   notices,
 }: {
   save: Save;
@@ -159,10 +165,15 @@ export function WorldSelect({
   onBoard: () => void;
   onAchievements: () => void;
   onStory: () => void;
+  /** The Vigil: the day's sky, and its board. */
+  onVigil: () => void;
+  onVigilBoard: () => void;
   notices?: ReactNode;
 }) {
+  const vigilTheme = vigilLevel(vigilDay()).theme;
   const panels: Panel[] = [
     ...WORLDS.map((_, index) => ({ kind: "world" as const, index })),
+    { kind: "vigil" as const },
     ...WORLDS_TO_COME.map((w) => ({
       kind: "soon" as const,
       id: w.id,
@@ -203,13 +214,19 @@ export function WorldSelect({
       {/* Each world's painted scene behind the panels; the focused one fades in. */}
       <div className="world-bgs" aria-hidden="true">
         {panels.map((panel, i) => {
-          const id = panel.kind === "world" ? WORLDS[panel.index]!.id : panel.id;
+          const id =
+            panel.kind === "world"
+              ? WORLDS[panel.index]!.id
+              : panel.kind === "vigil"
+                ? "vigil"
+                : panel.id;
+          // The Vigil's scene is the day's sky itself.
+          const still = panel.kind === "vigil" ? `sky/${vigilTheme}.jpg` : `bg-${id}.jpg`;
+          const loop = panel.kind === "vigil" ? `sky/${vigilTheme}.mp4` : `bg-${id}.mp4`;
           return (
             <div key={id} className={"world-bg" + (i === current ? " world-bg-on" : "")}>
-              <ArtImage name={`bg-${id}.jpg`} />
-              {Math.abs(i - current) <= 1 ? (
-                <ArtLoop name={`bg-${id}.mp4`} poster={`bg-${id}.jpg`} />
-              ) : null}
+              <ArtImage name={still} />
+              {Math.abs(i - current) <= 1 ? <ArtLoop name={loop} poster={still} /> : null}
             </div>
           );
         })}
@@ -229,6 +246,14 @@ export function WorldSelect({
               onNew={onNew}
               onOpen={onOpen}
               onBoss={onBoss}
+            />
+          ) : panel.kind === "vigil" ? (
+            <VigilPanel
+              key="vigil"
+              save={save}
+              focused={i === current}
+              onPlay={onVigil}
+              onBoard={onVigilBoard}
             />
           ) : (
             <div

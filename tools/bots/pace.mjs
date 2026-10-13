@@ -1,6 +1,6 @@
 // Plays a Hearth sky like a player of a given skill: taps no sooner than `every` seconds, and only
 // when the slab is within `aim` tolerances of the groove (1 = decent, 2 = beginner). Does the Dark catch them?
-// Usage: node tools/bots/pace.mjs <level> <min seconds between taps> <aim> [max seconds] [sound]
+// Usage: node tools/bots/pace.mjs <level|vigil|vigil:YYYY-MM-DD> <min seconds between taps> <aim> [max seconds] [sound]
 // `sound` turns music and sfx on in the save (the browser stays muted): every audio call runs.
 import puppeteer from "puppeteer-core";
 const [level = "0", every = "1.4", aim = "1", max = "120", sound = ""] = process.argv.slice(2);
@@ -45,7 +45,8 @@ await page.evaluate(
     const e = window.__spire;
     // A real player's first tap unlocks audio; the bot's does the same.
     e.wake();
-    e.startLevel(Number(level));
+    if (String(level).startsWith("vigil")) e.startVigil(String(level).split(":")[1] || undefined);
+    else e.startLevel(Number(level));
     let last = 0;
     const loop = () => {
       const p = e.probe();
@@ -88,4 +89,5 @@ for (let t = 0; t < Number(max); t += 5) {
   if (["won", "over", "menu"].includes(s.phase)) break;
 }
 console.log(`sky ${level} every ${every}s aim ${aim}: ${last}`);
+if (process.env.JSON) console.log("JSON " + last);
 await browser.close();

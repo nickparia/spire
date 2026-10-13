@@ -3,6 +3,13 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 114 — The Vigil (internal)
+
+- **The Vigil: one sky a day, a hundred floors, the same for everyone.** A new card on the worlds row, after the Gale. Each day (it turns at midnight UTC) draws one of Hearth's eight skies, five to seven courses in a row, six events and the things you pass from the date, so every builder climbs the same sky. Landings every twenty floors, and the stone below each one sets for good. Climb as often as you like; your best of the day counts.
+- **The day's board.** Summits stand by their time, then the highest climbs. The card a climb ends on shows your climb count, your best today and where it stands; the board shows everyone's, with how many climbs it took them.
+- **Vigil Kept.** A first summit earns a feat and the _Watch stone_ finish (night basalt, a lamp in the groove) under Achievements › Stone.
+- The Vigil opens once the Foundry is lit.
+
 ## Build 113 — Every button answers, and the new cards ignite (internal)
 
 - **A button you touch is pressed even if the phone drops the tap.** The window itself now watches every touch on a button; if the click doesn't follow within a third of a second, the button is pressed for you. Covers Nice, Begin, New, Try again — all of them. The tester trace records touches and clicks in menus too.
@@ -11,9 +18,9 @@ in-app "What's new" window shows the shorter notes in `public/version.json`.
 ## Build 112 — Events (internal)
 
 - **Every climb now has two moments that belong to its sky, at floors that differ every run**, each announced by the world a beat before, each asking something of the drop. Never on a landing, never the same two.
-- *Hearth, sky by sky* — **The Foundry**: the forge breathes (two slabs come red-hot and shrink while they hang — land them fast); the crane swings through the lane and drags the hanging slab a step. **Tidewater**: the swell (the sea rolls the tower for seven seconds); sea mist (the lane dims for four floors and the perfect moment goes — Second Sight sees through it). **The City**: smoke; the ground gives (the next drop must be a perfect or the Dark climbs two floors). **Red Canyon**: rockfall; a dust storm. **Gale Ridge**: a rogue gust, wind shear, a kite torn loose. **The Glacier**: hoarfrost (a help — the next three slabs freeze where they land); whiteout; avalanche. **The Eclipse**: lightning (one flash shows the groove for a single drop); nightfall. **The Apex** draws from all of them.
-- *Every sky*: lanterns drift across at the lane's height — drop under one to take a card; the Dark heaves a floor, then sleeps for eight seconds — time, if you use it.
-- *The Gale*: the rogue gust, the lull (ten seconds of dead air: build), wind shear, the kite — and the lanterns and the sleeping Dark.
+- _Hearth, sky by sky_ — **The Foundry**: the forge breathes (two slabs come red-hot and shrink while they hang — land them fast); the crane swings through the lane and drags the hanging slab a step. **Tidewater**: the swell (the sea rolls the tower for seven seconds); sea mist (the lane dims for four floors and the perfect moment goes — Second Sight sees through it). **The City**: smoke; the ground gives (the next drop must be a perfect or the Dark climbs two floors). **Red Canyon**: rockfall; a dust storm. **Gale Ridge**: a rogue gust, wind shear, a kite torn loose. **The Glacier**: hoarfrost (a help — the next three slabs freeze where they land); whiteout; avalanche. **The Eclipse**: lightning (one flash shows the groove for a single drop); nightfall. **The Apex** draws from all of them.
+- _Every sky_: lanterns drift across at the lane's height — drop under one to take a card; the Dark heaves a floor, then sleeps for eight seconds — time, if you use it.
+- _The Gale_: the rogue gust, the lull (ten seconds of dead air: build), wind shear, the kite — and the lanterns and the sleeping Dark.
 - **The Dark quickens without words now.** "The Dark quickens" is gone; when it speeds up — past par, or after a wide miss — its edge flares violet and it throws ink, and the floors-below count pulses.
 
 ## Build 111 — The cards stand tall again (internal)
@@ -36,15 +43,15 @@ in-app "What's new" window shows the shorter notes in `public/version.json`.
 
 ## Build 107 — Three schools, and the Dark follows your aim (internal)
 
-- **Three cards a landing, one from each school**: *Fire* strikes the Dark (Forge-fire, Starfall, Ember Trail), *Stone* holds the tower (Bedrock, Rime, Keystone), *Air* sees and breathes (Stillness, Second Sight, and the new *Open Hand* — your next drops judged half again as wide). The choice is always strike, hold, or see; kindling and the powers still lean the deal.
+- **Three cards a landing, one from each school**: _Fire_ strikes the Dark (Forge-fire, Starfall, Ember Trail), _Stone_ holds the tower (Bedrock, Rime, Keystone), _Air_ sees and breathes (Stillness, Second Sight, and the new _Open Hand_ — your next drops judged half again as wide). The choice is always strike, hold, or see; kindling and the powers still lean the deal.
 - **The Dark follows your aim.** A perfect slows it to 0.8× for the next floor; a wide miss (more than two tolerances off) spurs it to 1.4× and it surges; a clean drop leaves it be. One bad drop isn't a spiral — a run of them is.
 
 ## Build 106 — The Dark gives you a look, and cards that build (internal)
 
 - **The Gale: a free look.** On every floor the Dark holds still until the hanging slab has made a full pass (the first three skies) or half a pass (the last three). Reading the wind costs nothing; dithering past that does.
-- **Cards build now.** Take a card you already hold and it is *kindled* — the same element a tier stronger and longer: II, then III, which lasts the whole climb. The offer leans towards what you hold, so building a thing is a choice.
-- **Two cards make a power.** Forge-fire + Starfall = *Firestorm* (while the stone burns, every landing calls the lightning). Rime + Bedrock = *The Long Winter* (while the buttresses stand, the Dark stays frozen). Stillness + Starfall = *Held Breath* (in slow time the lightning strikes twice as deep). An offer that would complete one says so on the card.
-- **Three new cards**: *Keystone* (your next slabs are keystones, each perfect pushing twice), *Second Sight* (the perfect moment stays shown), *Ember Trail* (from the second perfect in a row, each pushes the Dark further).
+- **Cards build now.** Take a card you already hold and it is _kindled_ — the same element a tier stronger and longer: II, then III, which lasts the whole climb. The offer leans towards what you hold, so building a thing is a choice.
+- **Two cards make a power.** Forge-fire + Starfall = _Firestorm_ (while the stone burns, every landing calls the lightning). Rime + Bedrock = _The Long Winter_ (while the buttresses stand, the Dark stays frozen). Stillness + Starfall = _Held Breath_ (in slow time the lightning strikes twice as deep). An offer that would complete one says so on the card.
+- **Three new cards**: _Keystone_ (your next slabs are keystones, each perfect pushing twice), _Second Sight_ (the perfect moment stays shown), _Ember Trail_ (from the second perfect in a row, each pushes the Dark further).
 - **The hand is shown** under the score: each card held as a small stone with its tier, flaring when it fires; a power's name beside them.
 - **A favour**: three stars on a sky and you start the next one already holding the first card you took.
 
@@ -109,9 +116,9 @@ in-app "What's new" window shows the shorter notes in `public/version.json`.
 
 - **Each sky of the Gale is a different thing the wind does, and you can always see it.** A flag on the ridge shows the wind's direction and strength; the streaks thicken with it.
   - **The Updraft** — steady wind. Learn the lead.
-  - **Gusts** — calm for a few seconds, then a gust you see arrive. Drop in the calm and it's easy; drop *in* the gust and land true and it's a **wind-true**: the light drives the Dark twice as far.
+  - **Gusts** — calm for a few seconds, then a gust you see arrive. Drop in the calm and it's easy; drop _in_ the gust and land true and it's a **wind-true**: the light drives the Dark twice as far.
   - **Crosswinds** — it turns every floor, the flag first. Keystones ride it.
-  - **Tailwind** — it blows *along* the slide. Drop short and it carries the slab home; overshoot and it carries it away.
+  - **Tailwind** — it blows _along_ the slide. Drop short and it carries the slab home; overshoot and it carries it away.
   - **The Howl** — strength in a long wave; build in the lulls, which shorten as you climb. At full howl the air leans on anything you haven't set.
   - **The Eye** — gusts, crosswinds and the howl in turn; then the wind stops dead, and the boss.
 - The rule behind it: an element is irritating when it's invisible, random and only ever a penalty; it's fun when you can see it coming, read its pattern and use it. Half these winds help a good player.
@@ -140,7 +147,7 @@ in-app "What's new" window shows the shorter notes in `public/version.json`.
 
 ## Build 89 — The wheel (internal)
 
-- **The Ring is a wheel now, not a see-saw.** One rotation does everything: the tower rides the rim of a vast stone wheel (drawn as the arc under you, spokes running to a hub far below), and as the wheel rolls the tower is carried sideways *and* leans by the same angle — ±9° on the Rim, ±13° on the Spoke, ±15° on the Hub (on the beat, no gale) — while the crane and the sky hold still. A true column rides it; a loose stack lags and leans. Still grey boxes, still borrowed art: judge whether the world turning under you makes your taps matter.
+- **The Ring is a wheel now, not a see-saw.** One rotation does everything: the tower rides the rim of a vast stone wheel (drawn as the arc under you, spokes running to a hub far below), and as the wheel rolls the tower is carried sideways _and_ leans by the same angle — ±9° on the Rim, ±13° on the Spoke, ±15° on the Hub (on the beat, no gale) — while the crane and the sky hold still. A true column rides it; a loose stack lags and leans. Still grey boxes, still borrowed art: judge whether the world turning under you makes your taps matter.
 
 ## Build 88 — The rim turns (internal)
 
@@ -171,7 +178,7 @@ in-app "What's new" window shows the shorter notes in `public/version.json`.
 ## Build 83 — Finishes (internal)
 
 - **Your stars and feats earn something you wear.** Under Achievements, below the feats:
-  - **Stone.** Three stars on a sky earns its painted stone as a finish — Sea stone, Canyon stone, Glacier ice, Apex stone… — to cut your slabs from in *any* sky. Every sky relit earns the Boring iron. Locked tiles say how.
+  - **Stone.** Three stars on a sky earns its painted stone as a finish — Sea stone, Canyon stone, Glacier ice, Apex stone… — to cut your slabs from in _any_ sky. Every sky relit earns the Boring iron. Locked tiles say how.
   - **Trail.** Feats earn a trail the moving slab leaves in the air: Embers (four skies relit), Rime (a summit with every drop perfect), Shadow (beat your own ghost), Starlight (every star on every sky).
   - Tap a tile to wear it; it applies to your next drop. Nothing here changes how the game plays.
 - **The Descent is parked.** It sits on the map as a world to come, next to the Wheel, until it has a picture worth playing. Its depths and engine stay in the build.
@@ -179,7 +186,7 @@ in-app "What's new" window shows the shorter notes in `public/version.json`.
 ## Build 82 — The lift (internal)
 
 - **The Descent is Hearth's game, going down.** You stack on the drill's platform — a plate hung on two chains from the winch above, the machine under it with its bit pointing down the shaft — and every floor you add is the lift being lowered. Real physics, lean, sway, topple, landings, the cards: all of it, with the Descent's painted depths scrolling up past you.
-- **The Dark pours down from above.** It's the clock, the same race as Hearth's mirrored: the gap is counted in floors *above* the tower, the lift descends with every floor, and the eyes-and-tendrils mass follows you down. Let it reach the top of the tower and the light is buried.
+- **The Dark pours down from above.** It's the clock, the same race as Hearth's mirrored: the gap is counted in floors _above_ the tower, the lift descends with every floor, and the eyes-and-tendrils mass follows you down. Let it reach the top of the tower and the light is buried.
 - **The god's arms.** From Depth 3, arms burst from the shaft walls and shove the top of the stack. The stack has to take it; the topple is the risk. Deeper, more often and harder.
 - **Breaking through.** The summit of a depth is the lift punching through its floor: rock and light burst up under the platform, the shaft shudders, the next depth opens.
 - The chain-and-wire Descent (builds 76–79) is retired; its feel test stays at `/proto/chain.html`.

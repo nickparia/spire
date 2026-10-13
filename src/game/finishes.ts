@@ -17,7 +17,8 @@ export type FinishId =
   | "glacier"
   | "eclipse"
   | "apex"
-  | "drill";
+  | "drill"
+  | "vigil";
 
 export type TrailId = "none" | "ember" | "frost" | "shadow" | "star";
 
@@ -59,6 +60,12 @@ export const FINISHES: FinishDef[] = [
     name: "Boring iron",
     how: "Every sky relit",
     unlocked: (save) => Boolean(save.feats["sky-relit"]),
+  },
+  {
+    id: "vigil",
+    name: "Watch stone",
+    how: "Summit the Vigil",
+    unlocked: (save) => Boolean(save.feats["vigil-summit"]),
   },
 ];
 

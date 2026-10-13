@@ -4836,3 +4836,33 @@
     text-shadow: 0 0 16px rgba(190, 110, 255, 0.95);
   }
 }
+
+/* The Vigil: its card among the worlds, and the lines on its cards. */
+.wpanel-vigil .wpanel-num {
+  color: #e8c46a;
+}
+
+.vigil-date {
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  transform: skewY(3deg);
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow:
+    0 2px 14px rgba(0, 0, 0, 0.7),
+    0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+.vigil-next {
+  opacity: 0.6;
+}
+
+.vigil-line {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.85;
+}

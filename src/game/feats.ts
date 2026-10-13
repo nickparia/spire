@@ -12,7 +12,8 @@ export type FeatId =
   | "own-ghost"
   | "rival-ghost"
   | "on-the-board"
-  | "all-stars";
+  | "all-stars"
+  | "vigil-summit";
 
 export type FeatDef = { id: FeatId; name: string; blurb: string };
 
@@ -26,6 +27,7 @@ export const FEATS: FeatDef[] = [
   { id: "own-ghost", name: "Faster Than Yourself", blurb: "Beat your own ghost" },
   { id: "rival-ghost", name: "Outbuilt", blurb: "Beat a rival's ghost" },
   { id: "on-the-board", name: "On the Board", blurb: "Top ten on a leaderboard" },
+  { id: "vigil-summit", name: "Vigil Kept", blurb: "A hundred floors on the Vigil" },
 ];
 
 export const FEAT_BY_ID: Record<FeatId, FeatDef> = Object.fromEntries(

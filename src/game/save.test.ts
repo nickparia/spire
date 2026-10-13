@@ -7,6 +7,7 @@ import {
   nextLevelIndex,
   parseSave,
   recordRun,
+  rollVigil,
   totalStars,
 } from "./save";
 
@@ -178,5 +179,53 @@ describe("isUnlocked", () => {
     // Hearth still gates sky by sky.
     expect(isUnlocked(save, at("foundry"))).toBe(true);
     expect(isUnlocked(save, at("tide"))).toBe(false);
+  });
+});
+
+describe("the Vigil in the save", () => {
+  it("keeps a well-formed day and drops the rest", () => {
+    const save = parseSave(
+      JSON.stringify({
+        v: 2,
+        vigil: {
+          day: "2026-10-13",
+          floors: 74.6,
+          summit: false,
+          time: 151.2,
+          accuracy: 0.9,
+          attempts: 3,
+          rank: 12,
+          ghost: [0, 1.5, 3],
+          history: [{ day: "2026-10-12", floors: 100, summit: true, rank: 2 }, "no", { day: 5 }],
+        },
+      }),
+    );
+    expect(save.vigil).toEqual({
+      day: "2026-10-13",
+      floors: 74,
+      summit: false,
+      time: 151.2,
+      accuracy: 0.9,
+      attempts: 3,
+      rank: 12,
+      ghost: [0, 1.5, 3],
+      history: [{ day: "2026-10-12", floors: 100, summit: true, rank: 2 }],
+    });
+    expect(parseSave(JSON.stringify({ v: 2, vigil: { day: "yesterday" } })).vigil.day).toBe("");
+  });
+
+  it("rolls a day gone by into the history", () => {
+    const save = emptySave();
+    expect(rollVigil(save, "2026-10-13")).toBe(true);
+    expect(save.vigil.day).toBe("2026-10-13");
+    expect(save.vigil.history).toEqual([]);
+    save.vigil.attempts = 2;
+    save.vigil.floors = 60;
+    save.vigil.rank = 4;
+    expect(rollVigil(save, "2026-10-13")).toBe(false);
+    expect(rollVigil(save, "2026-10-14")).toBe(true);
+    expect(save.vigil.attempts).toBe(0);
+    expect(save.vigil.floors).toBe(0);
+    expect(save.vigil.history).toEqual([{ day: "2026-10-13", floors: 60, summit: false, rank: 4 }]);
   });
 });

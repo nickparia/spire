@@ -279,3 +279,97 @@ export function newPlayerId(): string {
     return (c === "x" ? r : (r & 3) | 8).toString(16);
   });
 }
+
+/* ------------------------------------------------------------- the Vigil */
+
+export type VigilEntry = {
+  playerId: string;
+  name: string;
+  floors: number;
+  summit: boolean;
+  time: number;
+  accuracy: number;
+  attempts: number;
+  trace: Ghost;
+};
+
+function vigilEntryOf(row: Record<string, unknown>): VigilEntry | null {
+  const trace = Array.isArray(row.trace)
+    ? row.trace.filter((t): t is number => typeof t === "number")
+    : [];
+  if (typeof row.public_id !== "string" || typeof row.name !== "string") return null;
+  return {
+    playerId: row.public_id,
+    name: row.name,
+    floors: Number(row.floors),
+    summit: row.summit === true,
+    time: Number(row.time),
+    accuracy: Number(row.accuracy),
+    attempts: Number(row.attempts),
+    trace,
+  };
+}
+
+/** One day's Vigil, best first: summits by time, then falls by height. */
+export async function fetchVigilBoard(day: string, limit = 25): Promise<VigilEntry[] | null> {
+  const q = `day=eq.${encodeURIComponent(day)}&order=summit.desc,floors.desc,time.asc&limit=${limit}&select=public_id,name,floors,summit,time,accuracy,attempts,trace`;
+  const res = await call(`/rest/v1/vigil?${q}`, { method: "GET" }, 6000);
+  if (!res) return null;
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows.map(vigilEntryOf).filter((e): e is VigilEntry => e !== null);
+}
+
+/**
+ * Posts a Vigil attempt. The server counts the attempt and keeps the run
+ * only if it ranks above the day's best so far. True when it was kept.
+ */
+export async function postVigil(
+  playerId: string,
+  day: string,
+  name: string,
+  floors: number,
+  summit: boolean,
+  time: number,
+  accuracy: number,
+  trace: Ghost,
+): Promise<boolean> {
+  const res = await call(
+    "/rest/v1/rpc/post_vigil",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_player: playerId,
+        p_day: day,
+        p_name: name,
+        p_floors: floors,
+        p_summit: summit,
+        p_time: time,
+        p_accuracy: accuracy,
+        p_trace: trace,
+      }),
+    },
+    8000,
+  );
+  if (!res) return false;
+  return (await res.json()) === true;
+}
+
+/** Where a run stands on a day's Vigil: 1 is the best. Null when offline. */
+export async function vigilRank(
+  day: string,
+  run: { floors: number; summit: boolean; time: number },
+): Promise<number | null> {
+  const above = run.summit
+    ? `summit=is.true&time=lt.${run.time}`
+    : `or=(summit.is.true,floors.gt.${run.floors},and(floors.eq.${run.floors},time.lt.${run.time}))`;
+  const q = `day=eq.${encodeURIComponent(day)}&${above}&select=public_id`;
+  const res = await call(
+    `/rest/v1/vigil?${q}`,
+    { method: "HEAD", headers: { Prefer: "count=exact" } },
+    6000,
+  );
+  const range = res?.headers.get("content-range");
+  const total = range?.split("/")[1];
+  if (total === undefined || total === "*") return null;
+  return Number(total) + 1;
+}
