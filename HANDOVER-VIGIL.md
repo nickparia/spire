@@ -254,6 +254,15 @@ Each is a `tools/bump.mjs` build with a `RELEASE_NOTES.md` entry and a `BACKLOG.
 - **The passer effects table.** Approve, change or strike rows before engine work starts.
 - **Vigil rewards.** Nothing is specified. A finish or trail for a first summit would fit `finishes.ts`; a streak counter that punishes a missed day is deliberately left out.
 
+## How the game will make money (agreed 13 Oct, not part of this build)
+
+Nothing in these five packages implements purchases or ads. The direction is recorded here so the work does not cut against it:
+
+- Free to download, no forced ads.
+- One purchase unlocks everything beyond Hearth.
+- The Vigil is free for everyone. Do not gate it behind world progress beyond the Foundry or behind a purchase.
+- Possibly later: opt-in rewarded ads that grant a rebuild after a fall, reusing the hidden `rescue` offer. If that is built, a rescued run is never ranked: keep it off the Vigil board and the sky boards. Do not remove the `rescue` code in a dead-systems tidy without asking Nick.
+
 ## Not verified
 
 - No build was run and nothing was played. Every tuning number above is a starting point.
