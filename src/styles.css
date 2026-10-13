@@ -4748,37 +4748,34 @@
   color: #ffd98a;
 }
 
-/* ---- Three schools dealt: a triangle, one card up and two below, every card full size.
-   The top card's words sit beside it, so the rows never collide. */
+/* ---- Three schools dealt: a triangle, one card up and two below, every card the same
+   size and every blurb centred under its card, so the deal reads as one shape (Nick,
+   13 Oct: "not symmetrical… the labels balanced as well as the cards… use more of the screen"). */
 .gifts-three .gifts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px 12px;
+  gap: 10px 10px;
   align-items: start;
   justify-items: center;
+  width: min(100%, 372px);
+  padding: 0 6px;
 }
 .gifts-three .ecard {
-  width: 150px;
+  width: min(172px, 44vw);
+  gap: 8px;
   --tilt: calc((var(--i) - 1.5) * 4deg);
 }
 .gifts-three .ecard-face {
-  width: 150px;
+  width: min(172px, 44vw);
 }
 .gifts-three .ecard:first-child {
   grid-column: 1 / -1;
-  flex-direction: row;
-  align-items: center;
-  width: auto;
-  gap: 14px;
-  --tilt: -2deg;
+  --tilt: 0deg;
 }
-.gifts-three .ecard:first-child .ecard-blurb,
-.gifts-three .ecard:first-child .ecard-combo {
-  width: 150px;
-  text-align: left;
-}
-.gifts-three .ecard-blurb {
-  font-size: 12px;
+.gifts-three .ecard-blurb,
+.gifts-three .ecard-combo {
+  max-width: min(172px, 44vw);
+  font-size: 12.5px;
   line-height: 1.3;
 }
 .ecard-face {

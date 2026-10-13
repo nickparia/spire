@@ -9,6 +9,7 @@ in-app "What's new" window shows the shorter notes in `public/version.json`.
 - **The day's board.** Summits stand by their time, then the highest climbs. The card a climb ends on shows your climb count, your best today and where it stands; the board shows everyone's, with how many climbs it took them.
 - **Vigil Kept.** A first summit earns a feat and the _Watch stone_ finish (night basalt, a lamp in the groove) under Achievements › Stone.
 - The Vigil opens once the Foundry is lit.
+- **The three-card deal is symmetric** (Nick: "not symmetrical… use more of the screen"): one card up, two below, every card the same size and larger, every blurb centred under its card.
 
 ## Build 113 — Every button answers, and the new cards ignite (internal)
 
