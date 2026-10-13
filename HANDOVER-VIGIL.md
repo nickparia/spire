@@ -169,7 +169,10 @@ His own rule for this (backlog, Oct 10 night): an element is irritating when it 
 - Move animated kinds to sprite sheets drawn through `sprite(name)`, built with `tools/sprites.mjs` from short clips, the way the claw was. Birds flap, the kite flutters, scraps tumble. Frame is chosen from the passer's age, so each one is offset from the next.
 - Painted light kinds (cloud, rain, sun, moon) stay as images but get motion from code: a cloud is two layers drifting at different speeds, the sun and moon breathe in brightness, rain already scrolls.
 - Do the same for event art that shows a moving thing: the crane swings on its cable, the event kite flutters, the lanterns bob and flicker individually.
-- Art generation uses Nick's Higgsfield account and costs credits. List the clips you need (kind, length, background colour for keying) and ask him before generating.
+- **All animation is made with Higgsfield**, driven by you through the `higgsfield` CLI as in earlier builds (see `ART.md` and the 108, 109 and 113 entries in `BACKLOG.md`). Do not hand-draw frames or animate procedurally where a clip would do.
+- Start each clip from the existing painting so the look holds: image-to-video from `public/art/passers/<kind>.png` or `public/art/events/<art>.png` (build 113 used `kling3_0_turbo` this way for the card ignites). Ask for a loop whose first and last frames match.
+- Backgrounds follow the build 108 finding: dark subjects (birds, kite, scraps, crane) on flat magenta, keyed with ffmpeg `colorkey`; light subjects on pure black, drawn with `screen`. Then `tools/sprites.mjs` cuts the sheet.
+- Keep sheets small: around 24 frames, cells no wider than the kind's drawn width at depth 1. Check memory and frame rate on the iOS simulator with three passers on screen.
 
 ### Make them matter
 
@@ -250,7 +253,6 @@ Each is a `tools/bump.mjs` build with a `RELEASE_NOTES.md` entry and a `BACKLOG.
 - **When the day turns.** UTC is simple and fair across countries; it means the sky changes at 01:00 or 02:00 in Amsterdam.
 - **The passer effects table.** Approve, change or strike rows before engine work starts.
 - **Vigil rewards.** Nothing is specified. A finish or trail for a first summit would fit `finishes.ts`; a streak counter that punishes a missed day is deliberately left out.
-- **Art credits** for the sprite clips.
 
 ## Not verified
 
