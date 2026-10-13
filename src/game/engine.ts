@@ -1655,10 +1655,12 @@ export class SpireEngine {
   }
 
   private begin(): void {
-    // The painted videos start only when a sky does, never behind the title.
-    this.loadSourceArt();
-    this.loadDarkArt();
+    // The painted videos start only when a sky does, never behind the title —
+    // and one at a time (see tendArt): the sky's plate first, then the Dark, then the source.
     this.resetRun("ready", true);
+    this.artStage = 0;
+    this.artSince = performance.now();
+    this.paintedSky();
     this.cut = this.plan.cut
       ? {
           spin: 0,
@@ -3283,14 +3285,133 @@ export class SpireEngine {
    * on iOS, which left the Dark blank under its line.
    */
   private frameOf(v: HTMLVideoElement, still: string): CanvasImageSource | null {
-    if (!v.paused && v.readyState >= 2 && v.currentTime > 0) return v;
-    let img = this.stills.get(still);
-    if (!img) {
-      img = Object.assign(new Image(), { src: still });
-      this.stills.set(still, img);
-    }
+    if (this.videoLive(v)) return v;
+    const img = this.still(still);
     if (img.complete && img.naturalWidth > 0) return img;
-    return v.readyState >= 2 ? v : null;
+    return null;
+  }
+
+  /** A still, fetched the first time it is named so it is there before its video is. */
+  private still(src: string): HTMLImageElement {
+    let img = this.stills.get(src);
+    if (!img) {
+      img = Object.assign(new Image(), { src });
+      this.stills.set(src, img);
+    }
+    return img;
+  }
+
+  /**
+   * What each painted video has actually delivered. A video iOS calls
+   * "playing" can still have decoded nothing (the phone's decoders are few
+   * and shared); drawn then, it paints black, or throws and takes the frame
+   * with it. So a video is drawn only once a frame of it has arrived.
+   */
+  private plates = new WeakMap<
+    HTMLVideoElement,
+    { name: string; frames: number; since: number; told: boolean; brokenAt: number }
+  >();
+
+  /** Registers a painted video: its still is fetched now, and its first frame is waited for. */
+  private armVideo(v: HTMLVideoElement, name: string, still: string): void {
+    this.still(still);
+    const plate = { name, frames: 0, since: performance.now(), told: false, brokenAt: 0 };
+    this.plates.set(v, plate);
+    const rvfc = (
+      v as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: () => void) => number;
+      }
+    ).requestVideoFrameCallback;
+    if (typeof rvfc === "function") {
+      const onFrame = () => {
+        plate.frames++;
+        if (!plate.told) {
+          plate.told = true;
+          trace(
+            `video ${name}: first frame after ${Math.round(performance.now() - plate.since)} ms`,
+          );
+        }
+        rvfc.call(v, onFrame);
+      };
+      rvfc.call(v, onFrame);
+    } else {
+      // Without frame callbacks: a frame is assumed a moment after the clock starts moving.
+      v.addEventListener("timeupdate", () => {
+        if (v.currentTime > 0.1 && !plate.told) {
+          plate.told = true;
+          plate.frames = 1;
+          trace(`video ${name}: running after ${Math.round(performance.now() - plate.since)} ms`);
+        }
+      });
+    }
+    v.addEventListener("error", () => {
+      trace(`video ${name}: error ${v.error?.code ?? "?"}`);
+    });
+  }
+
+  /** Whether a painted video can be drawn this frame: playing, and a frame of it has come. */
+  private videoLive(v: HTMLVideoElement): boolean {
+    if (v.paused || v.readyState < 2) return false;
+    const plate = this.plates.get(v);
+    if (!plate) return v.currentTime > 0;
+    if (plate.brokenAt > 0 && performance.now() - plate.brokenAt < 2000) return false;
+    return plate.frames > 0;
+  }
+
+  /**
+   * Draws a painted frame; a video that will not draw (iOS, mid-decode) is
+   * noted and its still stands in for a while, and the frame goes on.
+   */
+  private drawPlate(
+    ctx: CanvasRenderingContext2D,
+    frame: CanvasImageSource,
+    still: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ): void {
+    try {
+      ctx.drawImage(frame, x, y, w, h);
+    } catch (err) {
+      if (frame instanceof HTMLVideoElement) {
+        const plate = this.plates.get(frame);
+        if (plate) {
+          plate.brokenAt = performance.now();
+          trace(
+            `video ${plate.name}: would not draw (${err instanceof Error ? err.message : String(err)})`,
+          );
+        }
+        const img = this.still(still);
+        if (img.complete && img.naturalWidth > 0) ctx.drawImage(img, x, y, w, h);
+      }
+    }
+  }
+
+  /**
+   * The painted videos a sky needs, started one at a time: the sky's own
+   * first, the Dark once the sky has drawn a frame (or after a moment), the
+   * source after that. Starting them together is what the phone cannot take.
+   */
+  private artStage = 2;
+  private artSince = 0;
+
+  private tendArt(): void {
+    if (this.artStage >= 2 || this.phase === "menu" || typeof document === "undefined") return;
+    const waited = performance.now() - this.artSince;
+    if (this.artStage === 0) {
+      const sky = this.skies.get(this.paintKey());
+      const skyDrawn =
+        !sky || this.videoLive(sky.video) || !PAINTED_SKIES.includes(this.paintKey());
+      if (!skyDrawn && waited < 1500) return;
+      this.loadDarkArt();
+      this.artStage = 1;
+      this.artSince = performance.now();
+      return;
+    }
+    if (waited < 700) return;
+    this.loadSourceArt();
+    this.artStage = 2;
   }
 
   /** Loads the painted Dark quietly; the drawn gradient stands in until then. */
@@ -3343,8 +3464,8 @@ export class SpireEngine {
     v.addEventListener("timeupdate", ready);
     v.addEventListener("error", () => {
       this.darkArtReady = false;
-      trace(`video error: dark (${v.error?.code ?? "?"})`);
     });
+    this.armVideo(v, "dark", "art/dark-hearth.jpg");
     document.body.appendChild(v);
     this.darkArt = v;
     v.load();
@@ -3367,7 +3488,7 @@ export class SpireEngine {
     const v = this.darkArt;
     if (v?.paused) void v.play().catch(() => undefined);
     // Its video while it really plays, at full quality; the sheet when iOS won't.
-    const live = v && !v.paused && v.readyState >= 2 && v.currentTime > 0 ? v : null;
+    const live = v && this.videoLive(v) ? v : null;
     if (!live && (!sheet.complete || sheet.naturalWidth === 0)) return false;
     const cw = live ? live.videoWidth : sheet.naturalWidth / DARK_COLS;
     const ch = live ? live.videoHeight : sheet.naturalHeight / DARK_ROWS;
@@ -3440,8 +3561,8 @@ export class SpireEngine {
     v.addEventListener("timeupdate", ready);
     v.addEventListener("error", () => {
       this.sourceArtReady = false;
-      trace(`video error: source (${v.error?.code ?? "?"})`);
     });
+    this.armVideo(v, "source", "art/source.jpg");
     document.body.appendChild(v);
     this.sourceArt = v;
     v.load();
@@ -5286,6 +5407,7 @@ export class SpireEngine {
       }
       if (steps === 5) this.acc = 0;
     }
+    this.tendArt();
     // One bad frame must never stop the game: keep the loop alive whatever happens.
     try {
       this.render();
@@ -5592,6 +5714,7 @@ export class SpireEngine {
       video.addEventListener("loadeddata", ready);
       video.addEventListener("playing", ready);
       video.addEventListener("timeupdate", ready);
+      this.armVideo(video, `sky ${id}`, video.poster);
       document.body.appendChild(video);
       video.load();
       this.skies.set(id, made);
@@ -5600,8 +5723,7 @@ export class SpireEngine {
     // Only the sky in view plays.
     for (const [other, s] of this.skies) if (other !== id && !s.video.paused) s.video.pause();
     this.wakeVideo(sky.video);
-    // Ready once its video plays, or its still has loaded to stand in.
-    if (sky.ready) return sky;
+    // Drawn once its still has loaded, or its video has a frame to show.
     return this.frameOf(sky.video, sky.video.poster) ? sky : null;
   }
 
@@ -5623,7 +5745,7 @@ export class SpireEngine {
     const y = (view.h - h) * (this.plan.descent ? climb : 1 - climb);
     const x = (view.w - w) / 2 - view.camX * 0.04;
     const frame = this.frameOf(v, v.poster);
-    if (frame) ctx.drawImage(frame, x, y, w, h);
+    if (frame) this.drawPlate(ctx, frame, v.poster, x, y, w, h);
     // Held back, darkest down the middle, so the tower reads first.
     const shade = ctx.createLinearGradient(0, 0, view.w, 0);
     shade.addColorStop(0, "rgba(8,5,10,0.22)");
@@ -5811,6 +5933,7 @@ export class SpireEngine {
     v.addEventListener("loadeddata", ready);
     v.addEventListener("playing", ready);
     v.addEventListener("timeupdate", ready);
+    this.armVideo(v, "blind", "art/blind.jpg");
     document.body.appendChild(v);
     this.blindArt = v;
     v.load();
@@ -5884,6 +6007,7 @@ export class SpireEngine {
       v.preload = "auto";
       v.setAttribute("playsinline", "");
       v.style.cssText = VIDEO_BEHIND;
+      this.armVideo(v, "dark-descent", "art/dark-descent.jpg");
       document.body.appendChild(v);
       v.load();
       this.dDark = v;

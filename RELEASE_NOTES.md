@@ -3,6 +3,11 @@
 Written for testers; paste the newest entry into TestFlight's "What to Test". The
 in-app "What's new" window shows the shorter notes in `public/version.json`.
 
+## Build 115 — The dark screen at a sky's start (internal)
+
+- **Fixed: pressing New, Continue or Begin showed a dark screen for ten seconds or more.** Root cause, traced through every report of the "first screen" since build 62: the game drew a painted sky, the Dark and the source into the canvas the moment the phone said their videos were "playing", before a single frame had been decoded. The phone has only a few video decoders, and at that moment it was tearing down the worlds screen's four loops (one of them a file that never existed) while starting three more; a video with no frame yet paints black, or fails the whole frame. Now every painted video shows its still until a real frame has arrived; the sky's plate starts first, the Dark once the sky has drawn, the source after that; the worlds screen plays one loop instead of four; and a plate that will not draw falls back to its still instead of taking the frame with it.
+- The tester trace (Options › Tester tools) now records each painted video's first-frame time and any frame it refused, so if a dark screen ever shows again, one screenshot of that section names the cause.
+
 ## Build 114 — The Vigil (internal)
 
 - **The Vigil: one sky a day, a hundred floors, the same for everyone.** A new card on the worlds row, after the Gale. Each day (it turns at midnight UTC) draws one of Hearth's eight skies, five to seven courses in a row, six events and the things you pass from the date, so every builder climbs the same sky. Landings every twenty floors, and the stone below each one sets for good. Climb as often as you like; your best of the day counts.

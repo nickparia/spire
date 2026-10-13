@@ -34,6 +34,9 @@ const TITLE_EMBERS = Array.from({ length: 22 }, (_, i) => {
 /** Seconds the tap's flare and push-in last before the worlds open. */
 const TITLE_LEAVE = 1.7;
 
+/** Worlds with a painted loop on their panel (art/world-<id>.mp4); the rest keep their still. */
+const WORLD_LOOPS = new Set(["gale"]);
+
 /**
  * The title: out of the dark the painted Spire fades up, the name forms out
  * of embers, then the way in. A tap wakes it: the sting, the score swelling,
@@ -226,7 +229,9 @@ export function WorldSelect({
           return (
             <div key={id} className={"world-bg" + (i === current ? " world-bg-on" : "")}>
               <ArtImage name={still} />
-              {Math.abs(i - current) <= 1 ? <ArtLoop name={loop} poster={still} /> : null}
+              {/* Only the scene in view moves: every video playing here is one the phone's
+                  few decoders must share with the sky about to start. */}
+              {i === current ? <ArtLoop name={loop} poster={still} /> : null}
             </div>
           );
         })}
@@ -338,7 +343,9 @@ function WorldPanel({
         onClick={() => open && onOpen(LEVELS.indexOf(nextLevel))}
       >
         <ArtImage name={`world-${world.id}.jpg`} className="wpanel-paint" />
-        <ArtLoop name={`world-${world.id}.mp4`} className="wpanel-paint" />
+        {focused && WORLD_LOOPS.has(world.id) ? (
+          <ArtLoop name={`world-${world.id}.mp4`} className="wpanel-paint" />
+        ) : null}
         <svg className="wpanel-stars" viewBox="0 0 100 100" aria-hidden="true">
           {world.stars.slice(1).map((to, i) => {
             const from = world.stars[i]!;
